@@ -105,11 +105,12 @@ fn draw_home(frame: &mut Frame, area: Rect, app: &TuiApp) {
 
     let lines = if app.input_buffer.is_empty() {
         vec![
-            Line::from(""), // Padding atas
             Line::from(Span::styled(
                 "  Ask anything... \"Spawn a new research agent\"",
                 Style::default().fg(Color::DarkGray),
             )),
+            Line::from(""), // Spacer
+            Line::from(""), // Spacer
             Line::from(vec![
                 Span::raw("  "),
                 Span::styled(
@@ -124,11 +125,12 @@ fn draw_home(frame: &mut Frame, area: Rect, app: &TuiApp) {
         ]
     } else {
         vec![
-            Line::from(""), // Padding atas
             Line::from(Span::styled(
                 format!("  {}", app.input_buffer),
                 Style::default().fg(Color::White),
             )),
+            Line::from(""), // Spacer
+            Line::from(""), // Spacer
             Line::from(vec![
                 Span::raw("  "),
                 Span::styled(
@@ -148,10 +150,10 @@ fn draw_home(frame: &mut Frame, area: Rect, app: &TuiApp) {
         .block(input_block);
     frame.render_widget(input_widget, input_box_area);
 
-    // Set cursor position di baris tengah
+    // Set cursor position di baris atas (karena input placeholder/buffer berada di index 0)
     frame.set_cursor_position((
         input_inner.x + 2 + app.input_buffer.len() as u16,
-        input_inner.y + 1,
+        input_inner.y,
     ));
 
     // 3. Sub-input info (Shortcuts saja di bawah kanan di luar box)
