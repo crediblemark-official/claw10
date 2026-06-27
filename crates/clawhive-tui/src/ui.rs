@@ -247,7 +247,6 @@ fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
         .constraints([
             Constraint::Min(0),    // Chat history
             Constraint::Length(4), // Input Box (height 4 untuk text + model info di dalam)
-            Constraint::Length(1), // Sub-input info
         ])
         .split(main_chunks[0]);
 
@@ -381,42 +380,84 @@ fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
 
     let input_inner = input_block.inner(active_input_area);
 
+    let (active_model_name, provider_name) = if let Some(router) = &app.state.model_router {
+        let registry = router.registry();
+        let profiles = registry.list_profiles();
+        if profiles.is_empty() {
+            ("Belum Dikonfigurasi".to_string(), "None".to_string())
+        } else {
+            let matched = profiles.iter().find(|p| p.model_name == app.active_model || p.id == app.active_model);
+            if let Some(profile) = matched {
+                (profile.model_name.clone(), profile.provider.clone())
+            } else {
+                (profiles[0].model_name.clone(), profiles[0].provider.clone())
+            }
+        }
+    } else {
+        ("Belum Dikonfigurasi".to_string(), "None".to_string())
+    };
+
+    let left_len = 2 + 3 + 3 + active_model_name.len() + 1 + provider_name.len();
+    let right_len = 40; // panjang visual dari: "/ commands  : terminal  ctrl+p palette  "
+    
+    let spacer_len = (input_inner.width as usize)
+        .saturating_sub(left_len)
+        .saturating_sub(right_len)
+        .max(1);
+    let middle_spacer = " ".repeat(spacer_len);
+
     let chat_input_lines = if app.input_buffer.is_empty() {
         vec![
-            Line::from(""), // Padding atas
             Line::from(Span::styled(
                 "  Ketik pesan di sini...",
                 Style::default().fg(Color::DarkGray),
             )),
+            Line::from(""), // Spacer
+            Line::from(""), // Spacer
             Line::from(vec![
                 Span::raw("  "),
                 Span::styled(
-                    "Build",
+                    "TUI",
                     Style::default()
                         .fg(Color::Cyan)
                         .add_modifier(Modifier::BOLD),
                 ),
-                Span::styled(" · Kimi K2.7 Code ", Style::default().fg(Color::White)),
-                Span::styled("OpenCode Go", Style::default().fg(Color::DarkGray)),
+                Span::styled(format!(" · {} ", active_model_name), Style::default().fg(Color::White)),
+                Span::styled(provider_name.clone(), Style::default().fg(Color::DarkGray)),
+                Span::raw(middle_spacer.clone()),
+                Span::styled("/", Style::default().fg(Color::White)),
+                Span::styled(" commands  ", Style::default().fg(Color::DarkGray)),
+                Span::styled(":", Style::default().fg(Color::White)),
+                Span::styled(" terminal  ", Style::default().fg(Color::DarkGray)),
+                Span::styled("ctrl+p", Style::default().fg(Color::White)),
+                Span::styled(" palette  ", Style::default().fg(Color::DarkGray)),
             ]),
         ]
     } else {
         vec![
-            Line::from(""), // Padding atas
             Line::from(Span::styled(
                 format!("  {}", app.input_buffer),
                 Style::default().fg(Color::White),
             )),
+            Line::from(""), // Spacer
+            Line::from(""), // Spacer
             Line::from(vec![
                 Span::raw("  "),
                 Span::styled(
-                    "Build",
+                    "TUI",
                     Style::default()
                         .fg(Color::Cyan)
                         .add_modifier(Modifier::BOLD),
                 ),
-                Span::styled(" · Kimi K2.7 Code ", Style::default().fg(Color::White)),
-                Span::styled("OpenCode Go", Style::default().fg(Color::DarkGray)),
+                Span::styled(format!(" · {} ", active_model_name), Style::default().fg(Color::White)),
+                Span::styled(provider_name, Style::default().fg(Color::DarkGray)),
+                Span::raw(middle_spacer),
+                Span::styled("/", Style::default().fg(Color::White)),
+                Span::styled(" commands  ", Style::default().fg(Color::DarkGray)),
+                Span::styled(":", Style::default().fg(Color::White)),
+                Span::styled(" terminal  ", Style::default().fg(Color::DarkGray)),
+                Span::styled("ctrl+p", Style::default().fg(Color::White)),
+                Span::styled(" palette  ", Style::default().fg(Color::DarkGray)),
             ]),
         ]
     };
@@ -428,29 +469,8 @@ fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
 
     frame.set_cursor_position((
         input_inner.x + 2 + app.input_buffer.len() as u16,
-        input_inner.y + 1,
+        input_inner.y,
     ));
-
-    // 3. Sub-input info (Tambahkan margin horizontal 2 spasi kiri-kanan agar sejajar)
-    let horizontal_info_layout = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Length(2), // Margin kiri 2 spasi
-            Constraint::Min(0),    // Sub-info utama
-            Constraint::Length(2), // Margin kanan 2 spasi
-        ])
-        .split(left_chunks[2]);
-    let active_info_area = horizontal_info_layout[1];
-
-    let shortcuts_spans = vec![
-        Span::styled("tab", Style::default().fg(Color::White)),
-        Span::styled(" agents  ", Style::default().fg(Color::DarkGray)),
-        Span::styled("ctrl+p", Style::default().fg(Color::White)),
-        Span::styled(" commands", Style::default().fg(Color::DarkGray)),
-    ];
-    let shortcuts =
-        Paragraph::new(Line::from(shortcuts_spans)).alignment(ratatui::layout::Alignment::Right);
-    frame.render_widget(shortcuts, active_info_area);
 
     if show_sidebar {
         // --- KOLOM KANAN (SIDEBAR) ---
