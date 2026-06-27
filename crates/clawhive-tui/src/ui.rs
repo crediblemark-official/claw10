@@ -211,6 +211,17 @@ fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
             height: (area.height as i16 - 1).max(0) as u16,
         };
 
+        // Tambahkan gap horizontal 2 spasi dari tepi kiri layar dan tepi kanan (pembatas)
+        let horizontal_bubble_layout = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Length(2),      // Margin kiri 2 spasi
+                Constraint::Min(0),         // Gelembung chat utama
+                Constraint::Length(2),      // Margin kanan 2 spasi
+            ])
+            .split(bubble_area);
+        let active_bubble_area = horizontal_bubble_layout[1];
+
         let is_user = sender.to_lowercase() == "user";
         let is_system = sender.to_lowercase() == "system";
 
@@ -229,31 +240,45 @@ fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
             lines.push(Line::from("")); // Padding vertikal bawah
 
             let p = Paragraph::new(lines).block(input_block);
-            frame.render_widget(p, bubble_area);
+            frame.render_widget(p, active_bubble_area);
         } else {
-            // Agent / Assistant (Respon polos)
+            // Agent / Assistant (Respon polos dengan padding kiri 2 spasi)
             let mut lines = Vec::new();
             // Solid blue box icon: ■
             lines.push(Line::from(vec![
+                Span::raw("  "), // Padding kiri 2 spasi
                 Span::styled("■ ", Style::default().fg(Color::Cyan)),
                 Span::styled(model.as_str(), Style::default().fg(Color::DarkGray)),
             ]));
             lines.push(Line::from("")); // Blank line
             for part in msg.lines() {
-                lines.push(Line::from(Span::styled(part, Style::default().fg(Color::White))));
+                lines.push(Line::from(vec![
+                    Span::raw("  "), // Padding kiri 2 spasi
+                    Span::styled(part, Style::default().fg(Color::White)),
+                ]));
             }
 
             let p = Paragraph::new(lines);
-            frame.render_widget(p, bubble_area);
+            frame.render_widget(p, active_bubble_area);
         }
     }
 
-    // 2. Input Box
+    // 2. Input Box (Tambahkan margin horizontal 2 spasi kiri-kanan agar simetris)
+    let horizontal_input_layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Length(2),      // Margin kiri 2 spasi
+            Constraint::Min(0),         // Input box utama
+            Constraint::Length(2),      // Margin kanan 2 spasi
+        ])
+        .split(left_chunks[1]);
+    let active_input_area = horizontal_input_layout[1];
+
     let input_block = Block::default()
         .borders(Borders::LEFT)
         .border_style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD));
     
-    let input_inner = input_block.inner(left_chunks[1]);
+    let input_inner = input_block.inner(active_input_area);
 
     let chat_input_lines = if app.input_buffer.is_empty() {
         vec![
@@ -278,18 +303,28 @@ fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
     let input_widget = Paragraph::new(chat_input_lines)
         .style(Style::default().bg(Color::Rgb(30, 30, 30)))
         .block(input_block);
-    frame.render_widget(input_widget, left_chunks[1]);
+    frame.render_widget(input_widget, active_input_area);
 
     frame.set_cursor_position((
         input_inner.x + 2 + app.input_buffer.len() as u16,
         input_inner.y + 1,
     ));
 
-    // 3. Sub-input info
+    // 3. Sub-input info (Tambahkan margin horizontal 2 spasi kiri-kanan agar sejajar)
+    let horizontal_info_layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Length(2),      // Margin kiri 2 spasi
+            Constraint::Min(0),         // Sub-info utama
+            Constraint::Length(2),      // Margin kanan 2 spasi
+        ])
+        .split(left_chunks[2]);
+    let active_info_area = horizontal_info_layout[1];
+
     let sub_chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-        .split(left_chunks[2]);
+        .split(active_info_area);
 
     let model_info = Line::from(vec![
         Span::styled("Build", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
@@ -311,6 +346,17 @@ fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
     let sidebar_inner = sidebar_block.inner(main_chunks[1]);
     frame.render_widget(sidebar_block, main_chunks[1]);
 
+    // Berikan padding horizontal 2 spasi di dalam sidebar agar teks tidak mepet border
+    let horizontal_sidebar_layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Length(2),      // Padding kiri dari garis pembatas
+            Constraint::Min(0),         // Area utama sidebar
+            Constraint::Length(2),      // Padding kanan dari tepi terminal
+        ])
+        .split(sidebar_inner);
+    let active_sidebar_area = horizontal_sidebar_layout[1];
+
     let sidebar_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -318,7 +364,7 @@ fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
             Constraint::Min(0),    // Tab content
             Constraint::Length(3), // Footer sidebar
         ])
-        .split(sidebar_inner);
+        .split(active_sidebar_area);
 
     // Tab Header (Lebih minimalis dan modern tanpa bracket [])
     let tab_titles = vec!["Session", "Agents", "Workers", "Spawn"];
