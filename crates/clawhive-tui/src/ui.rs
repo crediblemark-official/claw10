@@ -26,12 +26,11 @@ fn draw_home(frame: &mut Frame, area: Rect, app: &TuiApp) {
         .split(area);
 
     // 1. Logo ASCII
-    let logo_text = "\
-   ____ _                 _   _ _           
+    let logo_text = r#"   ____ _                 _   _ _           
   / ___| | __ ___      __| | | (_)_   _____ 
- | |   | |/ _` \\ \\ /\\ / /| |_| | \\ \\ / / _ \\
- | |___| | (_| |\\ V  V / |  _  | |\\ V /  __/
-  \\____|_|\\__,_| \\_/\\_/  |_| |_|_| \\_/ \\___|";
+ | |   | |/ _` \ \ /\ / /| |_| | \ \ / / _ \
+ | |___| | (_| |\ V  V / |  _  | |\ V /  __/
+  \____|_|\__,_| \_/\_/  |_| |_|_| \_/ \___|"#;
     
     let logo = Paragraph::new(logo_text)
         .style(Style::default().fg(Color::DarkGray))

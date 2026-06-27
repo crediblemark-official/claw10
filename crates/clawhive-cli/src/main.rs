@@ -42,6 +42,13 @@ enum Commands {
 
 #[tokio::main]
 async fn main() {
+    let cli = Cli::parse();
+    let is_tui = match &cli.command {
+        Commands::Tui { .. } => true,
+        Commands::Serve { tui, .. } => *tui,
+        Commands::Version => false,
+    };
+
     // Ensure logs directory exists
     let _ = std::fs::create_dir_all("logs");
 
@@ -61,13 +68,18 @@ async fn main() {
     let env_filter =
         tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into());
 
-    Registry::default()
-        .with(env_filter)
-        .with(file_layer)
-        .with(stderr_layer)
-        .init();
-
-    let cli = Cli::parse();
+    if is_tui {
+        Registry::default()
+            .with(env_filter)
+            .with(file_layer)
+            .init();
+    } else {
+        Registry::default()
+            .with(env_filter)
+            .with(file_layer)
+            .with(stderr_layer)
+            .init();
+    }
 
     match cli.command {
         Commands::Serve { bind, db, tui } => {
