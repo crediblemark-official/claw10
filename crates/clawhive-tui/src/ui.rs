@@ -390,9 +390,9 @@ fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                     Tab::SpawnRequests => i == 3,
                 };
                 if is_selected {
-                    Span::styled(format!("  {}  ", t), Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
+                    Span::styled(format!(" {} ", t), Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
                 } else {
-                    Span::styled(format!("  {}  ", t), Style::default().fg(Color::DarkGray))
+                    Span::styled(format!(" {} ", t), Style::default().fg(Color::DarkGray))
                 }
             })
             .collect();
