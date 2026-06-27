@@ -163,84 +163,90 @@ fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
             Constraint::Min(0),      // Chat history
             Constraint::Length(3),   // Input Box
             Constraint::Length(1),   // Sub-input info
-            Constraint::Length(1),   // Status message
         ])
         .split(main_chunks[0]);
 
-    // 1. Chat History
-    let mut list_items = Vec::new();
-    for (sender, model, msg) in &app.chat_history {
-        let mut lines = Vec::new();
-        
-        if sender == "User" {
-            // User: background abu-abu gelap (#161616) dengan border kiri Cyan
-            let border_color = Color::Cyan;
-            lines.push(Line::from(vec![
-                Span::styled("┃", Style::default().fg(border_color).add_modifier(Modifier::BOLD)),
-                Span::raw(" "),
-            ]));
-            for part in msg.lines() {
-                lines.push(Line::from(vec![
-                    Span::styled("┃", Style::default().fg(border_color).add_modifier(Modifier::BOLD)),
-                    Span::raw(format!("  {}", part)),
-                ]));
-            }
-            lines.push(Line::from(vec![
-                Span::styled("┃", Style::default().fg(border_color).add_modifier(Modifier::BOLD)),
-                Span::raw(" "),
-            ]));
-            // Baris kosong pemisah di luar box abu-abu
-            lines.push(Line::from(""));
-
-            let text_content = ratatui::text::Text::from(lines);
-            let list_item = ListItem::new(text_content)
-                .style(Style::default().bg(Color::Rgb(20, 20, 20))); // background box abu-abu gelap
-            list_items.push(list_item);
-        } else if sender == "System" {
-            // System/Error: background abu-abu gelap dengan border kiri Red
-            let border_color = Color::Red;
-            lines.push(Line::from(vec![
-                Span::styled("┃", Style::default().fg(border_color).add_modifier(Modifier::BOLD)),
-                Span::raw(" "),
-            ]));
-            for part in msg.lines() {
-                lines.push(Line::from(vec![
-                    Span::styled("┃", Style::default().fg(border_color).add_modifier(Modifier::BOLD)),
-                    Span::raw(format!("  {}", part)),
-                ]));
-            }
-            lines.push(Line::from(vec![
-                Span::styled("┃", Style::default().fg(border_color).add_modifier(Modifier::BOLD)),
-                Span::raw(" "),
-            ]));
-            lines.push(Line::from(""));
-
-            let text_content = ratatui::text::Text::from(lines);
-            let list_item = ListItem::new(text_content)
-                .style(Style::default().bg(Color::Rgb(20, 20, 20)));
-            list_items.push(list_item);
+    // 1. Chat History (Render manual menggunakan sub-layout dinamis agar background solid dan rapi)
+    let max_height = left_chunks[0].height as i16;
+    let mut current_height = 0;
+    let mut visible_chats = Vec::new();
+    
+    for (sender, model, msg) in app.chat_history.iter().rev() {
+        let lines_count = msg.lines().count() as i16;
+        let is_box = sender.to_lowercase() == "user" || sender.to_lowercase() == "system";
+        let item_height = if is_box {
+            lines_count + 2 + 1 // 2 untuk padding vertikal + 1 margin
         } else {
-            // Agent/Assistant: Teks polos (background hitam default), diawali label header kecil
-            // Ikon kotak biru solid: ■
+            1 + 1 + lines_count + 1 // 1 label + 1 blank line + lines_count + 1 margin
+        };
+        
+        if current_height + item_height <= max_height {
+            visible_chats.push((sender, model, msg, item_height));
+            current_height += item_height;
+        } else {
+            break; // Tidak cukup tinggi layar
+        }
+    }
+    visible_chats.reverse(); // Kembalikan ke urutan kronologis
+
+    // Buat sub-layout constraints
+    let mut constraints = Vec::new();
+    for (_, _, _, h) in &visible_chats {
+        constraints.push(Constraint::Length(*h as u16));
+    }
+    constraints.push(Constraint::Min(0)); // Spacer sisa di bawah
+
+    let chat_areas = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(constraints)
+        .split(left_chunks[0]);
+
+    for (idx, (sender, model, msg, _)) in visible_chats.into_iter().enumerate() {
+        let area = chat_areas[idx];
+        // Kurangi tinggi 1 baris untuk pemisah (margin bawah)
+        let bubble_area = Rect {
+            x: area.x,
+            y: area.y,
+            width: area.width,
+            height: (area.height as i16 - 1).max(0) as u16,
+        };
+
+        let is_user = sender.to_lowercase() == "user";
+        let is_system = sender.to_lowercase() == "system";
+
+        if is_user || is_system {
+            let border_color = if is_user { Color::Cyan } else { Color::Red };
+            let input_block = Block::default()
+                .borders(Borders::LEFT)
+                .border_style(Style::default().fg(border_color).add_modifier(Modifier::BOLD))
+                .style(Style::default().bg(Color::Indexed(236))); // Background abu-abu gelap solid
+
+            let mut lines = Vec::new();
+            lines.push(Line::from("")); // Padding vertikal atas
+            for part in msg.lines() {
+                lines.push(Line::from(format!("  {}", part))); // Padding horizontal kiri
+            }
+            lines.push(Line::from("")); // Padding vertikal bawah
+
+            let p = Paragraph::new(lines).block(input_block);
+            frame.render_widget(p, bubble_area);
+        } else {
+            // Agent / Assistant (Respon polos)
+            let mut lines = Vec::new();
+            // Solid blue box icon: ■
             lines.push(Line::from(vec![
                 Span::styled("■ ", Style::default().fg(Color::Cyan)),
-                Span::styled(model, Style::default().fg(Color::DarkGray)),
+                Span::styled(model.as_str(), Style::default().fg(Color::DarkGray)),
             ]));
-            lines.push(Line::from(""));
+            lines.push(Line::from("")); // Blank line
             for part in msg.lines() {
                 lines.push(Line::from(Span::styled(part, Style::default().fg(Color::White))));
             }
-            lines.push(Line::from(""));
 
-            let text_content = ratatui::text::Text::from(lines);
-            let list_item = ListItem::new(text_content); // Polos
-            list_items.push(list_item);
+            let p = Paragraph::new(lines);
+            frame.render_widget(p, bubble_area);
         }
     }
-
-    let chat_list = List::new(list_items)
-        .block(Block::default().borders(Borders::NONE));
-    frame.render_widget(chat_list, left_chunks[0]);
 
     // 2. Input Box
     let input_block = Block::default()
@@ -295,10 +301,6 @@ fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
         .style(Style::default().fg(Color::DarkGray))
         .alignment(ratatui::layout::Alignment::Right);
     frame.render_widget(shortcuts, sub_chunks[1]);
-
-    let status_para = Paragraph::new(app.status_message.as_str())
-        .style(Style::default().fg(Color::DarkGray));
-    frame.render_widget(status_para, left_chunks[3]);
 
     // --- KOLOM KANAN (SIDEBAR) ---
     let sidebar_block = Block::default()
