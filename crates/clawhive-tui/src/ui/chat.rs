@@ -3,7 +3,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, Paragraph},
+    widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
     Frame,
 };
 
@@ -57,11 +57,26 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
 
     let chat_area = horizontal_chat_layout[1];
 
+    let max_text_width = (chat_area.width as usize).saturating_sub(6).max(1);
+
     // Hitung tinggi total yang dibutuhkan oleh seluruh chat history
     let mut total_needed_height = 0;
-    for (_, _, msg) in &app.chat_history {
-        // 1 baris nama pengirim/model + 1 baris kosong + jumlah baris pesan + 2 baris padding gelembung
-        total_needed_height += 1 + 1 + msg.lines().count() + 2;
+    for (sender, _, msg) in &app.chat_history {
+        let mut visual_lines = 0;
+        for line in msg.lines() {
+            let line_len = line.len();
+            if line_len == 0 {
+                visual_lines += 1;
+            } else {
+                visual_lines += (line_len + max_text_width - 1) / max_text_width;
+            }
+        }
+        let msg_height = if sender.to_lowercase() == "user" || sender.to_lowercase() == "system" {
+            visual_lines + 2 // padding vertikal atas-bawah
+        } else {
+            1 + 1 + visual_lines // header + blank line + lines
+        };
+        total_needed_height += msg_height;
     }
 
     // Buat scrolling offset dinamis agar pesan terbaru selalu terlihat di bawah
@@ -72,8 +87,21 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
 
     // Bagi area chat_area menjadi deretan sub-layout secara dinamis per gelembung pesan
     let mut constraints = Vec::new();
-    for (_, _, msg) in &app.chat_history {
-        let msg_height = 1 + 1 + msg.lines().count() + 2; // total baris gelembung
+    for (sender, _, msg) in &app.chat_history {
+        let mut visual_lines = 0;
+        for line in msg.lines() {
+            let line_len = line.len();
+            if line_len == 0 {
+                visual_lines += 1;
+            } else {
+                visual_lines += (line_len + max_text_width - 1) / max_text_width;
+            }
+        }
+        let msg_height = if sender.to_lowercase() == "user" || sender.to_lowercase() == "system" {
+            visual_lines + 2
+        } else {
+            1 + 1 + visual_lines
+        };
         constraints.push(Constraint::Length(msg_height as u16));
     }
 
@@ -132,11 +160,13 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
             let mut lines = Vec::new();
             lines.push(Line::from("")); // Padding vertikal atas
             for part in msg.lines() {
-                lines.push(Line::from(format!("  {}", part))); // Padding horizontal kiri
+                lines.push(Line::from(part.to_string()));
             }
             lines.push(Line::from("")); // Padding vertikal bawah
 
-            let p = Paragraph::new(lines).block(input_block);
+            let p = Paragraph::new(lines)
+                .block(input_block)
+                .wrap(Wrap { trim: false });
             frame.render_widget(p, render_area);
         } else {
             // Agent / Assistant (Respon polos dengan padding kiri 2 spasi)
@@ -155,7 +185,8 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                 ]));
             }
 
-            let p = Paragraph::new(lines);
+            let p = Paragraph::new(lines)
+                .wrap(Wrap { trim: false });
             frame.render_widget(p, render_area);
         }
     }
@@ -302,32 +333,23 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
             .split(active_sidebar_area);
 
         // Sidebar Header (Titel tab aktif dengan indikator navigasi)
-        let header_text = format!(
-            "{} ({}/{})",
-            match app.selected_tab {
-                Tab::Session => "Session",
-                Tab::Agents => "Swarm Agents",
-                Tab::Workers => "Workers Pool",
-                Tab::SpawnRequests => "Spawn Broker",
-            },
-            match app.selected_tab {
-                Tab::Session => 1,
-                Tab::Agents => 2,
-                Tab::Workers => 3,
-                Tab::SpawnRequests => 4,
-            },
-            4
-        );
-        let header = Paragraph::new(Line::from(vec![
-            Span::styled("● ", Style::default().fg(Color::Cyan)),
-            Span::styled(
-                header_text,
+        let tab_titles = vec!["Session", "Agents", "Workers", "Broker"];
+        let tabs = ratatui::widgets::Tabs::new(tab_titles)
+            .select(match app.selected_tab {
+                Tab::Session => 0,
+                Tab::Agents => 1,
+                Tab::Workers => 2,
+                Tab::SpawnRequests => 3,
+            })
+            .block(Block::default().borders(Borders::BOTTOM).border_style(Style::default().fg(Color::DarkGray)))
+            .style(Style::default().fg(Color::DarkGray))
+            .highlight_style(
                 Style::default()
                     .fg(Color::Cyan)
                     .add_modifier(Modifier::BOLD),
-            ),
-        ]));
-        frame.render_widget(header, sidebar_chunks[0]);
+            )
+            .divider("  ");
+        frame.render_widget(tabs, sidebar_chunks[0]);
 
         // Render data list sidebar sesuai tab aktif
         match app.selected_tab {
