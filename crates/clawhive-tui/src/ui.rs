@@ -247,6 +247,7 @@ fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
         .constraints([
             Constraint::Min(0),    // Chat history
             Constraint::Length(4), // Input Box (height 4 untuk text + model info di dalam)
+            Constraint::Length(1), // Spacer bawah agar tidak mepet ke footer/batas bawah
         ])
         .split(main_chunks[0]);
 
