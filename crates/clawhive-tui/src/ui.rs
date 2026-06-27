@@ -37,12 +37,33 @@ fn draw_home(frame: &mut Frame, area: Rect, app: &TuiApp) {
         .alignment(ratatui::layout::Alignment::Center);
     frame.render_widget(logo, chunks[1]);
 
+    // Pembagian horizontal di tengah (lebar 60%) agar input box tidak full-width
+    let horizontal_input_layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(20),
+            Constraint::Percentage(60),
+            Constraint::Percentage(20),
+        ])
+        .split(chunks[3]);
+    let input_box_area = horizontal_input_layout[1];
+
+    let horizontal_sub_layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(20),
+            Constraint::Percentage(60),
+            Constraint::Percentage(20),
+        ])
+        .split(chunks[4]);
+    let sub_info_area = horizontal_sub_layout[1];
+
     // 2. Input Box (dengan border kiri Cyan/Blue dan background gelap)
     let input_block = Block::default()
         .borders(Borders::LEFT)
         .border_style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD));
     
-    let input_inner = input_block.inner(chunks[3]);
+    let input_inner = input_block.inner(input_box_area);
 
     let lines = if app.input_buffer.is_empty() {
         vec![
@@ -67,7 +88,7 @@ fn draw_home(frame: &mut Frame, area: Rect, app: &TuiApp) {
     let input_widget = Paragraph::new(lines)
         .style(Style::default().bg(Color::Rgb(30, 30, 30)))
         .block(input_block);
-    frame.render_widget(input_widget, chunks[3]);
+    frame.render_widget(input_widget, input_box_area);
 
     // Set cursor position di baris tengah
     frame.set_cursor_position((
@@ -79,7 +100,7 @@ fn draw_home(frame: &mut Frame, area: Rect, app: &TuiApp) {
     let sub_chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-        .split(chunks[4]);
+        .split(sub_info_area);
 
     let model_info = Line::from(vec![
         Span::styled("Build", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
