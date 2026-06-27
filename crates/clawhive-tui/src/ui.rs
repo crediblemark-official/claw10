@@ -177,7 +177,17 @@ fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
         .split(main_chunks[0]);
 
     // 1. Chat History (Render manual menggunakan sub-layout dinamis agar background solid dan rapi)
-    let max_height = left_chunks[0].height as i16;
+    // Tambahkan 1 baris spacer kosong di paling atas agar chat tidak mepet ke atas
+    let chat_layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1), // Spacer kosong di paling atas
+            Constraint::Min(0),    // Area utama chat history
+        ])
+        .split(left_chunks[0]);
+    let chat_history_area = chat_layout[1];
+
+    let max_height = chat_history_area.height as i16;
     let mut current_height = 0;
     let mut visible_chats = Vec::new();
     
@@ -209,7 +219,7 @@ fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
     let chat_areas = Layout::default()
         .direction(Direction::Vertical)
         .constraints(constraints)
-        .split(left_chunks[0]);
+        .split(chat_history_area);
 
     for (idx, (sender, model, msg, _)) in visible_chats.into_iter().enumerate() {
         let area = chat_areas[idx];
