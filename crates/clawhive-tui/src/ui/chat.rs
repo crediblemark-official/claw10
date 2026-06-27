@@ -149,6 +149,17 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
         if sender.to_lowercase() == "user" || sender.to_lowercase() == "system" {
             let is_user = sender.to_lowercase() == "user";
             let border_color = if is_user { Color::Cyan } else { Color::Red };
+
+            // Bagi area gelembung secara horizontal: border kiri (1 kolom), spacer (2 kolom), teks (sisa area)
+            let bubble_chunks = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([
+                    Constraint::Length(1), // Border kiri
+                    Constraint::Length(2), // Jarak spasi kosong dari border kiri
+                    Constraint::Min(0),    // Konten teks pesan
+                ])
+                .split(render_area);
+
             let input_block = Block::default()
                 .borders(Borders::LEFT)
                 .border_style(
@@ -156,6 +167,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                         .fg(border_color)
                         .add_modifier(Modifier::BOLD),
                 );
+            frame.render_widget(input_block, bubble_chunks[0]);
 
             let mut lines = Vec::new();
             lines.push(Line::from("")); // Padding vertikal atas
@@ -165,9 +177,8 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
             lines.push(Line::from("")); // Padding vertikal bawah
 
             let p = Paragraph::new(lines)
-                .block(input_block)
                 .wrap(Wrap { trim: false });
-            frame.render_widget(p, render_area);
+            frame.render_widget(p, bubble_chunks[2]);
         } else {
             // Agent / Assistant (Respon polos dengan padding kiri 2 spasi)
             let mut lines = Vec::new();
