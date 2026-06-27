@@ -19,6 +19,8 @@ clawhive-policy = { path = "../clawhive-policy" }
 clawhive-memory = { path = "../clawhive-memory" }
 clawhive-gateway = { path = "../clawhive-gateway" }
 clawhive-store = { path = "../clawhive-store" }
+clawhive-agent = { path = "../clawhive-agent" }
+clawhive-event = { path = "../clawhive-event" }
 clawhive-telemetry = { path = "../clawhive-telemetry" }
 serde = { workspace = true }
 serde_json = { workspace = true }

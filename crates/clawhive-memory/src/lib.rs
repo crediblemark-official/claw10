@@ -1,5 +1,7 @@
 #![allow(clippy::pedantic)]
 
+pub mod admission;
+
 use std::sync::Arc;
 
 use chrono::Utc;

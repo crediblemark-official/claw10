@@ -16,6 +16,10 @@ clawhive-policy = { path = "../crates/clawhive-policy" }
 clawhive-memory = { path = "../crates/clawhive-memory" }
 clawhive-gateway = { path = "../crates/clawhive-gateway" }
 clawhive-store = { path = "../crates/clawhive-store" }
+clawhive-control-api = { path = "../crates/clawhive-control-api" }
+clawhive-telemetry = { path = "../crates/clawhive-telemetry" }
+clawhive-agent = { path = "../crates/clawhive-agent" }
+clawhive-event = { path = "../crates/clawhive-event" }
 chrono = { workspace = true }
 uuid = { workspace = true }
 tokio = { workspace = true }

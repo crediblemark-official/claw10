@@ -8,12 +8,16 @@ clawhive-domain = { path = "../clawhive-domain" }
 clawhive-auth = { path = "../clawhive-auth" }
 clawhive-budget = { path = "../clawhive-budget" }
 clawhive-lineage = { path = "../clawhive-lineage" }
+clawhive-store = { path = "../clawhive-store" }
+clawhive-agent = { path = "../clawhive-agent" }
+clawhive-event = { path = "../clawhive-event" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+async-trait = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt", "macros"] }

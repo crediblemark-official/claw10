@@ -30,6 +30,7 @@ members = [
     "crates/clawhive-tui",
     "crates/clawhive-store",
     "crates/clawhive-prompt",
+    "crates/clawhive-event",
     "tests",
 ]
 

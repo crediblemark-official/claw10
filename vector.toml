@@ -1,0 +1,153 @@
+# ──────────────────────────────────────────────────────────────────────
+# ClawHive OS — Vector Observability Pipeline
+# ──────────────────────────────────────────────────────────────────────
+# Reads structured JSON telemetry from tracing logs (via file tail)
+# and forwards to configurable sinks.
+#
+# Usage:
+#   vector --config vector.toml
+#
+# Telemetry is emitted via `tracing::info!(target: "clawhive_telemetry", ...)`
+# and written to a JSON log file by the tracing_subscriber layer.
+# ──────────────────────────────────────────────────────────────────────
+
+[api]
+enabled = true
+address = "0.0.0.0:8686"
+
+# ── Sources ───────────────────────────────────────────────────────────
+
+# Source: tail the ClawHive JSON telemetry log
+[sources.clawhive_logs]
+type = "file"
+include = ["/var/log/clawhive/telemetry.json"]
+# Or use a relative path for development:
+# include = ["logs/clawhive-telemetry.json"]
+start_at_beginning = false
+ignore_older_secs = 600
+fingerprint.strategy = "device_and_inode"
+
+# Source: internal Vector metrics
+[sources.internal_metrics]
+type = "internal_metrics"
+
+# ── Transforms ────────────────────────────────────────────────────────
+
+# Parse JSON lines from the raw log file
+[transforms.parse_telemetry]
+type = "remap"
+inputs = ["clawhive_logs"]
+source = '''
+  # The log line from tracing is: "timestamp [target] message"
+  # Our telemetry emits JSON as the message part
+  parsed = parse_json!(.message)
+
+  # Promote telemetry fields to top-level event fields
+  .timestamp = parsed.timestamp
+  .event_type = parsed.event_type
+  .status = parsed.status
+  .agent_id = parsed.agent_id ?? null
+  .mission_id = parsed.mission_id ?? null
+  .task_id = parsed.task_id ?? null
+  .worker_id = parsed.worker_id ?? null
+  .parent_agent_id = parsed.parent_agent_id ?? null
+  .lineage_id = parsed.lineage_id ?? null
+  .tenant_id = parsed.tenant_id ?? null
+  .lifecycle_mode = parsed.lifecycle_mode ?? null
+  .risk_level = parsed.risk_level ?? null
+  .cost_usd = parsed.cost_usd ?? 0.0
+  .trace_id = parsed.trace_id ?? null
+
+  # Flatten additional fields into a structured map
+  .additional = parsed.additional ?? {}
+
+  # Remove raw message after parsing
+  del(.message)
+'''
+
+# Filter: only telemetry events (skip internal logs)
+[transforms.filter_telemetry]
+type = "filter"
+inputs = ["parse_telemetry"]
+condition = '.event_type != null && .event_type != ""'
+
+# Route events by type for different processing
+[transforms.route_by_type]
+type = "route"
+inputs = ["filter_telemetry"]
+route.agent_events = 'starts_with!(.event_type, "agent.") || starts_with!(.event_type, "spawn.")'
+route.worker_events = 'starts_with!(.event_type, "worker.")'
+route.memory_events = 'starts_with!(.event_type, "memory.")'
+route.gateway_events = 'starts_with!(.event_type, "gateway.")'
+route.policy_events = 'starts_with!(.event_type, "policy.") || starts_with!(.event_type, "checkpoint.") || starts_with!(.event_type, "schedule.")'
+
+# ── Sinks ─────────────────────────────────────────────────────────────
+
+# Sink: Console output (for development)
+[sinks.console]
+type = "console"
+inputs = ["filter_telemetry"]
+target = "stdout"
+encoding.codec = "json"
+
+# Sink: Agent lifecycle events → separate file
+[sinks.agent_events_file]
+type = "file"
+inputs = ["route_by_type.agent_events"]
+path = "/var/log/clawhive/agents.jsonl"
+encoding.codec = "json"
+
+# Sink: Worker events → separate file
+[sinks.worker_events_file]
+type = "file"
+inputs = ["route_by_type.worker_events"]
+path = "/var/log/clawhive/workers.jsonl"
+encoding.codec = "json"
+
+# Sink: Memory/Mission events → separate file
+[sinks.memory_events_file]
+type = "file"
+inputs = ["route_by_type.memory_events"]
+path = "/var/log/clawhive/memory.jsonl"
+encoding.codec = "json"
+
+# Sink: Policy/Gateway/Schedule events → separate file
+[sinks.policy_events_file]
+type = "file"
+inputs = ["route_by_type.policy_events"]
+path = "/var/log/clawhive/operations.jsonl"
+encoding.codec = "json"
+
+# ── Optional: External sinks (uncomment as needed) ────────────────────
+
+# Sink: Elasticsearch
+# [sinks.elasticsearch]
+# type = "elasticsearch"
+# inputs = ["filter_telemetry"]
+# endpoint = "http://localhost:9200"
+# index = "clawhive-telemetry-%Y-%m-%d"
+# encoding.codec = "json"
+# bulk.action = "index"
+
+# Sink: OpenTelemetry Collector
+# [sinks.otlp]
+# type = "opentelemetry"
+# inputs = ["filter_telemetry"]
+# endpoint = "http://localhost:4317"
+# protocol = "grpc"
+
+# Sink: Prometheus metrics
+# [sinks.prometheus]
+# type = "prometheus_exporter"
+# inputs = ["internal_metrics"]
+# address = "0.0.0.0:9598"
+
+# Sink: Loki
+# [sinks.loki]
+# type = "loki"
+# inputs = ["filter_telemetry"]
+# endpoint = "http://localhost:3100"
+# encoding.codec = "json"
+# labels.event_type = "{{ event_type }}"
+# labels.status = "{{ status }}"
+# labels.agent_id = "{{ agent_id }}"

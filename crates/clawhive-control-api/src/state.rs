@@ -1,9 +1,11 @@
 use std::sync::Arc;
 
+use clawhive_agent::AgentStore;
 use clawhive_auth::credential::CredentialService;
 use clawhive_auth::identity::IdentityService;
 use clawhive_auth::rbac::RbacService;
 use clawhive_domain::SwarmLimitsConfig;
+use clawhive_event::InMemoryEventBus;
 use clawhive_gateway::GatewayService;
 use clawhive_memory::MemoryService;
 use clawhive_scheduler::ScheduleService;
@@ -29,13 +31,13 @@ pub struct AppState {
 }
 
 impl AppState {
-    /// Create AppState with an in-memory KV store.
+    /// Create AppState dengan in-memory KV store.
     #[must_use]
     pub fn new() -> Self {
         Self::new_with_store(Arc::new(KvInMemory::new()))
     }
 
-    /// Create AppState with a shared KV store (for prod use with sled).
+    /// Create AppState dengan shared KV store (untuk prod dengan sled).
     #[must_use]
     pub fn new_with_store(kv_store: Arc<dyn Store>) -> Self {
         let limits = SwarmLimitsConfig {
@@ -47,6 +49,13 @@ impl AppState {
             max_turns_per_ephemeral_agent: 100,
             max_idle_seconds_ephemeral: 600,
         };
+
+        // AgentStore menggunakan KV store yang sama
+        let agent_store = Arc::new(AgentStore::new(Arc::clone(&kv_store)));
+
+        // Event bus: in-memory untuk development, nanti bisa diganti NatsEventBus
+        let event_bus = Arc::new(InMemoryEventBus::new());
+
         Self {
             identity_service: Arc::new(IdentityService),
             rbac_service: Arc::new(std::sync::Mutex::new(RbacService::new())),
@@ -55,7 +64,7 @@ impl AppState {
             worker_service: Arc::new(WorkerService::new(Arc::clone(&kv_store))),
             memory_service: Arc::new(MemoryService::new(Arc::clone(&kv_store))),
             gateway_service: Arc::new(GatewayService::new(Arc::clone(&kv_store))),
-            spawn_broker: Arc::new(SpawnBroker::new(limits)),
+            spawn_broker: Arc::new(SpawnBroker::new(limits, agent_store, event_bus)),
             telemetry: TelemetryService::default(),
             kv_store,
         }
@@ -67,3 +76,4 @@ impl Default for AppState {
         Self::new()
     }
 }
+

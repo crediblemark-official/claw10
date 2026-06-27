@@ -1,3 +1,6 @@
+use std::sync::Arc;
+
+use clawhive_agent::AgentStore;
 use clawhive_auth::credential::CredentialService;
 use clawhive_auth::identity::IdentityService;
 use clawhive_domain::{
@@ -6,9 +9,18 @@ use clawhive_domain::{
     MissionState, ModelPolicy, NetworkPolicy, OrganizationId, Permission, PolicyBundle,
     PolicyBundleId, RiskLevel, RuntimeConfig, SwarmLimitsConfig,
 };
+use clawhive_event::InMemoryEventBus;
 use clawhive_lineage::LineageService;
 use clawhive_spawn::broker::SpawnBroker;
 use clawhive_spawn::descendant::DescendantManager;
+use clawhive_store::InMemoryStore;
+
+fn make_broker() -> SpawnBroker {
+    let store = Arc::new(InMemoryStore::new());
+    let agent_store = Arc::new(AgentStore::new(store));
+    let event_bus = Arc::new(InMemoryEventBus::new());
+    SpawnBroker::new(make_limits(), agent_store, event_bus)
+}
 
 fn make_test_mission() -> Mission {
     Mission {
@@ -164,7 +176,7 @@ fn make_limits() -> SwarmLimitsConfig {
 async fn test_full_spawn_flow() {
     let mission = make_test_mission();
     let mut root = make_root_agent(&mission);
-    let broker = SpawnBroker::new(make_limits());
+    let broker = make_broker();
     let root_clone = root.clone();
 
     let request = SpawnBroker::create_request(
@@ -205,7 +217,7 @@ async fn test_spawn_validation_fails_when_parent_not_active() {
     let mission = make_test_mission();
     let mut root = make_root_agent(&mission);
     root.state = AgentState::Terminated;
-    let broker = SpawnBroker::new(make_limits());
+    let broker = make_broker();
     let root_clone = root.clone();
 
     let request = SpawnBroker::create_request(
@@ -227,7 +239,7 @@ async fn test_spawn_validation_fails_when_parent_cannot_spawn() {
     let mission = make_test_mission();
     let mut root = make_root_agent(&mission);
     root.genome.autonomy.can_spawn = false;
-    let broker = SpawnBroker::new(make_limits());
+    let broker = make_broker();
     let root_clone = root.clone();
 
     let request = SpawnBroker::create_request(
@@ -248,7 +260,7 @@ async fn test_spawn_validation_fails_when_parent_cannot_spawn() {
 async fn test_spawn_validation_fails_when_depth_exceeded() {
     let mission = make_test_mission();
     let mut root = make_root_agent(&mission);
-    let broker = SpawnBroker::new(make_limits());
+    let broker = make_broker();
     let root_clone = root.clone();
 
     let request = SpawnBroker::create_request(
@@ -270,7 +282,7 @@ async fn test_spawn_validation_fails_when_budget_insufficient() {
     let mission = make_test_mission();
     let mut root = make_root_agent(&mission);
     root.budget.spent_usd = 480.0;
-    let broker = SpawnBroker::new(make_limits());
+    let broker = make_broker();
     let root_clone = root.clone();
 
     let request = SpawnBroker::create_request(
@@ -292,7 +304,7 @@ async fn test_descendant_teardown() {
     let mission = make_test_mission();
     let mut root = make_root_agent(&mission);
     let mut lineage = make_lineage(&mission, &root);
-    let broker = SpawnBroker::new(make_limits());
+    let broker = make_broker();
     let root_clone = root.clone();
 
     let request = SpawnBroker::create_request(
