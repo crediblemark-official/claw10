@@ -134,14 +134,14 @@ fn draw_home(frame: &mut Frame, area: Rect, app: &TuiApp) {
                         .fg(Color::Cyan)
                         .add_modifier(Modifier::BOLD),
                 ),
-                Span::styled(format!(" · {} ", active_model_name), Style::default().fg(Color::White)),
+                Span::styled(format!(" · {} ", active_model_name), Style::default()),
                 Span::styled(provider_name.clone(), Style::default().fg(Color::DarkGray)),
                 Span::raw(middle_spacer.clone()),
-                Span::styled("/", Style::default().fg(Color::White)),
+                Span::styled("/", Style::default()),
                 Span::styled(" commands  ", Style::default().fg(Color::DarkGray)),
-                Span::styled(":", Style::default().fg(Color::White)),
+                Span::styled(":", Style::default()),
                 Span::styled(" terminal  ", Style::default().fg(Color::DarkGray)),
-                Span::styled("ctrl+p", Style::default().fg(Color::White)),
+                Span::styled("ctrl+p", Style::default()),
                 Span::styled(" palette  ", Style::default().fg(Color::DarkGray)),
             ]),
         ]
@@ -149,7 +149,7 @@ fn draw_home(frame: &mut Frame, area: Rect, app: &TuiApp) {
         vec![
             Line::from(Span::styled(
                 format!("  {}", app.input_buffer),
-                Style::default().fg(Color::White),
+                Style::default(),
             )),
             Line::from(""), // Spacer
             Line::from(""), // Spacer
@@ -161,14 +161,14 @@ fn draw_home(frame: &mut Frame, area: Rect, app: &TuiApp) {
                         .fg(Color::Cyan)
                         .add_modifier(Modifier::BOLD),
                 ),
-                Span::styled(format!(" · {} ", active_model_name), Style::default().fg(Color::White)),
+                Span::styled(format!(" · {} ", active_model_name), Style::default()),
                 Span::styled(provider_name, Style::default().fg(Color::DarkGray)),
                 Span::raw(middle_spacer),
-                Span::styled("/", Style::default().fg(Color::White)),
+                Span::styled("/", Style::default()),
                 Span::styled(" commands  ", Style::default().fg(Color::DarkGray)),
-                Span::styled(":", Style::default().fg(Color::White)),
+                Span::styled(":", Style::default()),
                 Span::styled(" terminal  ", Style::default().fg(Color::DarkGray)),
-                Span::styled("ctrl+p", Style::default().fg(Color::White)),
+                Span::styled("ctrl+p", Style::default()),
                 Span::styled(" palette  ", Style::default().fg(Color::DarkGray)),
             ]),
         ]
@@ -421,14 +421,14 @@ fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                         .fg(Color::Cyan)
                         .add_modifier(Modifier::BOLD),
                 ),
-                Span::styled(format!(" · {} ", active_model_name), Style::default().fg(Color::White)),
+                Span::styled(format!(" · {} ", active_model_name), Style::default()),
                 Span::styled(provider_name.clone(), Style::default().fg(Color::DarkGray)),
                 Span::raw(middle_spacer.clone()),
-                Span::styled("/", Style::default().fg(Color::White)),
+                Span::styled("/", Style::default()),
                 Span::styled(" commands  ", Style::default().fg(Color::DarkGray)),
-                Span::styled(":", Style::default().fg(Color::White)),
+                Span::styled(":", Style::default()),
                 Span::styled(" terminal  ", Style::default().fg(Color::DarkGray)),
-                Span::styled("ctrl+p", Style::default().fg(Color::White)),
+                Span::styled("ctrl+p", Style::default()),
                 Span::styled(" palette  ", Style::default().fg(Color::DarkGray)),
             ]),
         ]
@@ -436,7 +436,7 @@ fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
         vec![
             Line::from(Span::styled(
                 format!("  {}", app.input_buffer),
-                Style::default().fg(Color::White),
+                Style::default(),
             )),
             Line::from(""), // Spacer
             Line::from(""), // Spacer
@@ -448,14 +448,14 @@ fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                         .fg(Color::Cyan)
                         .add_modifier(Modifier::BOLD),
                 ),
-                Span::styled(format!(" · {} ", active_model_name), Style::default().fg(Color::White)),
+                Span::styled(format!(" · {} ", active_model_name), Style::default()),
                 Span::styled(provider_name, Style::default().fg(Color::DarkGray)),
                 Span::raw(middle_spacer),
-                Span::styled("/", Style::default().fg(Color::White)),
+                Span::styled("/", Style::default()),
                 Span::styled(" commands  ", Style::default().fg(Color::DarkGray)),
-                Span::styled(":", Style::default().fg(Color::White)),
+                Span::styled(":", Style::default()),
                 Span::styled(" terminal  ", Style::default().fg(Color::DarkGray)),
-                Span::styled("ctrl+p", Style::default().fg(Color::White)),
+                Span::styled("ctrl+p", Style::default()),
                 Span::styled(" palette  ", Style::default().fg(Color::DarkGray)),
             ]),
         ]
