@@ -9,55 +9,6 @@ use ratatui::{
 
 use crate::app::{Screen, Tab, TuiApp};
 
-fn parse_ansi_logo(content: &'static str) -> Vec<Line<'static>> {
-    let mut lines = Vec::new();
-    for line in content.lines() {
-        if line.is_empty() {
-            lines.push(Line::from(""));
-            continue;
-        }
-
-        if line.contains("\x1b[38;2;") {
-            let parts: Vec<&str> = line.split("\x1b[38;2;").collect();
-            let mut spans = Vec::new();
-            
-            if !parts[0].is_empty() && !parts[0].starts_with("\x1b[") {
-                spans.push(Span::raw(parts[0]));
-            }
-
-            for part in parts.iter().skip(1) {
-                if let Some(m_idx) = part.find('m') {
-                    let color_def = &part[..m_idx];
-                    let text = &part[m_idx + 1..];
-                    let clean_text = text.replace("\x1b[0m", "");
-                    
-                    let rgb: Vec<&str> = color_def.split(';').collect();
-                    if rgb.len() == 3 {
-                        if let (Ok(r), Ok(g), Ok(b)) = (rgb[0].parse::<u8>(), rgb[1].parse::<u8>(), rgb[2].parse::<u8>()) {
-                            spans.push(Span::styled(
-                                clean_text,
-                                Style::default().fg(Color::Rgb(r, g, b)),
-                            ));
-                            continue;
-                        }
-                    }
-                    spans.push(Span::raw(clean_text));
-                } else {
-                    spans.push(Span::raw(*part));
-                }
-            }
-            
-            lines.push(Line::from(spans));
-        } else {
-            let clean_line = line.replace("\x1b[0m", "");
-            if !clean_line.trim().is_empty() {
-                lines.push(Line::from(clean_line));
-            }
-        }
-    }
-    lines
-}
-
 fn draw_home(frame: &mut Frame, area: Rect, app: &TuiApp) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -117,9 +68,22 @@ fn draw_home(frame: &mut Frame, area: Rect, app: &TuiApp) {
         Line::from(""),
     ];
 
+    let gradient_colors = [
+        Color::Rgb(255, 225, 120),
+        Color::Rgb(245, 205, 90),
+        Color::Rgb(230, 190, 65),
+        Color::Rgb(205, 165, 40),
+        Color::Rgb(184, 134, 11),
+    ];
+
     let ansi_content = include_str!("../../../assets/clawhive-gold-gradient.ans");
-    let text_lines = parse_ansi_logo(ansi_content);
-    logo_lines.extend(text_lines);
+    for (i, line) in ansi_content.lines().enumerate() {
+        let color = gradient_colors.get(i).copied().unwrap_or(Color::Rgb(184, 134, 11));
+        logo_lines.push(Line::from(Span::styled(
+            line,
+            Style::default().fg(color),
+        )));
+    }
 
     let logo = Paragraph::new(logo_lines).alignment(ratatui::layout::Alignment::Center);
     frame.render_widget(logo, chunks[1]);
