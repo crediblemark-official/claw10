@@ -613,4 +613,210 @@ mod tests {
             err
         );
     }
+
+    // ── Integration test with MockModelProvider ─────────────────
+
+    struct MockModelProvider {
+        name: String,
+        models: Vec<String>,
+    }
+
+    impl MockModelProvider {
+        fn new(name: &str, models: Vec<&str>) -> Self {
+            Self {
+                name: name.to_string(),
+                models: models.into_iter().map(|s| s.to_string()).collect(),
+            }
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl clawhive_model_router::provider::ModelProvider for MockModelProvider {
+        fn name(&self) -> &str {
+            &self.name
+        }
+
+        fn supported_models(&self) -> Vec<&str> {
+            self.models.iter().map(|s| s.as_str()).collect()
+        }
+
+        fn get_profile(&self, model_name: &str) -> Option<clawhive_model_router::types::ModelProfile> {
+            if self.models.iter().any(|m| m == model_name) {
+                Some(clawhive_model_router::types::ModelProfile {
+                    id: model_name.to_string(),
+                    provider: self.name.clone(),
+                    model_name: model_name.to_string(),
+                    context_window: 4096,
+                    max_output_tokens: 1024,
+                    cost_per_1k_input: 0.01,
+                    cost_per_1k_output: 0.03,
+                    suitable_for: vec!["general".to_string()],
+                })
+            } else {
+                None
+            }
+        }
+
+        async fn chat(
+            &self,
+            _request: clawhive_model_router::types::ChatRequest,
+        ) -> Result<clawhive_model_router::types::ChatResponse, clawhive_model_router::ModelError> {
+            // Return a simple final answer immediately (no tool calls → loop terminates)
+            Ok(clawhive_model_router::types::ChatResponse {
+                message: clawhive_model_router::types::ModelMessage {
+                    role: clawhive_model_router::types::MessageRole::Assistant,
+                    content: "Task completed successfully.".into(),
+                    tool_calls: None,
+                    tool_call_id: None,
+                    name: None,
+                },
+                finish_reason: clawhive_model_router::types::FinishReason::Stop,
+                usage: clawhive_model_router::types::UsageInfo {
+                    prompt_tokens: 100,
+                    completion_tokens: 20,
+                    total_tokens: 120,
+                    cost_usd: 0.002,
+                },
+                model_used: self.models[0].clone(),
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn test_runtime_integration_with_mock_provider() {
+        let memory = Arc::new(clawhive_store::InMemoryStore::new());
+        let store = AgentStore::new(memory.clone());
+
+        // Register mock model provider
+        let mut registry = clawhive_model_router::provider::ModelRegistry::new();
+        registry.register(Box::new(MockModelProvider::new(
+            "mock",
+            vec!["gpt-4o", "gpt-4o-mini"],
+        )));
+        let model_router = Arc::new(clawhive_model_router::router::ModelRouter::new(registry));
+
+        // Register tools (shell, read_file for context)
+        let mut tool_registry = clawhive_tool::registry::ToolRegistry::new();
+        tool_registry.register(Box::new(clawhive_tool::builtin::ShellTool));
+        tool_registry.register(Box::new(clawhive_tool::builtin::ReadFileTool));
+        let tool_registry = Arc::new(tool_registry);
+
+        let budget_service = Arc::new(clawhive_budget::BudgetService);
+        let worker_service = Arc::new(clawhive_worker::WorkerService::new(memory.clone()));
+        let default_worker_id = Some(WorkerId(uuid::Uuid::now_v7()));
+
+        let runtime = AgentRuntime::new(
+            AgentStore::new(memory.clone()),
+            model_router,
+            tool_registry,
+            budget_service,
+            worker_service,
+            default_worker_id.clone(),
+        );
+
+        // Save an Active agent
+        let mut agent = sample_agent();
+        agent.genome.model_policy.preferred_profile = "gpt-4o".into();
+        agent.genome.model_policy.fallback_profiles = vec!["gpt-4o-mini".into()];
+        store.save(&agent).await.unwrap();
+
+        // Execute
+        let (session, events) = runtime
+            .execute_agent(
+                &agent.id,
+                "complete the task".into(),
+                HashMap::new(),
+                default_worker_id,
+            )
+            .await
+            .expect("runtime.execute_agent should succeed with mock provider");
+
+        // Verify session state
+        assert!(
+            session.state == crate::session::SessionState::Completed
+                || session.state == crate::session::SessionState::Active,
+            "session should be completed or active, got {:?}",
+            session.state
+        );
+        assert!(session.turn_count > 0, "should have at least 1 turn");
+        assert!(session.total_tokens > 0, "should have consumed tokens");
+
+        // Verify events
+        assert!(!events.is_empty(), "should have events");
+        let has_session_started = events
+            .iter()
+            .any(|e| matches!(e, crate::events::AgentEvent::SessionStarted { .. }));
+        assert!(has_session_started, "should have SessionStarted event");
+
+        let has_model_call = events
+            .iter()
+            .any(|e| matches!(e, crate::events::AgentEvent::ModelCall { .. }));
+        assert!(has_model_call, "should have ModelCall event");
+
+        let has_objective_complete = events
+            .iter()
+            .any(|e| matches!(e, crate::events::AgentEvent::ObjectiveComplete { .. }));
+        assert!(has_objective_complete, "should have ObjectiveComplete event");
+
+        // Verify agent state was persisted
+        let saved = store.get(&agent.id).await.unwrap().unwrap();
+        assert!(
+            saved.turn_count >= 1,
+            "persisted agent should have turn_count >= 1"
+        );
+        assert!(
+            saved.total_cost_usd > 0.0,
+            "persisted agent should have total_cost_usd > 0"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_runtime_integration_with_context() {
+        let memory = Arc::new(clawhive_store::InMemoryStore::new());
+        let store = AgentStore::new(memory.clone());
+
+        // Register mock provider
+        let mut registry = clawhive_model_router::provider::ModelRegistry::new();
+        registry.register(Box::new(MockModelProvider::new(
+            "mock",
+            vec!["gpt-4o"],
+        )));
+        let model_router = Arc::new(clawhive_model_router::router::ModelRouter::new(registry));
+
+        let tool_registry = Arc::new(clawhive_tool::registry::ToolRegistry::new());
+        let budget_service = Arc::new(clawhive_budget::BudgetService);
+        let worker_service = Arc::new(clawhive_worker::WorkerService::new(memory.clone()));
+        let worker_id = WorkerId(uuid::Uuid::now_v7());
+
+        let runtime = AgentRuntime::new(
+            AgentStore::new(memory.clone()),
+            model_router,
+            tool_registry,
+            budget_service,
+            worker_service,
+            Some(worker_id.clone()),
+        );
+
+        // Save agent with context-relevant settings
+        let mut agent = sample_agent();
+        agent.genome.model_policy.preferred_profile = "gpt-4o".into();
+        store.save(&agent).await.unwrap();
+
+        // Execute with extra context
+        let mut context = HashMap::new();
+        context.insert("mission_statement".into(), "Test mission".into());
+        context.insert("user_id".into(), "user-123".into());
+
+        let (session, events) = runtime
+            .execute_agent(&agent.id, "test with context".into(), context, None)
+            .await
+            .expect("execute_agent with context should succeed");
+
+        assert!(session.turn_count > 0, "should have completed at least 1 turn");
+
+        let has_thought = events
+            .iter()
+            .any(|e| matches!(e, crate::events::AgentEvent::Thought { .. }));
+        assert!(has_thought, "should have Thought event with response content");
+    }
 }

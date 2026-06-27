@@ -8,10 +8,12 @@ use clawhive_domain::SwarmLimitsConfig;
 use clawhive_event::InMemoryEventBus;
 use clawhive_gateway::GatewayService;
 use clawhive_memory::MemoryService;
+use clawhive_model_router::router::ModelRouter;
 use clawhive_scheduler::ScheduleService;
 use clawhive_spawn::broker::SpawnBroker;
 use clawhive_store::{InMemoryStore as KvInMemory, Store};
 use clawhive_telemetry::TelemetryService;
+use clawhive_tool::registry::ToolRegistry;
 use clawhive_worker::WorkerService;
 
 pub use crate::store::*;
@@ -28,6 +30,8 @@ pub struct AppState {
     pub spawn_broker: Arc<SpawnBroker>,
     pub telemetry: TelemetryService,
     pub kv_store: Arc<dyn Store>,
+    pub model_router: Option<Arc<ModelRouter>>,
+    pub tool_registry: Option<Arc<ToolRegistry>>,
 }
 
 impl AppState {
@@ -67,7 +71,22 @@ impl AppState {
             spawn_broker: Arc::new(SpawnBroker::new(limits, agent_store, event_bus)),
             telemetry: TelemetryService::default(),
             kv_store,
+            model_router: None,
+            tool_registry: None,
         }
+    }
+
+    /// Create AppState dengan model router dan tool registry untuk agent execution.
+    #[must_use]
+    pub fn new_with_services(
+        kv_store: Arc<dyn Store>,
+        model_router: Arc<ModelRouter>,
+        tool_registry: Arc<ToolRegistry>,
+    ) -> Self {
+        let mut state = Self::new_with_store(kv_store);
+        state.model_router = Some(model_router);
+        state.tool_registry = Some(tool_registry);
+        state
     }
 }
 

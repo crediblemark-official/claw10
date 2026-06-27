@@ -26,6 +26,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/v1/agents", get(agent::list_agents))
         .route("/v1/agents/{id}", get(agent::get_agent))
         .route("/v1/agents/{id}/pause", post(agent::pause_agent))
+        .route("/v1/agents/{id}/execute", post(agent::execute_agent))
         .route("/v1/agents/{id}/terminate", post(agent::terminate_agent))
         .route(
             "/v1/spawn-requests",

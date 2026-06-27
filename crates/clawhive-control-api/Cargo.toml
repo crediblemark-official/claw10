@@ -22,6 +22,8 @@ clawhive-store = { path = "../clawhive-store" }
 clawhive-agent = { path = "../clawhive-agent" }
 clawhive-event = { path = "../clawhive-event" }
 clawhive-telemetry = { path = "../clawhive-telemetry" }
+clawhive-model-router = { path = "../clawhive-model-router" }
+clawhive-tool = { path = "../clawhive-tool" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 uuid = { workspace = true }
