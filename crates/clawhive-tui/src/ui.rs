@@ -12,22 +12,44 @@ use crate::app::{Screen, Tab, TuiApp};
 fn draw_home(frame: &mut Frame, area: Rect, app: &TuiApp) {
     let banner_content = include_str!("../../../assets/clawhive.txt");
     let banner_lines_count = banner_content.lines().count();
-    let logo_height = banner_lines_count; // Setinggi teks saja
+    
+    // Hitung tinggi konten utama (logo + spacer + input + sub_input + spacer + tip)
+    let content_height = banner_lines_count as u16 + 10;
 
-    let chunks = Layout::default()
+    // 1. Pisahkan Area Footer terlebih dahulu di bagian paling bawah
+    let main_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Percentage(10), // Spacer atas sedikit dinaikkan agar seimbang di tengah
-            Constraint::Length(logo_height as u16), // Logo setinggi dinamis
-            Constraint::Length(2),      // Spacer logo-input
-            Constraint::Length(4),      // Input Box (height 4 untuk text + model info di dalam)
-            Constraint::Length(1),      // Sub-input info
-            Constraint::Length(2),      // Spacer input-tip
-            Constraint::Length(1),      // Tip
-            Constraint::Min(0),         // Spacer bawah
-            Constraint::Length(1),      // Footer
+            Constraint::Min(0),    // Area utama
+            Constraint::Length(1), // Footer
         ])
         .split(area);
+    let main_area = main_chunks[0];
+    let footer_area = main_chunks[1];
+
+    // 2. Bagi Area Utama secara vertikal: Spacer Atas (elastis), Konten Tengah, Spacer Bawah (elastis)
+    let center_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Min(0),                  // Spacer atas
+            Constraint::Length(content_height),  // Konten tengah
+            Constraint::Min(0),                  // Spacer bawah
+        ])
+        .split(main_area);
+    let content_area = center_chunks[1];
+
+    // 3. Bagi Area Konten Tengah menjadi komponen-komponennya
+    let inner_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(banner_lines_count as u16), // Logo
+            Constraint::Length(2),                         // Spacer logo-input
+            Constraint::Length(4),                         // Input Box
+            Constraint::Length(1),                         // Sub-input info
+            Constraint::Length(2),                         // Spacer input-tip
+            Constraint::Length(1),                         // Tip
+        ])
+        .split(content_area);
 
     let mut logo_lines = Vec::new();
 
@@ -49,7 +71,7 @@ fn draw_home(frame: &mut Frame, area: Rect, app: &TuiApp) {
     }
 
     let logo = Paragraph::new(logo_lines).alignment(ratatui::layout::Alignment::Center);
-    frame.render_widget(logo, chunks[1]);
+    frame.render_widget(logo, inner_chunks[0]);
 
     // Pembagian horizontal di tengah (lebar 60%) agar input box tidak full-width
     let horizontal_input_layout = Layout::default()
@@ -59,7 +81,7 @@ fn draw_home(frame: &mut Frame, area: Rect, app: &TuiApp) {
             Constraint::Percentage(60),
             Constraint::Percentage(20),
         ])
-        .split(chunks[3]);
+        .split(inner_chunks[2]);
     let input_box_area = horizontal_input_layout[1];
 
     let horizontal_sub_layout = Layout::default()
@@ -69,7 +91,7 @@ fn draw_home(frame: &mut Frame, area: Rect, app: &TuiApp) {
             Constraint::Percentage(60),
             Constraint::Percentage(20),
         ])
-        .split(chunks[4]);
+        .split(inner_chunks[3]);
     let sub_info_area = horizontal_sub_layout[1];
 
     // 2. Input Box (dengan border kiri Cyan/Blue dan background gelap)
@@ -157,13 +179,13 @@ fn draw_home(frame: &mut Frame, area: Rect, app: &TuiApp) {
         Span::raw(" untuk perintah terminal."),
     ]);
     let tip = Paragraph::new(tip_line).alignment(ratatui::layout::Alignment::Center);
-    frame.render_widget(tip, chunks[6]);
+    frame.render_widget(tip, inner_chunks[5]);
 
     // 5. Footer
     let footer_chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-        .split(chunks[8]);
+        .split(footer_area);
 
     let current_dir = std::env::current_dir()
         .map(|p| p.to_string_lossy().to_string())
