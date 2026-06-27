@@ -175,7 +175,6 @@ fn draw_home(frame: &mut Frame, area: Rect, app: &TuiApp) {
     };
 
     let input_widget = Paragraph::new(lines)
-        .style(Style::default().bg(Color::Rgb(30, 30, 30)))
         .block(input_block);
     frame.render_widget(input_widget, input_box_area);
 
@@ -328,8 +327,7 @@ fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                     Style::default()
                         .fg(border_color)
                         .add_modifier(Modifier::BOLD),
-                )
-                .style(Style::default().bg(Color::Indexed(236))); // Background abu-abu gelap solid
+                );
 
             let mut lines = Vec::new();
             lines.push(Line::from("")); // Padding vertikal atas
@@ -353,7 +351,7 @@ fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
             for part in msg.lines() {
                 lines.push(Line::from(vec![
                     Span::raw("  "), // Padding kiri 2 spasi
-                    Span::styled(part, Style::default().fg(Color::White)),
+                Span::styled(part, Style::default()),
                 ]));
             }
 
@@ -464,7 +462,6 @@ fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
     };
 
     let input_widget = Paragraph::new(chat_input_lines)
-        .style(Style::default().bg(Color::Rgb(30, 30, 30)))
         .block(input_block);
     frame.render_widget(input_widget, active_input_area);
 
