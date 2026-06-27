@@ -5,3 +5,14 @@ edition = "2024"
 
 [dependencies]
 clawhive-domain = { path = "../clawhive-domain" }
+clawhive-tool = { path = "../clawhive-tool" }
+clawhive-model-router = { path = "../clawhive-model-router" }
+clawhive-budget = { path = "../clawhive-budget" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+async-trait = "0.1"
+tokio = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }

@@ -5,3 +5,11 @@ edition = "2024"
 
 [dependencies]
 clawhive-domain = { path = "../clawhive-domain" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+async-trait = "0.1"
+tokio = { workspace = true }
+uuid = { workspace = true }
+reqwest = { version = "0.12", default-features = false, features = ["json"] }
