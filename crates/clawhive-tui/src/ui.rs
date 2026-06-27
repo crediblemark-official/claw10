@@ -151,10 +151,20 @@ fn draw_home(frame: &mut Frame, area: Rect, app: &TuiApp) {
 }
 
 fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
-    let main_chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(75), Constraint::Percentage(25)])
-        .split(area);
+    // Tampilkan sidebar hanya jika lebar layar >= 90
+    let show_sidebar = area.width >= 90;
+
+    let main_chunks = if show_sidebar {
+        Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(75), Constraint::Percentage(25)])
+            .split(area)
+    } else {
+        Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(100)])
+            .split(area)
+    };
 
     // --- KOLOM KIRI (CHAT & INPUT AREA) ---
     let left_chunks = Layout::default()
@@ -337,185 +347,187 @@ fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
         .alignment(ratatui::layout::Alignment::Right);
     frame.render_widget(shortcuts, sub_chunks[1]);
 
-    // --- KOLOM KANAN (SIDEBAR) ---
-    // Sidebar block dengan background hitam pekat solid untuk membedakannya dari chat area
-    let sidebar_block = Block::default()
-        .borders(Borders::LEFT)
-        .border_style(Style::default().fg(Color::DarkGray))
-        .style(Style::default().bg(Color::Black));
-    let sidebar_inner = sidebar_block.inner(main_chunks[1]);
-    frame.render_widget(sidebar_block, main_chunks[1]);
-
-    // Berikan padding horizontal 2 spasi di dalam sidebar agar teks tidak mepet border
-    let horizontal_sidebar_layout = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Length(2),      // Padding kiri dari garis pembatas
-            Constraint::Min(0),         // Area utama sidebar
-            Constraint::Length(2),      // Padding kanan dari tepi terminal
-        ])
-        .split(sidebar_inner);
-    let active_sidebar_area = horizontal_sidebar_layout[1];
-
-    let sidebar_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(3), // Tab header
-            Constraint::Min(0),    // Tab content
-            Constraint::Length(3), // Footer sidebar
-        ])
-        .split(active_sidebar_area);
-
-    // Tab Header (Lebih minimalis dan modern tanpa bracket [])
-    let tab_titles = vec!["Session", "Agents", "Workers", "Spawn"];
-    let tab_spans: Vec<Span> = tab_titles
-        .iter()
-        .enumerate()
-        .map(|(i, t)| {
-            let is_selected = match app.selected_tab {
-                Tab::Session => i == 0,
-                Tab::Agents => i == 1,
-                Tab::Workers => i == 2,
-                Tab::SpawnRequests => i == 3,
-            };
-            if is_selected {
-                Span::styled(format!("  {}  ", t), Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
-            } else {
-                Span::styled(format!("  {}  ", t), Style::default().fg(Color::DarkGray))
-            }
-        })
-        .collect();
-    
-    let tab_header = Paragraph::new(Line::from(tab_spans))
-        .style(Style::default().bg(Color::Black)) // Background hitam pekat
-        .block(Block::default()
-            .borders(Borders::BOTTOM)
+    if show_sidebar {
+        // --- KOLOM KANAN (SIDEBAR) ---
+        // Sidebar block dengan background hitam pekat solid untuk membedakannya dari chat area
+        let sidebar_block = Block::default()
+            .borders(Borders::LEFT)
             .border_style(Style::default().fg(Color::DarkGray))
-            .style(Style::default().bg(Color::Black)));
-    frame.render_widget(tab_header, sidebar_chunks[0]);
+            .style(Style::default().bg(Color::Black));
+        let sidebar_inner = sidebar_block.inner(main_chunks[1]);
+        frame.render_widget(sidebar_block, main_chunks[1]);
 
-    // Tab Content
-    match app.selected_tab {
-        Tab::Session => {
-            let now_str = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S.000Z").to_string();
-            let tokens_str = format!("{} tokens", app.chat_history.len() * 12);
-            
-            // Susun lines dengan kontras hierarki warna (Putih tebal untuk judul seksi, abu-abu untuk detail)
-            let lines = vec![
-                Line::from(Span::styled(format!("New session - {}", now_str), Style::default().fg(Color::White))),
-                Line::from(""),
-                Line::from(Span::styled("Context", Style::default().fg(Color::White).add_modifier(Modifier::BOLD))),
-                Line::from(Span::styled(tokens_str, Style::default().fg(Color::DarkGray))),
-                Line::from(Span::styled("0% used", Style::default().fg(Color::DarkGray))),
-                Line::from(Span::styled("$0.00 spent", Style::default().fg(Color::DarkGray))),
-                Line::from(""),
-                Line::from(Span::styled("LSP", Style::default().fg(Color::White).add_modifier(Modifier::BOLD))),
-                Line::from(Span::styled("LSPs are disabled", Style::default().fg(Color::DarkGray))),
-            ];
+        // Berikan padding horizontal 2 spasi di dalam sidebar agar teks tidak mepet border
+        let horizontal_sidebar_layout = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Length(2),      // Padding kiri dari garis pembatas
+                Constraint::Min(0),         // Area utama sidebar
+                Constraint::Length(2),      // Padding kanan dari tepi terminal
+            ])
+            .split(sidebar_inner);
+        let active_sidebar_area = horizontal_sidebar_layout[1];
 
-            let session_para = Paragraph::new(lines)
-                .style(Style::default().bg(Color::Black)) // Background hitam pekat
-                .wrap(Wrap { trim: false });
-            frame.render_widget(session_para, sidebar_chunks[1]);
-        }
-        Tab::Agents => {
-            let items: Vec<ListItem> = app.agents.iter().enumerate().map(|(i, a)| {
-                let prefix = if i == app.selected_index { "> " } else { "  " };
-                let state_color = match a.state {
-                    AgentState::Active => Color::Green,
-                    AgentState::Paused => Color::Blue,
-                    _ => Color::DarkGray,
+        let sidebar_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(3), // Tab header
+                Constraint::Min(0),    // Tab content
+                Constraint::Length(3), // Footer sidebar
+            ])
+            .split(active_sidebar_area);
+
+        // Tab Header (Lebih minimalis dan modern tanpa bracket [])
+        let tab_titles = vec!["Session", "Agents", "Workers", "Spawn"];
+        let tab_spans: Vec<Span> = tab_titles
+            .iter()
+            .enumerate()
+            .map(|(i, t)| {
+                let is_selected = match app.selected_tab {
+                    Tab::Session => i == 0,
+                    Tab::Agents => i == 1,
+                    Tab::Workers => i == 2,
+                    Tab::SpawnRequests => i == 3,
                 };
-                ListItem::new(Line::from(vec![
-                    Span::styled(prefix, Style::default().fg(Color::Cyan)),
-                    Span::raw(format!("{} ", a.name)),
-                    Span::styled(format!("{:?}", a.state), Style::default().fg(state_color)),
-                ]))
-            }).collect();
-            let list = List::new(items)
-                .style(Style::default().bg(Color::Black)) // Background hitam pekat
-                .block(Block::default()
-                    .title(" Agents ")
-                    .title_alignment(ratatui::layout::Alignment::Center)
-                    .style(Style::default().bg(Color::Black)));
-            frame.render_widget(list, sidebar_chunks[1]);
-        }
-        Tab::Workers => {
-            let items: Vec<ListItem> = app.workers.iter().enumerate().map(|(i, w)| {
-                let prefix = if i == app.selected_index { "> " } else { "  " };
-                ListItem::new(Line::from(vec![
-                    Span::styled(prefix, Style::default().fg(Color::Cyan)),
-                    Span::raw(format!("{} ", w.name)),
-                    Span::styled(format!("{:?}", w.state), Style::default().fg(Color::Green)),
-                ]))
-            }).collect();
-            let list = List::new(items)
-                .style(Style::default().bg(Color::Black)) // Background hitam pekat
-                .block(Block::default()
-                    .title(" Workers ")
-                    .title_alignment(ratatui::layout::Alignment::Center)
-                    .style(Style::default().bg(Color::Black)));
-            frame.render_widget(list, sidebar_chunks[1]);
-        }
-        Tab::SpawnRequests => {
-            let items: Vec<ListItem> = app.spawn_requests.iter().enumerate().map(|(i, r)| {
-                let prefix = if i == app.selected_index { "> " } else { "  " };
-                let display_id = if r.id.0.to_string().len() > 8 {
-                    r.id.0.to_string()[..8].to_string()
+                if is_selected {
+                    Span::styled(format!("  {}  ", t), Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
                 } else {
-                    r.id.0.to_string()
-                };
-                ListItem::new(Line::from(vec![
-                    Span::styled(prefix, Style::default().fg(Color::Cyan)),
-                    Span::raw(format!("{} ", display_id)),
-                    Span::styled(format!("{:?}", r.state), Style::default().fg(Color::Yellow)),
-                ]))
-            }).collect();
-            let list = List::new(items)
-                .style(Style::default().bg(Color::Black)) // Background hitam pekat
-                .block(Block::default()
-                    .title(" Spawn Requests ")
-                    .title_alignment(ratatui::layout::Alignment::Center)
-                    .style(Style::default().bg(Color::Black)));
-            frame.render_widget(list, sidebar_chunks[1]);
+                    Span::styled(format!("  {}  ", t), Style::default().fg(Color::DarkGray))
+                }
+            })
+            .collect();
+        
+        let tab_header = Paragraph::new(Line::from(tab_spans))
+            .style(Style::default().bg(Color::Black)) // Background hitam pekat
+            .block(Block::default()
+                .borders(Borders::BOTTOM)
+                .border_style(Style::default().fg(Color::DarkGray))
+                .style(Style::default().bg(Color::Black)));
+        frame.render_widget(tab_header, sidebar_chunks[0]);
+
+        // Tab Content
+        match app.selected_tab {
+            Tab::Session => {
+                let now_str = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S.000Z").to_string();
+                let tokens_str = format!("{} tokens", app.chat_history.len() * 12);
+                
+                // Susun lines dengan kontras hierarki warna (Putih tebal untuk judul seksi, abu-abu untuk detail)
+                let lines = vec![
+                    Line::from(Span::styled(format!("New session - {}", now_str), Style::default().fg(Color::White))),
+                    Line::from(""),
+                    Line::from(Span::styled("Context", Style::default().fg(Color::White).add_modifier(Modifier::BOLD))),
+                    Line::from(Span::styled(tokens_str, Style::default().fg(Color::DarkGray))),
+                    Line::from(Span::styled("0% used", Style::default().fg(Color::DarkGray))),
+                    Line::from(Span::styled("$0.00 spent", Style::default().fg(Color::DarkGray))),
+                    Line::from(""),
+                    Line::from(Span::styled("LSP", Style::default().fg(Color::White).add_modifier(Modifier::BOLD))),
+                    Line::from(Span::styled("LSPs are disabled", Style::default().fg(Color::DarkGray))),
+                ];
+
+                let session_para = Paragraph::new(lines)
+                    .style(Style::default().bg(Color::Black)) // Background hitam pekat
+                    .wrap(Wrap { trim: false });
+                frame.render_widget(session_para, sidebar_chunks[1]);
+            }
+            Tab::Agents => {
+                let items: Vec<ListItem> = app.agents.iter().enumerate().map(|(i, a)| {
+                    let prefix = if i == app.selected_index { "> " } else { "  " };
+                    let state_color = match a.state {
+                        AgentState::Active => Color::Green,
+                        AgentState::Paused => Color::Blue,
+                        _ => Color::DarkGray,
+                    };
+                    ListItem::new(Line::from(vec![
+                        Span::styled(prefix, Style::default().fg(Color::Cyan)),
+                        Span::raw(format!("{} ", a.name)),
+                        Span::styled(format!("{:?}", a.state), Style::default().fg(state_color)),
+                    ]))
+                }).collect();
+                let list = List::new(items)
+                    .style(Style::default().bg(Color::Black)) // Background hitam pekat
+                    .block(Block::default()
+                        .title(" Agents ")
+                        .title_alignment(ratatui::layout::Alignment::Center)
+                        .style(Style::default().bg(Color::Black)));
+                frame.render_widget(list, sidebar_chunks[1]);
+            }
+            Tab::Workers => {
+                let items: Vec<ListItem> = app.workers.iter().enumerate().map(|(i, w)| {
+                    let prefix = if i == app.selected_index { "> " } else { "  " };
+                    ListItem::new(Line::from(vec![
+                        Span::styled(prefix, Style::default().fg(Color::Cyan)),
+                        Span::raw(format!("{} ", w.name)),
+                        Span::styled(format!("{:?}", w.state), Style::default().fg(Color::Green)),
+                    ]))
+                }).collect();
+                let list = List::new(items)
+                    .style(Style::default().bg(Color::Black)) // Background hitam pekat
+                    .block(Block::default()
+                        .title(" Workers ")
+                        .title_alignment(ratatui::layout::Alignment::Center)
+                        .style(Style::default().bg(Color::Black)));
+                frame.render_widget(list, sidebar_chunks[1]);
+            }
+            Tab::SpawnRequests => {
+                let items: Vec<ListItem> = app.spawn_requests.iter().enumerate().map(|(i, r)| {
+                    let prefix = if i == app.selected_index { "> " } else { "  " };
+                    let display_id = if r.id.0.to_string().len() > 8 {
+                        r.id.0.to_string()[..8].to_string()
+                    } else {
+                        r.id.0.to_string()
+                    };
+                    ListItem::new(Line::from(vec![
+                        Span::styled(prefix, Style::default().fg(Color::Cyan)),
+                        Span::raw(format!("{} ", display_id)),
+                        Span::styled(format!("{:?}", r.state), Style::default().fg(Color::Yellow)),
+                    ]))
+                }).collect();
+                let list = List::new(items)
+                    .style(Style::default().bg(Color::Black)) // Background hitam pekat
+                    .block(Block::default()
+                        .title(" Spawn Requests ")
+                        .title_alignment(ratatui::layout::Alignment::Center)
+                        .style(Style::default().bg(Color::Black)));
+                frame.render_widget(list, sidebar_chunks[1]);
+            }
         }
+
+        // Sidebar Footer
+        let current_dir = std::env::current_dir()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|_| "/home/rasyiqi/PROJECT/clawhive".to_string());
+        
+        // Pecah path agar kata "clawhive" dicetak putih tebal
+        let (base_path, folder_name) = if current_dir.ends_with("/clawhive") {
+            (current_dir[..current_dir.len() - 8].to_string(), "clawhive".to_string())
+        } else {
+            (current_dir.to_string(), "".to_string())
+        };
+
+        let repo_line = if folder_name.is_empty() {
+            Line::from(vec![
+                Span::styled(base_path, Style::default().fg(Color::DarkGray)),
+                Span::styled(":master", Style::default().fg(Color::White)),
+            ])
+        } else {
+            Line::from(vec![
+                Span::styled(base_path, Style::default().fg(Color::DarkGray)),
+                Span::styled(folder_name, Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
+                Span::styled(":master", Style::default().fg(Color::DarkGray)),
+            ])
+        };
+
+        let footer_text = Paragraph::new(vec![
+            repo_line,
+            Line::from(vec![
+                Span::styled("● ", Style::default().fg(Color::Green)),
+                Span::styled("ClawHive ", Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
+                Span::styled("0.1.0", Style::default().fg(Color::DarkGray)),
+            ]),
+        ])
+        .style(Style::default().bg(Color::Black)); // Background hitam pekat
+        frame.render_widget(footer_text, sidebar_chunks[2]);
     }
-
-    // Sidebar Footer
-    let current_dir = std::env::current_dir()
-        .map(|p| p.to_string_lossy().to_string())
-        .unwrap_or_else(|_| "/home/rasyiqi/PROJECT/clawhive".to_string());
-    
-    // Pecah path agar kata "clawhive" dicetak putih tebal
-    let (base_path, folder_name) = if current_dir.ends_with("/clawhive") {
-        (current_dir[..current_dir.len() - 8].to_string(), "clawhive".to_string())
-    } else {
-        (current_dir.to_string(), "".to_string())
-    };
-
-    let repo_line = if folder_name.is_empty() {
-        Line::from(vec![
-            Span::styled(base_path, Style::default().fg(Color::DarkGray)),
-            Span::styled(":master", Style::default().fg(Color::White)),
-        ])
-    } else {
-        Line::from(vec![
-            Span::styled(base_path, Style::default().fg(Color::DarkGray)),
-            Span::styled(folder_name, Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
-            Span::styled(":master", Style::default().fg(Color::DarkGray)),
-        ])
-    };
-
-    let footer_text = Paragraph::new(vec![
-        repo_line,
-        Line::from(vec![
-            Span::styled("● ", Style::default().fg(Color::Green)),
-            Span::styled("ClawHive ", Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
-            Span::styled("0.1.0", Style::default().fg(Color::DarkGray)),
-        ]),
-    ])
-    .style(Style::default().bg(Color::Black)); // Background hitam pekat
-    frame.render_widget(footer_text, sidebar_chunks[2]);
 }
 
 pub fn draw(frame: &mut Frame, area: Rect, app: &TuiApp) {
