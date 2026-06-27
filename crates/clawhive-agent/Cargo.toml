@@ -8,7 +8,9 @@ clawhive-domain = { path = "../clawhive-domain" }
 clawhive-tool = { path = "../clawhive-tool" }
 clawhive-model-router = { path = "../clawhive-model-router" }
 clawhive-budget = { path = "../clawhive-budget" }
+clawhive-lifecycle = { path = "../clawhive-lifecycle" }
 clawhive-store = { path = "../clawhive-store" }
+clawhive-worker = { path = "../clawhive-worker" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

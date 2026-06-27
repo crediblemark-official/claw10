@@ -99,4 +99,38 @@ impl AgentRole {
             Self::Maintenance => "MaintenanceReport",
         }
     }
+
+    /// All 22 role variants for exhaustive iteration.
+    #[must_use]
+    pub fn all_variants() -> Vec<Self> {
+        vec![
+            Self::Root,
+            Self::Director,
+            Self::Planner,
+            Self::Orchestrator,
+            Self::Manager,
+            Self::Specialist,
+            Self::Research,
+            Self::Browser,
+            Self::Coding,
+            Self::Data,
+            Self::Communication,
+            Self::Device,
+            Self::Critic,
+            Self::Verifier,
+            Self::Judge,
+            Self::SecurityGuardian,
+            Self::MemoryCurator,
+            Self::SkillEngineer,
+            Self::CostController,
+            Self::Recovery,
+            Self::Watcher,
+            Self::Maintenance,
+        ]
+    }
 }
+
+#[cfg(test)]
+#[path = "lib_test.rs"]
+mod tests;
+

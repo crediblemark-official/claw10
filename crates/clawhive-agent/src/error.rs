@@ -56,3 +56,13 @@ impl From<clawhive_budget::BudgetError> for AgentError {
         }
     }
 }
+
+impl From<crate::store::AgentStoreError> for AgentError {
+    fn from(e: crate::store::AgentStoreError) -> Self {
+        match e {
+            crate::store::AgentStoreError::NotFound(msg) => AgentError::AgentNotFound(msg),
+            crate::store::AgentStoreError::Store(se) => AgentError::Other(se.to_string()),
+        }
+    }
+}
+

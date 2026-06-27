@@ -46,10 +46,17 @@ _Thinking:_
 - **`clawhive-telemetry`** — TelemetryService (emit structured JSON via tracing, fire-and-forget per FR-093, TelemetryEvent builder pattern with additional fields, disabled mode) — 6 tests
 - **`clawhive-tui`** — Ratatui TUI dengan 3 tab (Agents, Workers, Spawn Requests), command input mode (`:` key), in-process access ke AppState, pembaruan otomatis tiap 2 detik. Commands: `:help`, `:pause`, `:terminate`, `:approve`, `:deny`, `:spawn`, `:goto`, `:refresh`, `:q`. Keyboard: Tab switch, ↑↓/jk nav, q quit
 - **RbacService** — ditinggalkan pakai `Arc<Mutex<HashMap>>` karena tidak ada handler yang mengakses
-- **Total integration tests**: 117 — semuanya green (store 8 + icvs 4 + toon 8 + worker 10 + memory 9 + scheduler 8 + gateway 11 + lifecycle 11 + spawn 6 + policy 11 + audit 6 + artifact 8 + context 8 + skill 9 + telemetry 6)
+- **`clawhive-prompt` prompts → `.icvs` files** — pindah prompt dari embed Rust `r#"..."#` ke 4 file `.icvs` eksternal (`roles.icvs`, `base_kernel.icvs`, `lifecycle.icvs`, `injection.icvs`), load via `include_str!()`. Fix 12 failing tests akibat ICVS parser v0.2.2 tidak support `"""` multi-line
+- **Telemetry integration ke 5 handler files** — `worker.rs` (5 events), `memory.rs` (5 events), `gateway.rs` (6 events), `scheduler.rs` (2 events), `policy.rs` (1 event) — fire-and-forget pattern `let _ = state.telemetry.record()`
+- **E2E integration test: spawn→approve→agent lifecycle** — `tests/tests/e2e_spawn_approve_lifecycle.rs` — 4 test cases (full lifecycle, budget exhaustion, validation, lineage tracking)
+- **Vector observability pipeline** — `vector.toml`: file source (JSON telemetry), transform (parse + filter + route by event type), 4 sinks (dev console + separate JSONL per domain: agent, worker, memory, gateway, policy)
+- **TUI refactor: VecStore → kv_store** — `clawhive-tui/src/app.rs` migrated from `state.store.agents.lock().await` to `state.kv_store.scan_prefix::<Agent>(AGENT_PREFIX)` using `StoreExt` trait. Commands (`:pause`, `:terminate`, `:approve`, `:deny`, `:spawn`) now use load→modify→save pattern
+- **HTTP E2E tests** — `tests/tests/e2e_http_api.rs` — 6 test cases: health check, spawn→approve→lifecycle (15-step), gateway+memory, lineage tracking, schedule CRUD (add/list/delete/due), comprehensive lifecycle+gateway+memory+worker (hibernate→wake→heartbeat→checkpoint→channel→session→memory→worker)
+- **Telemetry file appender** — `main.rs`: dual subscriber via `tracing_subscriber::Registry` — Layer 1: file `logs/clawhive.log` (daily rolling, non-ANSI), Layer 2: stderr (ANSI, human-readable). `create_dir_all("logs")` sebelum appender. `reqwest` switched to `rustls-tls` (no openssl system dep)
+- **Dual tracing subscriber** — `main.rs`: layered `Registry` with `EnvFilter + fmt::layer (file, non-ANSI) + fmt::layer (stderr, ANSI)`. Kedua layer independen — event yang sama muncul di kedua output
 
 ### In Progress
-- **Vec-based store di `control-api/store.rs`** → refactor ke `Store` trait (blokir refactor agent/lifecycle/spawn/policy handlers, ditunda karena deep coupling ke handler logic)
+- (none currently)
 
 ### Blocked
 - (none)
@@ -63,24 +70,27 @@ _Thinking:_
 - **Skill state machine** — 14 valid transitions, FR-064: `sign_skill` wajib sebelum transisi ke Active (unsigned skills ditolak)
 - **Telemetry fire-and-forget** — per FR-093, `TelemetryService::emit()` return `Result` tapi caller harus tidak propagate error ke task/agent state. Menggunakan `tracing::info!` dengan JSON payload untuk Vector/OpenTelemetry pipeline
 - **TUI in-process** — `clawhive-tui` mengakses `AppState` langsung (tanpa HTTP client). Ribuan baris data dirender via ratatui Layout split. Command input mode dengan `:` key dan parsing manual di `execute_command()`
-- **Vec-based store ditunda** — control-api/state.rs menggunakan `VecStore` (tokio::sync::Mutex<Vec>), bukan `Store` trait, karena handler logic sangat terikat dengan mutable references (`iter_mut().find()`). Refactor memerlukan rewrite ulang handler (4 files)
+- **Prompt ICVS eksternal** — file `.icvs` di `crates/clawhive-prompt/prompts/`, load via `include_str!()`. Content single-line dengan `\n` escape (ICVS v0.2.2 tidak support multi-line strings)
 - **No Markdown prompts** — ICVS nodes dengan `type = prompt` menangani semua instruction authoring
 
 ## Next Steps
-1. Refactor Vec-based store di `control-api/src/store.rs` → `Store` trait (memerlukan rewrite 4 handler files: agent.rs, spawn.rs, lifecycle.rs)
-2. Telemetry integration ke services (emit events dari agent/task lifecycle)
-3. TUI integration ke CLI (`clawhive tui` subcommand)
-4. Observability dashboard via Vector/OpenTelemetry pipeline
-5. End-to-end integration tests untuk spawn→approve→agent lifecycle
+1. CI pipeline update — add clippy + e2e_http_api tests + cargo audit ke `.github/workflows/ci.yml`
+2. Unit tests untuk `clawhive-prompt` assembler — ICVS compilation, policy digest injection, role prompt resolution
+3. Agent host runtime — integrasi model-router + tool execution + worker assignment untuk agent lifecycle execution
+4. Dual subscriber refinement — layered subscriber dengan JSON formatting untuk file output
 
 ## Critical Context
 - Rust 1.96.0, cargo 1.96.0, `.cargo/config.toml` → `-D clippy::all -D clippy::pedantic`
 - Binary: `cargo run -- serve` → API server di 0.0.0.0:3000, opsional `--db <path>` untuk persistence
 - `cargo run -p clawhive-tui` → standalone TUI app
 - `cargo check --all-targets` → clean (0 errors)
-- `cargo test --all-targets` → 117 passed, 0 failed
+- `cargo test --all-targets` → 121+ passed, 0 failed (4 e2e + 6 HTTP e2e + previous 111)
 - File PRD: `/home/rasyiqi/PROJECT/clawhive/TXT.txt` (2880+ baris, Appendix A — architecture decisions)
-- 2 crates still empty: `clawhive-tui` (done but not wired to CLI binary), `clawhive-telemetry` (done)
+- Semua crate sudah terisi — tidak ada empty crate
+- `reqwest` pakai `rustls-tls` (no openssl system dep required)
+- `tracing-appender` file logging: `logs/clawhive.log` (daily rotation, created automatically)
+
+
 
 ## Relevant Files
 - `/home/rasyiqi/PROJECT/clawhive/crates/clawhive-store/src/lib.rs`: `Store` trait + `StoreExt` + `InMemoryStore` + `SledStore` (~250 baris)

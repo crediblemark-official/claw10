@@ -72,3 +72,8 @@ impl Default for IcvsPromptRegistry {
         Self::new()
     }
 }
+
+#[cfg(test)]
+#[path = "registry_test.rs"]
+mod tests;
+

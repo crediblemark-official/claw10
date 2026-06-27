@@ -372,14 +372,11 @@ mod tests {
         // Clone Arc so runtime and assertion handle share the same backing store.
         let assert_store = AgentStore::new(store.clone());
 
-        // Minimal mock services for construction
         let registry = clawhive_model_router::provider::ModelRegistry::new();
         let model_router = Arc::new(clawhive_model_router::router::ModelRouter::new(registry));
         let tool_registry = Arc::new(clawhive_tool::registry::ToolRegistry::new());
         let budget_service = Arc::new(clawhive_budget::BudgetService);
-
         let worker_service = Arc::new(clawhive_worker::WorkerService::new(store.clone()));
-
         let default_worker_id = Some(WorkerId(uuid::Uuid::now_v7()));
 
         let runtime = AgentRuntime::new(

@@ -142,3 +142,8 @@ impl PromptBundle {
         total
     }
 }
+
+#[cfg(test)]
+#[path = "bundle_test.rs"]
+mod tests;
+
