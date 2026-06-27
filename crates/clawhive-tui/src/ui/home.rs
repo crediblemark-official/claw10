@@ -86,7 +86,7 @@ pub fn draw_home(frame: &mut Frame, area: Rect, app: &TuiApp) {
     // 2. Input Box (dengan border kiri Cyan/Blue dan background gelap)
     let input_block = Block::default().borders(Borders::LEFT).border_style(
         Style::default()
-            .fg(Color::Cyan)
+            .fg(Color::Rgb(218, 165, 32))
             .add_modifier(Modifier::BOLD),
     );
 
@@ -131,7 +131,7 @@ pub fn draw_home(frame: &mut Frame, area: Rect, app: &TuiApp) {
                 Span::styled(
                     "TUI",
                     Style::default()
-                        .fg(Color::Cyan)
+                        .fg(Color::Rgb(218, 165, 32))
                         .add_modifier(Modifier::BOLD),
                 ),
                 Span::styled(format!(" · {} ", active_model_name), Style::default()),
@@ -158,7 +158,7 @@ pub fn draw_home(frame: &mut Frame, area: Rect, app: &TuiApp) {
                 Span::styled(
                     "TUI",
                     Style::default()
-                        .fg(Color::Cyan)
+                        .fg(Color::Rgb(218, 165, 32))
                         .add_modifier(Modifier::BOLD),
                 ),
                 Span::styled(format!(" · {} ", active_model_name), Style::default()),
@@ -194,7 +194,7 @@ pub fn draw_home(frame: &mut Frame, area: Rect, app: &TuiApp) {
                 .add_modifier(Modifier::BOLD),
         ),
         Span::raw(" Ketik prompt dan tekan Enter untuk menjalankan agen. Gunakan "),
-        Span::styled(":help", Style::default().fg(Color::Cyan)),
+        Span::styled(":help", Style::default().fg(Color::Rgb(218, 165, 32))),
         Span::raw(" untuk perintah terminal."),
     ]);
     let tip = Paragraph::new(tip_line).alignment(ratatui::layout::Alignment::Center);

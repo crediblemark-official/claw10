@@ -148,7 +148,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
         // Render gelembung pesan chat
         if sender.to_lowercase() == "user" || sender.to_lowercase() == "system" {
             let is_user = sender.to_lowercase() == "user";
-            let border_color = if is_user { Color::Cyan } else { Color::Red };
+            let border_color = if is_user { Color::Rgb(218, 165, 32) } else { Color::Red };
 
             // Bagi area gelembung secara horizontal: border kiri (1 kolom), spacer (2 kolom), teks (sisa area)
             let bubble_chunks = Layout::default()
@@ -185,7 +185,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
             // Solid blue box icon: ■
             lines.push(Line::from(vec![
                 Span::raw("  "), // Padding kiri 2 spasi
-                Span::styled("■ ", Style::default().fg(Color::Cyan)),
+                Span::styled("■ ", Style::default().fg(Color::Rgb(218, 165, 32))),
                 Span::styled(model.as_str(), Style::default().fg(Color::DarkGray)),
             ]));
             lines.push(Line::from("")); // Blank line
@@ -215,7 +215,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
 
     let input_block = Block::default().borders(Borders::LEFT).border_style(
         Style::default()
-            .fg(Color::Cyan)
+            .fg(Color::Rgb(218, 165, 32))
             .add_modifier(Modifier::BOLD),
     );
 
@@ -260,7 +260,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                 Span::styled(
                     "TUI",
                     Style::default()
-                        .fg(Color::Cyan)
+                        .fg(Color::Rgb(218, 165, 32))
                         .add_modifier(Modifier::BOLD),
                 ),
                 Span::styled(format!(" · {} ", active_model_name), Style::default()),
@@ -287,7 +287,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                 Span::styled(
                     "TUI",
                     Style::default()
-                        .fg(Color::Cyan)
+                        .fg(Color::Rgb(218, 165, 32))
                         .add_modifier(Modifier::BOLD),
                 ),
                 Span::styled(format!(" · {} ", active_model_name), Style::default()),
@@ -373,7 +373,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
             .style(Style::default().fg(Color::Rgb(200, 200, 200)).bg(Color::Rgb(0, 0, 0)))
             .highlight_style(
                 Style::default()
-                    .fg(Color::Cyan)
+                    .fg(Color::Rgb(218, 165, 32))
                     .bg(Color::Rgb(0, 0, 0))
                     .add_modifier(Modifier::BOLD),
             )
@@ -385,7 +385,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
             Tab::Session => {
                 let items = vec![ListItem::new(Span::styled(
                     "  Sesi default (Aktif)",
-                    Style::default().fg(Color::Cyan).bg(Color::Rgb(0, 0, 0)),
+                    Style::default().fg(Color::Rgb(218, 165, 32)).bg(Color::Rgb(0, 0, 0)),
                 ))];
                 let list = List::new(items)
                     .block(Block::default())

@@ -38,7 +38,7 @@ pub fn draw_slash_autocomplete(frame: &mut Frame, input_area: Rect, app: &TuiApp
                 .borders(Borders::LEFT)
                 .border_style(
                     Style::default()
-                        .fg(Color::Cyan)
+                        .fg(Color::Rgb(218, 165, 32))
                         .add_modifier(Modifier::BOLD),
                 )
                 .style(Style::default().bg(Color::Rgb(15, 15, 15))); // Background super gelap
