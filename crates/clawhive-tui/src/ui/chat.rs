@@ -316,14 +316,14 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
         // --- KOLOM KANAN (SIDEBAR) ---
         // Bersihkan area sidebar dan isi dengan background hitam pekat solid
         frame.render_widget(ratatui::widgets::Clear, main_chunks[1]);
-        let bg_block = Block::default().style(Style::default().bg(Color::Black));
+        let bg_block = Block::default().style(Style::default().bg(Color::Rgb(0, 0, 0)));
         frame.render_widget(bg_block, main_chunks[1]);
 
         // Sidebar block dengan background hitam pekat solid untuk membedakannya dari chat area
         let sidebar_block = Block::default()
             .borders(Borders::LEFT)
             .border_style(Style::default().fg(Color::DarkGray))
-            .style(Style::default().bg(Color::Black));
+            .style(Style::default().bg(Color::Rgb(0, 0, 0)));
         let sidebar_inner = sidebar_block.inner(main_chunks[1]);
         frame.render_widget(sidebar_block, main_chunks[1]);
 
@@ -338,6 +338,12 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
             .split(sidebar_inner);
         let active_sidebar_area = horizontal_sidebar_layout[1];
 
+        // Isi padding horizontal dengan background hitam pekat agar tidak transparan
+        let black = Style::default().bg(Color::Rgb(0, 0, 0));
+        let black_block = Block::default().style(black);
+        frame.render_widget(black_block.clone(), horizontal_sidebar_layout[0]);
+        frame.render_widget(black_block.clone(), horizontal_sidebar_layout[2]);
+
         // Bagi sidebar menjadi: Spacer Atas, Header (Titel tab), Spacer Tengah, List, dan Footer info
         let sidebar_chunks = Layout::default()
             .direction(Direction::Vertical)
@@ -350,6 +356,10 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
             ])
             .split(active_sidebar_area);
 
+        // Isi spacer atas dan tengah dengan background hitam pekat
+        frame.render_widget(black_block.clone(), sidebar_chunks[0]);
+        frame.render_widget(black_block.clone(), sidebar_chunks[2]);
+
         // Sidebar Header (Titel tab aktif dengan indikator navigasi)
         let tab_titles = vec!["Sess", "Agents", "Pool", "Broker"];
         let tabs = ratatui::widgets::Tabs::new(tab_titles)
@@ -359,12 +369,12 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                 Tab::Workers => 2,
                 Tab::SpawnRequests => 3,
             })
-            .block(Block::default().borders(Borders::BOTTOM).border_style(Style::default().fg(Color::DarkGray)))
-            .style(Style::default().fg(Color::DarkGray).bg(Color::Black))
+            .block(Block::default().borders(Borders::BOTTOM).border_style(Style::default().fg(Color::DarkGray).bg(Color::Rgb(0, 0, 0))))
+            .style(Style::default().fg(Color::DarkGray).bg(Color::Rgb(0, 0, 0)))
             .highlight_style(
                 Style::default()
                     .fg(Color::Cyan)
-                    .bg(Color::Black)
+                    .bg(Color::Rgb(0, 0, 0))
                     .add_modifier(Modifier::BOLD),
             )
             .divider(" ");
@@ -375,11 +385,11 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
             Tab::Session => {
                 let items = vec![ListItem::new(Span::styled(
                     "  Sesi default (Aktif)",
-                    Style::default().fg(Color::Cyan).bg(Color::Black),
+                    Style::default().fg(Color::Cyan).bg(Color::Rgb(0, 0, 0)),
                 ))];
                 let list = List::new(items)
                     .block(Block::default())
-                    .style(Style::default().bg(Color::Black));
+                    .style(Style::default().bg(Color::Rgb(0, 0, 0)));
                 frame.render_widget(list, sidebar_chunks[3]);
             }
             Tab::Agents => {
@@ -388,7 +398,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                         "  No active agents.",
                         Style::default().fg(Color::DarkGray),
                     ))
-                    .style(Style::default().bg(Color::Black));
+                    .style(Style::default().bg(Color::Rgb(0, 0, 0)));
                     frame.render_widget(p, sidebar_chunks[3]);
                 } else {
                     let items: Vec<ListItem> = app
@@ -399,26 +409,26 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                             let is_selected = i == app.selected_index;
                             let style = if is_selected {
                                 Style::default()
-                                    .fg(Color::Black)
+                                    .fg(Color::Rgb(0, 0, 0))
                                     .bg(Color::Rgb(254, 192, 126))
                                     .add_modifier(Modifier::BOLD)
                             } else {
-                                Style::default().fg(Color::White).bg(Color::Black)
+                                Style::default().fg(Color::White).bg(Color::Rgb(0, 0, 0))
                             };
 
                             let status_indicator = match a.state {
-                                AgentState::Active => Span::styled("● ", Style::default().fg(Color::Green).bg(Color::Black)),
+                                AgentState::Active => Span::styled("● ", Style::default().fg(Color::Green).bg(Color::Rgb(0, 0, 0))),
                                 AgentState::Paused => {
-                                    Span::styled("● ", Style::default().fg(Color::Yellow).bg(Color::Black))
+                                    Span::styled("● ", Style::default().fg(Color::Yellow).bg(Color::Rgb(0, 0, 0)))
                                 }
                                 AgentState::Terminated => {
-                                    Span::styled("● ", Style::default().fg(Color::Red).bg(Color::Black))
+                                    Span::styled("● ", Style::default().fg(Color::Red).bg(Color::Rgb(0, 0, 0)))
                                 }
-                                _ => Span::styled("● ", Style::default().fg(Color::DarkGray).bg(Color::Black)),
+                                _ => Span::styled("● ", Style::default().fg(Color::DarkGray).bg(Color::Rgb(0, 0, 0))),
                             };
 
                             ListItem::new(Line::from(vec![
-                                Span::styled("  ", Style::default().bg(Color::Black)),
+                                Span::styled("  ", Style::default().bg(Color::Rgb(0, 0, 0))),
                                 status_indicator,
                                 Span::styled(format!("{:<15}", a.name), style),
                             ]))
@@ -426,7 +436,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                         .collect();
                     let list = List::new(items)
                         .block(Block::default())
-                        .style(Style::default().bg(Color::Black));
+                        .style(Style::default().bg(Color::Rgb(0, 0, 0)));
                     frame.render_widget(list, sidebar_chunks[3]);
                 }
             }
@@ -436,7 +446,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                         "  No registered workers.",
                         Style::default().fg(Color::DarkGray),
                     ))
-                    .style(Style::default().bg(Color::Black));
+                    .style(Style::default().bg(Color::Rgb(0, 0, 0)));
                     frame.render_widget(p, sidebar_chunks[3]);
                 } else {
                     let items: Vec<ListItem> = app
@@ -445,14 +455,14 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                         .map(|w| {
                             let name = format!("  {:<15}", w.id.0.to_string().chars().take(8).collect::<String>());
                             ListItem::new(Line::from(vec![
-                                Span::styled(name, Style::default().fg(Color::White).bg(Color::Black)),
-                                Span::styled(format!(" {:?}", w.state), Style::default().fg(Color::DarkGray).bg(Color::Black)),
+                                Span::styled(name, Style::default().fg(Color::White).bg(Color::Rgb(0, 0, 0))),
+                                Span::styled(format!(" {:?}", w.state), Style::default().fg(Color::DarkGray).bg(Color::Rgb(0, 0, 0))),
                             ]))
                         })
                         .collect();
                     let list = List::new(items)
                         .block(Block::default())
-                        .style(Style::default().bg(Color::Black));
+                        .style(Style::default().bg(Color::Rgb(0, 0, 0)));
                     frame.render_widget(list, sidebar_chunks[3]);
                 }
             }
@@ -462,7 +472,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                         "  No spawn requests.",
                         Style::default().fg(Color::DarkGray),
                     ))
-                    .style(Style::default().bg(Color::Black));
+                    .style(Style::default().bg(Color::Rgb(0, 0, 0)));
                     frame.render_widget(p, sidebar_chunks[3]);
                 } else {
                     let items: Vec<ListItem> = app
@@ -471,14 +481,14 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                         .map(|r| {
                             let name = format!("  {:<15}", r.team.name.chars().take(12).collect::<String>());
                             ListItem::new(Line::from(vec![
-                                Span::styled(name, Style::default().fg(Color::White).bg(Color::Black)),
-                                Span::styled(" Pending", Style::default().fg(Color::Yellow).bg(Color::Black)),
+                                Span::styled(name, Style::default().fg(Color::White).bg(Color::Rgb(0, 0, 0))),
+                                Span::styled(" Pending", Style::default().fg(Color::Yellow).bg(Color::Rgb(0, 0, 0))),
                             ]))
                         })
                         .collect();
                     let list = List::new(items)
                         .block(Block::default())
-                        .style(Style::default().bg(Color::Black));
+                        .style(Style::default().bg(Color::Rgb(0, 0, 0)));
                     frame.render_widget(list, sidebar_chunks[3]);
                 }
             }
@@ -501,36 +511,36 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
 
         let repo_line = if folder_name.is_empty() {
             Line::from(vec![
-                Span::styled(base_path, Style::default().fg(Color::DarkGray).bg(Color::Black)),
-                Span::styled(":master", Style::default().bg(Color::Black)),
+                Span::styled(base_path, Style::default().fg(Color::DarkGray).bg(Color::Rgb(0, 0, 0))),
+                Span::styled(":master", Style::default().bg(Color::Rgb(0, 0, 0))),
             ])
         } else {
             Line::from(vec![
-                Span::styled(base_path, Style::default().fg(Color::DarkGray).bg(Color::Black)),
+                Span::styled(base_path, Style::default().fg(Color::DarkGray).bg(Color::Rgb(0, 0, 0))),
                 Span::styled(
                     folder_name,
                     Style::default()
-                        .bg(Color::Black)
+                        .bg(Color::Rgb(0, 0, 0))
                         .add_modifier(Modifier::BOLD),
                 ),
-                Span::styled(":master", Style::default().fg(Color::DarkGray).bg(Color::Black)),
+                Span::styled(":master", Style::default().fg(Color::DarkGray).bg(Color::Rgb(0, 0, 0))),
             ])
         };
 
         let footer_text = Paragraph::new(vec![
             repo_line,
             Line::from(vec![
-                Span::styled("● ", Style::default().fg(Color::Green).bg(Color::Black)),
+                Span::styled("● ", Style::default().fg(Color::Green).bg(Color::Rgb(0, 0, 0))),
                 Span::styled(
                     "ClawHive ",
                     Style::default()
-                        .bg(Color::Black)
+                        .bg(Color::Rgb(0, 0, 0))
                         .add_modifier(Modifier::BOLD),
                 ),
-                Span::styled("0.1.0", Style::default().fg(Color::DarkGray).bg(Color::Black)),
+                Span::styled("0.1.0", Style::default().fg(Color::DarkGray).bg(Color::Rgb(0, 0, 0))),
             ]),
         ])
-        .style(Style::default().bg(Color::Black)); // Background hitam pekat
+        .style(Style::default().bg(Color::Rgb(0, 0, 0))); // Background hitam pekat
         frame.render_widget(footer_text, sidebar_chunks[4]);
     }
 
