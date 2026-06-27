@@ -12,9 +12,16 @@ use crate::ui;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Tab {
+    Session,
     Agents,
     Workers,
     SpawnRequests,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Screen {
+    Home,
+    Chat,
 }
 
 pub enum InputMode {
@@ -33,6 +40,8 @@ pub struct TuiApp {
     pub status_message: String,
     pub input_mode: InputMode,
     pub input_buffer: String,
+    pub active_screen: Screen,
+    pub chat_history: Vec<(String, String, String)>, // (sender, role/model, message)
 }
 
 impl TuiApp {
@@ -44,11 +53,13 @@ impl TuiApp {
             workers: Vec::new(),
             spawn_requests: Vec::new(),
             selected_index: 0,
-            selected_tab: Tab::Agents,
+            selected_tab: Tab::Session,
             should_quit: false,
-            status_message: "ClawHive OS TUI — :cmd  ↑↓:nav  Tab:switch  q:quit".into(),
+            status_message: "ClawHive OS TUI — Tab: switch sidebar | Esc: home | :q: quit".into(),
             input_mode: InputMode::Normal,
             input_buffer: String::new(),
+            active_screen: Screen::Home,
+            chat_history: Vec::new(),
         }
     }
 
@@ -85,6 +96,7 @@ impl TuiApp {
 
     fn current_list_len(&self) -> usize {
         match self.selected_tab {
+            Tab::Session => 0,
             Tab::Agents => self.agents.len(),
             Tab::Workers => self.workers.len(),
             Tab::SpawnRequests => self.spawn_requests.len(),
@@ -388,66 +400,68 @@ Commands:
     }
 
     async fn handle_event(&mut self, event: Event) {
-        if matches!(self.input_mode, InputMode::Command) {
-            if let Event::Key(key) = event {
-                if key.kind == KeyEventKind::Press {
-                    match key.code {
-                        KeyCode::Enter => {
-                            let cmd = std::mem::take(&mut self.input_buffer);
-                            self.input_mode = InputMode::Normal;
-                            self.execute_command(&cmd).await;
+        if let Event::Key(key) = event {
+            if key.kind == KeyEventKind::Press {
+                // Handle Ctrl+C to quit
+                if key.code == KeyCode::Char('c') && key.modifiers.contains(event::KeyModifiers::CONTROL) {
+                    self.should_quit = true;
+                    return;
+                }
+                
+                match key.code {
+                    KeyCode::Enter => {
+                        let content = std::mem::take(&mut self.input_buffer);
+                        let trimmed = content.trim();
+                        if !trimmed.is_empty() {
+                            if trimmed.starts_with(':') {
+                                self.execute_command(&trimmed[1..]).await;
+                            } else {
+                                // Add prompt to chat history
+                                self.chat_history.push(("User".to_string(), "".to_string(), trimmed.to_string()));
+                                self.active_screen = Screen::Chat;
+                                
+                                // Simulasikan respon dari agent
+                                let response = format!("Memproses instruksi: \"{}\". Memulai analisis codebase dan menyiapkan agent workspace...", trimmed);
+                                self.chat_history.push(("Agent".to_string(), "Build · Kimi K2.7 Code".to_string(), response));
+                            }
                         }
-                        KeyCode::Esc => {
-                            self.input_buffer.clear();
-                            self.input_mode = InputMode::Normal;
-                            self.status_message = "Command cancelled".into();
-                        }
-                        KeyCode::Backspace => {
-                            self.input_buffer.pop();
-                        }
-                        KeyCode::Char(c) => {
-                            self.input_buffer.push(c);
-                        }
-                        _ => {}
                     }
+                    KeyCode::Esc => {
+                        if self.active_screen == Screen::Chat {
+                            self.active_screen = Screen::Home;
+                        } else {
+                            self.should_quit = true;
+                        }
+                    }
+                    KeyCode::Backspace => {
+                        self.input_buffer.pop();
+                    }
+                    KeyCode::Char(c) => {
+                        self.input_buffer.push(c);
+                    }
+                    KeyCode::Tab => {
+                        self.selected_tab = match self.selected_tab {
+                            Tab::Session => Tab::Agents,
+                            Tab::Agents => Tab::Workers,
+                            Tab::Workers => Tab::SpawnRequests,
+                            Tab::SpawnRequests => Tab::Session,
+                        };
+                        self.selected_index = 0;
+                    }
+                    KeyCode::Up => {
+                        if self.selected_index > 0 {
+                            self.selected_index -= 1;
+                        }
+                    }
+                    KeyCode::Down => {
+                        let max = self.current_list_len().saturating_sub(1);
+                        if self.selected_index < max {
+                            self.selected_index += 1;
+                        }
+                    }
+                    _ => {}
                 }
             }
-            return;
-        }
-
-        match event {
-            Event::Key(key) if key.kind == KeyEventKind::Press => match key.code {
-                KeyCode::Char(':') => {
-                    self.input_mode = InputMode::Command;
-                    self.input_buffer.clear();
-                    self.status_message = "Enter command (type :help) ".into();
-                }
-                KeyCode::Char('q') | KeyCode::Esc => {
-                    self.should_quit = true;
-                }
-                KeyCode::Up | KeyCode::Char('k') => {
-                    if self.selected_index > 0 {
-                        self.selected_index -= 1;
-                    }
-                }
-                KeyCode::Down | KeyCode::Char('j') => {
-                    let max = self.current_list_len().saturating_sub(1);
-                    if self.selected_index < max {
-                        self.selected_index += 1;
-                    }
-                }
-                KeyCode::Tab => {
-                    self.selected_tab = match self.selected_tab {
-                        Tab::Agents => Tab::Workers,
-                        Tab::Workers => Tab::SpawnRequests,
-                        Tab::SpawnRequests => Tab::Agents,
-                    };
-                    self.selected_index = 0;
-                }
-                _ => {}
-            },
-            Event::Resize(_, _) => {}
-            _ => {}
         }
     }
 }
