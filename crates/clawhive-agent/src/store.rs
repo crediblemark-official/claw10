@@ -142,7 +142,7 @@ mod tests {
     use super::*;
     use clawhive_domain::{
         AgentGenome, AgentState, AutonomyConfig, Budget, LifecycleMode, LineageId, MemoryConfig,
-        MissionId, ModelPolicy, NetworkPolicy, OrganizationId, PolicyBundle, PolicyBundleId,
+        MissionId, ModelPolicy, NetworkPolicy, OrganizationId, PolicyBundle,
         RuntimeConfig,
     };
     use clawhive_store::InMemoryStore;

@@ -8,7 +8,7 @@ use clawhive_domain::{
 use clawhive_spawn::broker::SpawnBroker;
 
 use clawhive_control_api::state::AppState;
-use clawhive_store::{Store, StoreExt};
+use clawhive_store::StoreExt;
 
 const AGENT_PREFIX: &str = "agent:";
 const SPAWNREQ_PREFIX: &str = "spawnreq:";
@@ -301,7 +301,7 @@ async fn test_e2e_spawn_approve_lifecycle() {
     // (Agent must be Active or Hibernating to pause)
     {
         let child_key = format!("{AGENT_PREFIX}{}", children[0].id.0);
-        let mut child: Agent = store.get(&child_key).await.unwrap().unwrap();
+        let child: Agent = store.get(&child_key).await.unwrap().unwrap();
         assert_eq!(child.state, AgentState::Ready);
         // Attempting to pause a Ready agent should fail
         assert!(
@@ -347,7 +347,7 @@ async fn test_e2e_spawn_approve_lifecycle() {
     // 17. Test lifecycle: Hibernate parent → wake parent
     {
         let mut parent: Agent = store.get(&parent_key).await.unwrap().unwrap();
-        let cp = clawhive_lifecycle::LifecycleService::hibernate(&mut parent).unwrap();
+        let _cp = clawhive_lifecycle::LifecycleService::hibernate(&mut parent).unwrap();
         assert_eq!(parent.state, AgentState::Hibernating);
         assert!(parent.current_runtime.is_none());
         assert_eq!(parent.checkpoints.len(), 1);
@@ -456,7 +456,7 @@ async fn test_e2e_spawn_budget_exhaustion() {
         .map(|(_, a)| a)
         .collect();
 
-    let mut request: clawhive_domain::SpawnRequest =
+    let request: clawhive_domain::SpawnRequest =
         store.get(&spawn_key).await.unwrap().unwrap();
     let mission_stored: Mission = store.get(&mission_key).await.unwrap().unwrap();
     let mut parent: Agent = store.get(&root_key).await.unwrap().unwrap();
@@ -532,7 +532,7 @@ async fn test_e2e_spawn_validation_parent_not_active() {
         .map(|(_, a)| a)
         .collect();
 
-    let mut request: clawhive_domain::SpawnRequest =
+    let request: clawhive_domain::SpawnRequest =
         store.get(&spawn_key).await.unwrap().unwrap();
     let mission_stored: Mission = store.get(&mission_key).await.unwrap().unwrap();
     let mut parent: Agent = store.get(&root_key).await.unwrap().unwrap();
@@ -610,7 +610,7 @@ async fn test_e2e_spawn_with_lineage() {
         .collect();
 
     let mut parent: Agent = store.get(&root_key).await.unwrap().unwrap();
-    let mut request = spawn_request;
+    let request = spawn_request;
     let mission_stored: Mission = store.get(&mission_key).await.unwrap().unwrap();
     let current_depth = calculate_depth(&request.requested_by, &all_agents);
 
