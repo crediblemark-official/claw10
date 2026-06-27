@@ -1,0 +1,7 @@
+[target.'cfg(all())']
+rustflags = ["-D", "clippy::all", "-D", "clippy::pedantic"]
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

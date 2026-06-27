@@ -1,0 +1,13 @@
+[package]
+name = "clawhive-auth"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+clawhive-domain = { path = "../clawhive-domain" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }

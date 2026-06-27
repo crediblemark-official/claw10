@@ -1,0 +1,24 @@
+[package]
+name = "clawhive-control-api"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+clawhive-domain = { path = "../clawhive-domain" }
+clawhive-auth = { path = "../clawhive-auth" }
+clawhive-organization = { path = "../clawhive-organization" }
+clawhive-mission = { path = "../clawhive-mission" }
+clawhive-task = { path = "../clawhive-task" }
+clawhive-lineage = { path = "../clawhive-lineage" }
+clawhive-spawn = { path = "../clawhive-spawn" }
+clawhive-budget = { path = "../clawhive-budget" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+axum = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+tracing = { workspace = true }

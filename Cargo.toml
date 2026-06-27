@@ -1,0 +1,59 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/clawhive-domain",
+    "crates/clawhive-control-api",
+    "crates/clawhive-auth",
+    "crates/clawhive-organization",
+    "crates/clawhive-mission",
+    "crates/clawhive-task",
+    "crates/clawhive-scheduler",
+    "crates/clawhive-agent",
+    "crates/clawhive-lifecycle",
+    "crates/clawhive-spawn",
+    "crates/clawhive-lineage",
+    "crates/clawhive-policy",
+    "crates/clawhive-icvs",
+    "crates/clawhive-context",
+    "crates/clawhive-toon",
+    "crates/clawhive-model-router",
+    "crates/clawhive-memory",
+    "crates/clawhive-skill",
+    "crates/clawhive-tool",
+    "crates/clawhive-worker",
+    "crates/clawhive-artifact",
+    "crates/clawhive-budget",
+    "crates/clawhive-audit",
+    "crates/clawhive-telemetry",
+    "crates/clawhive-gateway",
+    "crates/clawhive-cli",
+    "crates/clawhive-tui",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+authors = ["ClawHive Contributors"]
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v7", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "2"
+tokio = { version = "1", features = ["full"] }
+axum = { version = "0.8", features = ["macros"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "uuid", "chrono", "json"] }
+clap = { version = "4", features = ["derive"] }
+ratatui = "0.29"
+crossterm = "0.28"
+nats = "0.24"
+opentelemetry = "0.27"
+schemars = "0.8"
+derivative = "2"
+strum = { version = "0.27", features = ["derive"] }
