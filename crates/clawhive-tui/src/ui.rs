@@ -63,7 +63,7 @@ fn draw_home(frame: &mut Frame, area: Rect, app: &TuiApp) {
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Percentage(10), // Spacer atas sedikit dinaikkan agar seimbang di tengah
-            Constraint::Length(16),     // Logo setinggi 16 baris (9 ikon + 1 spacer + 6 teks)
+            Constraint::Length(15),     // Logo setinggi 15 baris (9 ikon + 1 spacer + 5 teks)
             Constraint::Length(2),      // Spacer logo-input
             Constraint::Length(4),      // Input Box (height 4 untuk text + model info di dalam)
             Constraint::Length(1),      // Sub-input info
