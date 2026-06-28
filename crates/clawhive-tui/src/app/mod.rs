@@ -355,14 +355,7 @@ impl TuiApp {
         self.active_suggestions.clear();
         
         if self.input_buffer.starts_with('/') {
-            if self.input_buffer == "/" {
-                self.active_suggestions = vec![
-                    ("/model ".to_string(), "/model ".to_string()),
-                    ("/help".to_string(), "/help".to_string()),
-                    ("/refresh".to_string(), "/refresh".to_string()),
-                    ("/q".to_string(), "/q".to_string()),
-                ];
-            } else if self.input_buffer.starts_with("/model") {
+            if self.input_buffer.starts_with("/model") {
                 if let Some(router) = &self.state.model_router {
                     let profiles = router.registry().list_profiles();
                     let search = if self.input_buffer.len() > 7 {
@@ -377,6 +370,19 @@ impl TuiApp {
                         .map(|p| (p.id.clone(), format!("/model {}", p.id)))
                         .collect();
                 }
+            } else {
+                let query = self.input_buffer.to_lowercase();
+                let all_commands = vec![
+                    ("/model <id>".to_string(), "/model ".to_string()),
+                    ("/help".to_string(), "/help".to_string()),
+                    ("/refresh".to_string(), "/refresh".to_string()),
+                    ("/q".to_string(), "/q".to_string()),
+                ];
+                
+                self.active_suggestions = all_commands
+                    .into_iter()
+                    .filter(|(cmd_name, _)| cmd_name.starts_with(&query) || query == "/")
+                    .collect();
             }
         }
         

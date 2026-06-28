@@ -44,13 +44,12 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
     // Hitung tinggi tambahan untuk slash command suggestions
     let mut suggestion_height = 0;
     if app.input_buffer.starts_with('/') {
-        if app.input_buffer == "/" {
-            suggestion_height = 7; // Header + 4 commands + footer + spacer
-        } else if app.input_buffer.starts_with("/model") {
-            let model_count = app.state.model_router.as_ref()
-                .map(|r| r.registry().list_profiles().len())
-                .unwrap_or(0);
-            suggestion_height = 2 + model_count.max(1) + 1; // Header + model count + footer + spacer
+        if app.input_buffer.starts_with("/model") {
+            suggestion_height = 2 + app.active_suggestions.len().max(1) + 1; // Header + suggestions + footer + spacer
+        } else {
+            if !app.active_suggestions.is_empty() {
+                suggestion_height = 2 + app.active_suggestions.len() + 1; // Header + suggestions + footer + spacer
+            }
         }
     }
 
@@ -330,31 +329,40 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
     } else {
         // Tambahkan suggestions jika input diawali dengan '/'
         if app.input_buffer.starts_with('/') {
-            if app.input_buffer == "/" {
-                chat_input_lines.push(Line::from(Span::styled("   [Commands] ---------------------------------------------", Style::default().fg(Color::DarkGray))));
-                
-                let commands = vec![
-                    ("/model <id>", "   - Ganti model aktif secara cepat"),
-                    ("/help", "         - Tampilkan daftar perintah lengkap"),
-                    ("/refresh", "      - Segarkan database agen dan task"),
-                    ("/q", "            - Keluar dari aplikasi TUI"),
-                ];
-                
-                for (idx, (cmd, desc)) in commands.into_iter().enumerate() {
-                    let is_selected = idx == app.suggestion_index;
-                    let (prefix, style) = if is_selected {
-                        (" >  ", Style::default().fg(Color::Rgb(0, 0, 0)).bg(Color::Rgb(254, 192, 126)).add_modifier(Modifier::BOLD))
-                    } else {
-                        ("    ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
-                    };
-                    chat_input_lines.push(Line::from(vec![
-                        Span::styled(format!("{}{:<15}", prefix, cmd), style),
-                        Span::styled(desc, Style::default().fg(Color::Gray)),
-                    ]));
+            if !app.input_buffer.starts_with("/model") {
+                if !app.active_suggestions.is_empty() {
+                    chat_input_lines.push(Line::from(Span::styled("   [Commands] ---------------------------------------------", Style::default().fg(Color::DarkGray))));
+                    
+                    let all_descs = vec![
+                        ("/model <id>", "   - Ganti model aktif secara cepat"),
+                        ("/help", "         - Tampilkan daftar perintah lengkap"),
+                        ("/refresh", "      - Segarkan database agen dan task"),
+                        ("/q", "            - Keluar dari aplikasi TUI"),
+                    ];
+                    
+                    for (idx, (cmd_name, _)) in app.active_suggestions.iter().enumerate() {
+                        let is_selected = idx == app.suggestion_index;
+                        let (prefix, style) = if is_selected {
+                            (" >  ", Style::default().fg(Color::Rgb(0, 0, 0)).bg(Color::Rgb(254, 192, 126)).add_modifier(Modifier::BOLD))
+                        } else {
+                            ("    ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
+                        };
+                        
+                        let display_name = if cmd_name == "/model " { "/model <id>" } else { cmd_name.as_str() };
+                        let desc = all_descs.iter()
+                            .find(|(name, _)| *name == display_name || name.starts_with(cmd_name))
+                            .map(|(_, d)| *d)
+                            .unwrap_or("");
+                            
+                        chat_input_lines.push(Line::from(vec![
+                            Span::styled(format!("{}{:<15}", prefix, display_name), style),
+                            Span::styled(desc, Style::default().fg(Color::Gray)),
+                        ]));
+                    }
+                    
+                    chat_input_lines.push(Line::from(Span::styled("   --------------------------------------------------------", Style::default().fg(Color::DarkGray))));
+                    chat_input_lines.push(Line::from(""));
                 }
-                
-                chat_input_lines.push(Line::from(Span::styled("   --------------------------------------------------------", Style::default().fg(Color::DarkGray))));
-                chat_input_lines.push(Line::from(""));
             } else if app.input_buffer.starts_with("/model") {
                 chat_input_lines.push(Line::from(Span::styled("   [Select Model] -----------------------------------------", Style::default().fg(Color::DarkGray))));
                 if app.active_suggestions.is_empty() {
