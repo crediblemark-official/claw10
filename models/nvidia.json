@@ -4,6 +4,7 @@
   "nemotron-3-ultra-550b-a55b",
   "nemotron-3.5-content-safety",
   "cosmos3-nano",
+  "cosmos3-nano-reasoner",
   "llama-3.3-70b-instruct",
   "llama-3.1-nemotron-70b-instruct",
   "deepseek-r1",
@@ -17,6 +18,13 @@
   "llama-3.1-405b-instruct",
   "llama-3.2-1b-instruct",
   "llama-3.2-3b-instruct",
+  "llama-3.2-11b-vision-instruct",
+  "llama-3.2-90b-vision-instruct",
   "phi-3.5-mini-instruct",
-  "phi-3.5-moe-instruct"
+  "phi-3.5-moe-instruct",
+  "phi-4",
+  "qwen-2.5-7b-instruct",
+  "qwen-2.5-72b-instruct",
+  "qwen-2.5-coder-32b-instruct",
+  "mistral-large-2411"
 ]
