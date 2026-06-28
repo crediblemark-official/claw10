@@ -108,6 +108,8 @@ pub struct TuiApp {
     /// Daftar suggestions aktif: (teks tampilan, nilai autocomplete/command)
     pub active_suggestions: Vec<(String, String)>,
     // ── Workspace fields ─────────────────────────────────────────
+    /// Store global (akar, tanpa namespace) — untuk menyimpan dan membaca metadata workspace.
+    pub global_store: Arc<dyn Store>,
     /// Workspace yang sedang aktif.
     pub active_workspace: Option<Workspace>,
     /// Daftar semua workspace tersedia dari database.
@@ -121,6 +123,8 @@ pub struct TuiApp {
 impl TuiApp {
     #[must_use]
     pub fn new(state: AppState) -> Self {
+        // Simpan reference ke store akar sebelum dipindahkan ke struct
+        let global_store = Arc::clone(&state.kv_store);
         Self {
             state,
             agents: Vec::new(),
@@ -156,6 +160,7 @@ impl TuiApp {
             pending_tool_approval: None,
             suggestion_index: 0,
             active_suggestions: Vec::new(),
+            global_store,
             active_workspace: None,
             workspaces: Vec::new(),
             workspace_input: String::new(),
@@ -165,7 +170,8 @@ impl TuiApp {
 
     /// Load semua workspace dari database global ke `self.workspaces`.
     pub async fn load_workspaces(&mut self) {
-        if let Ok(items) = self.state.kv_store.scan_prefix::<Workspace>("workspace:").await {
+        // Selalu gunakan global_store (non-namespaced) untuk membaca daftar workspace
+        if let Ok(items) = self.global_store.scan_prefix::<Workspace>("workspace:").await {
             let mut workspaces: Vec<Workspace> = items.into_iter().map(|(_, ws)| ws).collect();
             // Urutkan dari yang paling terakhir digunakan
             workspaces.sort_by(|a, b| b.last_used_at.cmp(&a.last_used_at));
@@ -183,11 +189,11 @@ impl TuiApp {
         let ws = Workspace::new(name, None);
         let key = ws.store_key();
 
-        // Simpan metadata workspace ke global store (tanpa namespace)
-        let _ = self.state.kv_store.set(&key, &ws).await;
+        // Simpan metadata workspace ke global_store (tidak pernah ter-namespace)
+        let _ = self.global_store.set(&key, &ws).await;
 
-        // Buat namespaced store untuk workspace ini
-        let ns = NamespacedStore::new(Arc::clone(&self.state.kv_store), ws.namespace());
+        // Buat namespaced store di atas global_store
+        let ns = NamespacedStore::new(Arc::clone(&self.global_store), ws.namespace());
         let ns_store: Arc<dyn Store> = Arc::new(ns);
 
         // Ganti active store di AppState dengan namespaced store
@@ -204,13 +210,13 @@ impl TuiApp {
 
     /// Pilih workspace yang sudah ada dan masuk ke chat.
     pub async fn select_workspace(&mut self, ws: Workspace) {
-        // Perbarui last_used_at di global store (tanpa namespace)
+        // Perbarui last_used_at di global_store (tidak pernah ter-namespace)
         let mut ws_updated = ws.clone();
         ws_updated.last_used_at = chrono::Utc::now();
-        let _ = self.state.kv_store.set(&ws_updated.store_key(), &ws_updated).await;
+        let _ = self.global_store.set(&ws_updated.store_key(), &ws_updated).await;
 
-        // Buat namespaced store untuk workspace ini
-        let ns = NamespacedStore::new(Arc::clone(&self.state.kv_store), ws_updated.namespace());
+        // Buat namespaced store di atas global_store
+        let ns = NamespacedStore::new(Arc::clone(&self.global_store), ws_updated.namespace());
         let ns_store: Arc<dyn Store> = Arc::new(ns);
 
         self.state = clawhive_control_api::state::AppState::new_with_store(ns_store);
