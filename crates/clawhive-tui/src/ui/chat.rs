@@ -349,7 +349,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
 
     let cursor_pos = if app.pending_tool_approval.is_some() {
         // Sembunyikan cursor dengan menaruhnya di pojok kanan bawah terminal
-        (frame.size().width.saturating_sub(1), frame.size().height.saturating_sub(1))
+        (frame.area().width.saturating_sub(1), frame.area().height.saturating_sub(1))
     } else if app.input_buffer.is_empty() {
         (input_inner.x + 2, input_inner.y)
     } else {
