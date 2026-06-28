@@ -22,6 +22,7 @@ pub struct AgentExecutor {
     model_router: Arc<ModelRouter>,
     tool_registry: Arc<ToolRegistry>,
     _budget_service: Arc<BudgetService>,
+    kv_store: Arc<dyn clawhive_store::Store>,
 }
 
 impl AgentExecutor {
@@ -30,11 +31,13 @@ impl AgentExecutor {
         model_router: Arc<ModelRouter>,
         tool_registry: Arc<ToolRegistry>,
         budget_service: Arc<BudgetService>,
+        kv_store: Arc<dyn clawhive_store::Store>,
     ) -> Self {
         Self {
             model_router,
             tool_registry,
             _budget_service: budget_service,
+            kv_store,
         }
     }
 
@@ -136,18 +139,31 @@ impl AgentExecutor {
                                     })
                                     .ok();
 
-                                match tool.execute(&tool_context, args.clone()).await {
-                                    Ok(output) => {
-                                        event_tx
-                                            .send(AgentEvent::ToolCall {
-                                                tool: tool_name.clone(),
-                                                args: args.clone(),
-                                                result: output.data.clone(),
-                                            })
-                                            .ok();
-                                        output
+                                let approved = self.wait_for_tool_approval(agent, tool_name, args, &tc.id).await?;
+                                if approved {
+                                    match tool.execute(&tool_context, args.clone()).await {
+                                        Ok(output) => {
+                                            event_tx
+                                                .send(AgentEvent::ToolCall {
+                                                    tool: tool_name.clone(),
+                                                    args: args.clone(),
+                                                    result: output.data.clone(),
+                                                })
+                                                .ok();
+                                            output
+                                        }
+                                        Err(e) => ToolOutput::fail(e.to_string()),
                                     }
-                                    Err(e) => ToolOutput::fail(e.to_string()),
+                                } else {
+                                    let output = ToolOutput::fail("Tool invocation denied by operator".to_string());
+                                    event_tx
+                                        .send(AgentEvent::ToolCall {
+                                            tool: tool_name.clone(),
+                                            args: args.clone(),
+                                            result: output.data.clone(),
+                                        })
+                                        .ok();
+                                    output
                                 }
                             }
                             Err(e) => {
@@ -378,8 +394,24 @@ impl AgentExecutor {
                                 .ok();
 
                             let tool_result = match self.tool_registry.get(tool_name) {
-                                Ok(tool) => match tool.execute(&tool_context, args.clone()).await {
-                                    Ok(output) => {
+                                Ok(tool) => {
+                                    let approved = self.wait_for_tool_approval(agent, tool_name, args, tool_id).await?;
+                                    if approved {
+                                        match tool.execute(&tool_context, args.clone()).await {
+                                            Ok(output) => {
+                                                event_tx
+                                                    .send(AgentEvent::ToolCall {
+                                                        tool: tool_name.to_string(),
+                                                        args: args.clone(),
+                                                        result: output.data.clone(),
+                                                    })
+                                                    .ok();
+                                                output
+                                            }
+                                            Err(e) => ToolOutput::fail(e.to_string()),
+                                        }
+                                    } else {
+                                        let output = ToolOutput::fail("Tool invocation denied by operator".to_string());
                                         event_tx
                                             .send(AgentEvent::ToolCall {
                                                 tool: tool_name.to_string(),
@@ -389,8 +421,7 @@ impl AgentExecutor {
                                             .ok();
                                         output
                                     }
-                                    Err(e) => ToolOutput::fail(e.to_string()),
-                                },
+                                }
                                 Err(e) => {
                                     ToolOutput::fail(format!("tool '{tool_name}' not found: {e}"))
                                 }
@@ -475,8 +506,24 @@ impl AgentExecutor {
                                     .ok();
 
                                 let tool_result = match self.tool_registry.get(tool_name) {
-                                    Ok(tool) => match tool.execute(&tool_context, args.clone()).await {
-                                        Ok(output) => {
+                                    Ok(tool) => {
+                                        let approved = self.wait_for_tool_approval(agent, tool_name, args, &tc.id).await?;
+                                        if approved {
+                                            match tool.execute(&tool_context, args.clone()).await {
+                                                Ok(output) => {
+                                                    event_tx
+                                                        .send(AgentEvent::ToolCall {
+                                                            tool: tool_name.clone(),
+                                                            args: args.clone(),
+                                                            result: output.data.clone(),
+                                                        })
+                                                        .ok();
+                                                    output
+                                                }
+                                                Err(e) => ToolOutput::fail(e.to_string()),
+                                            }
+                                        } else {
+                                            let output = ToolOutput::fail("Tool invocation denied by operator".to_string());
                                             event_tx
                                                 .send(AgentEvent::ToolCall {
                                                     tool: tool_name.clone(),
@@ -486,8 +533,7 @@ impl AgentExecutor {
                                                 .ok();
                                             output
                                         }
-                                        Err(e) => ToolOutput::fail(e.to_string()),
-                                    },
+                                    }
                                     Err(e) => {
                                         ToolOutput::fail(format!("tool '{tool_name}' not found: {e}"))
                                     }
@@ -520,6 +566,70 @@ impl AgentExecutor {
 
         // Batas giliran tercapai tanpa penyelesaian
         Err(AgentError::MaxTurnsReached(max_turns))
+    }
+
+    async fn wait_for_tool_approval(
+        &self,
+        agent: &Agent,
+        tool_name: &str,
+        args: &serde_json::Value,
+        tool_call_id: &str,
+    ) -> Result<bool, AgentError> {
+        use clawhive_domain::approval::{ToolApprovalRequest, ToolApprovalState};
+        use clawhive_store::StoreExt;
+
+        // Kita hanya mengintersep tool berbahaya (seperti "shell")
+        if tool_name != "shell" {
+            return Ok(true);
+        }
+
+        // Cek always_allow di database
+        let always_allow_key = format!("always_allow:{}:{}", agent.id.0, tool_name);
+        if let Ok(Some(always)) = self.kv_store.get::<bool>(&always_allow_key).await {
+            if always {
+                return Ok(true);
+            }
+        }
+
+        // Ambil command string dari args shell
+        let command = args.get("command").and_then(|v| v.as_str()).unwrap_or("").to_string();
+
+        // Buat ToolApprovalRequest di database
+        let approval_key = format!("tool_approval:{}", tool_call_id);
+        let req = ToolApprovalRequest {
+            id: tool_call_id.to_string(),
+            agent_id: agent.id.clone(),
+            tool_name: tool_name.to_string(),
+            command,
+            state: ToolApprovalState::Pending,
+            created_at: chrono::Utc::now(),
+        };
+
+        if let Err(e) = self.kv_store.set(&approval_key, &req).await {
+            return Err(AgentError::Other(format!("gagal simpan request approval: {e}")));
+        }
+
+        // Loop menunggu approval
+        loop {
+            // Cek status approval
+            if let Ok(Some(current_req)) = self.kv_store.get::<ToolApprovalRequest>(&approval_key).await {
+                match current_req.state {
+                    ToolApprovalState::Approved => {
+                        return Ok(true);
+                    }
+                    ToolApprovalState::AlwaysApproved => {
+                        // Set always allow ke true
+                        let _ = self.kv_store.set(&always_allow_key, &true).await;
+                        return Ok(true);
+                    }
+                    ToolApprovalState::Denied => {
+                        return Ok(false);
+                    }
+                    ToolApprovalState::Pending => {}
+                }
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        }
     }
 }
 

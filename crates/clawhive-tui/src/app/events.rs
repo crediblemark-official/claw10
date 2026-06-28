@@ -182,6 +182,22 @@ impl TuiApp {
                         }
                     }
                     CommandMode::None => {
+                        if self.pending_tool_approval.is_some() {
+                            match key.code {
+                                KeyCode::Char('a') | KeyCode::Char('A') => {
+                                    self.handle_tool_approval(clawhive_domain::approval::ToolApprovalState::Approved).await;
+                                }
+                                KeyCode::Char('w') | KeyCode::Char('W') => {
+                                    self.handle_tool_approval(clawhive_domain::approval::ToolApprovalState::AlwaysApproved).await;
+                                }
+                                KeyCode::Char('d') | KeyCode::Char('D') => {
+                                    self.handle_tool_approval(clawhive_domain::approval::ToolApprovalState::Denied).await;
+                                }
+                                _ => {}
+                            }
+                            return;
+                        }
+
                         // Standard Input / Navigation handling
                         match key.code {
                             KeyCode::Enter => {
@@ -690,6 +706,26 @@ impl TuiApp {
                     "".to_string(),
                     format!("Denied spawn request {} via Broker tab selection", &req.id.0.to_string()[..8]),
                 ));
+                self.refresh().await;
+            }
+        }
+    }
+
+    pub(crate) async fn handle_tool_approval(&mut self, new_state: clawhive_domain::approval::ToolApprovalState) {
+        use clawhive_store::StoreExt;
+
+        if let Some(ref req) = self.pending_tool_approval {
+            let key = format!("tool_approval:{}", req.id);
+            let mut updated_req = req.clone();
+            updated_req.state = new_state.clone();
+            
+            if self.state.kv_store.set(&key, &updated_req).await.is_ok() {
+                self.chat_history.push((
+                    "System".to_string(),
+                    "".to_string(),
+                    format!("Persetujuan tool: {:?}", new_state),
+                ));
+                self.pending_tool_approval = None;
                 self.refresh().await;
             }
         }

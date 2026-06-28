@@ -53,3 +53,21 @@ pub enum ApprovalState {
     Expired,
     Cancelled,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ToolApprovalState {
+    Pending,
+    Approved,
+    Denied,
+    AlwaysApproved,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolApprovalRequest {
+    pub id: String,
+    pub agent_id: AgentId,
+    pub tool_name: String,
+    pub command: String,
+    pub state: ToolApprovalState,
+    pub created_at: DateTime<Utc>,
+}

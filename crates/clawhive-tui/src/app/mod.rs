@@ -97,6 +97,8 @@ pub struct TuiApp {
     pub(crate) active_agent_id: Option<AgentId>,
     /// Receiver AgentEvent dari running agent (untuk update TUI real-time).
     pub(crate) agent_rx: Option<tokio::sync::mpsc::UnboundedReceiver<AgentEvent>>,
+    /// Request approval tool yang sedang tertunda (pending).
+    pub pending_tool_approval: Option<clawhive_domain::approval::ToolApprovalRequest>,
 }
 
 impl TuiApp {
@@ -134,6 +136,7 @@ impl TuiApp {
             agent_runtime: None,
             active_agent_id: None,
             agent_rx: None,
+            pending_tool_approval: None,
         }
     }
 
@@ -195,6 +198,19 @@ impl TuiApp {
             .into_iter()
             .map(|(_, r)| r)
             .collect();
+
+        // Deteksi pending tool approval
+        let approvals = self
+            .state
+            .kv_store
+            .scan_prefix::<clawhive_domain::approval::ToolApprovalRequest>("tool_approval:")
+            .await
+            .unwrap_or_default();
+        
+        self.pending_tool_approval = approvals
+            .into_iter()
+            .map(|(_, r)| r)
+            .find(|r| r.state == clawhive_domain::approval::ToolApprovalState::Pending);
 
         if self.selected_index >= self.current_list_len() {
             self.selected_index = self.current_list_len().saturating_sub(1);

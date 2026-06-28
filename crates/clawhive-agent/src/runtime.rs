@@ -67,9 +67,15 @@ impl AgentRuntime {
         worker_service: Arc<WorkerService>,
         default_worker_id: Option<WorkerId>,
     ) -> Self {
+        let store = Arc::clone(agent_store.store());
         Self {
             agent_store,
-            executor: AgentExecutor::new(model_router, tool_registry, budget_service),
+            executor: AgentExecutor::new(
+                model_router,
+                tool_registry,
+                budget_service,
+                store,
+            ),
             worker_service,
             default_worker_id,
         }

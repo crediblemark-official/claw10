@@ -28,7 +28,10 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
 
     // Hitung tinggi input box secara dinamis berdasarkan wrap_text dari input_buffer
     let input_inner_width = (main_chunks[0].width as usize).saturating_sub(5).max(1);
-    let raw_input_lines = if app.input_buffer.is_empty() {
+    let raw_input_lines = if app.pending_tool_approval.is_some() {
+        // Sediakan ruang tinggi 4 baris untuk dialog approval
+        vec![String::new(), String::new(), String::new(), String::new()]
+    } else if app.input_buffer.is_empty() {
         vec!["Ketik pesan di sini...".to_string()]
     } else {
         crate::ui::wrap_text(&app.input_buffer, input_inner_width.saturating_sub(2).max(1))
@@ -292,13 +295,33 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
     let middle_spacer = " ".repeat(spacer_len);
 
     let mut chat_input_lines = Vec::new();
-    let text_style = if app.input_buffer.is_empty() {
-        Style::default().fg(Color::DarkGray)
+    if let Some(ref req) = app.pending_tool_approval {
+        chat_input_lines.push(Line::from(vec![
+            Span::styled("  ⚠️  PERSETUJUAN EKSEKUSI SHELL: ", Style::default().fg(Color::LightRed).add_modifier(Modifier::BOLD)),
+            Span::styled(&req.tool_name, Style::default().fg(Color::White).add_modifier(Modifier::ITALIC)),
+        ]));
+        chat_input_lines.push(Line::from(vec![
+            Span::styled("     $ ", Style::default().fg(Color::DarkGray)),
+            Span::styled(&req.command, Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+        ]));
+        chat_input_lines.push(Line::from(""));
+        chat_input_lines.push(Line::from(vec![
+            Span::styled("     Pilihan: ", Style::default().fg(Color::White)),
+            Span::styled("[a] Allow (Sekali)", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+            Span::styled("   ", Style::default()),
+            Span::styled("[w] Always Allow", Style::default().fg(Color::LightGreen).add_modifier(Modifier::BOLD)),
+            Span::styled("   ", Style::default()),
+            Span::styled("[d] Deny (Tolak)", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
+        ]));
     } else {
-        Style::default()
-    };
-    for line in &input_lines {
-        chat_input_lines.push(Line::from(Span::styled(line.clone(), text_style)));
+        let text_style = if app.input_buffer.is_empty() {
+            Style::default().fg(Color::DarkGray)
+        } else {
+            Style::default()
+        };
+        for line in &input_lines {
+            chat_input_lines.push(Line::from(Span::styled(line.clone(), text_style)));
+        }
     }
     chat_input_lines.push(Line::from("")); // Spacer
     chat_input_lines.push(Line::from(vec![
@@ -324,7 +347,10 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
         .block(input_block);
     frame.render_widget(input_widget, active_input_area);
 
-    let cursor_pos = if app.input_buffer.is_empty() {
+    let cursor_pos = if app.pending_tool_approval.is_some() {
+        // Sembunyikan cursor dengan menaruhnya di pojok kanan bawah terminal
+        (frame.size().width.saturating_sub(1), frame.size().height.saturating_sub(1))
+    } else if app.input_buffer.is_empty() {
         (input_inner.x + 2, input_inner.y)
     } else {
         let last_line = input_lines.last().cloned().unwrap_or_default();

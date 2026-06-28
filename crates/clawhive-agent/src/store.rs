@@ -135,6 +135,11 @@ impl AgentStore {
     pub fn new_id() -> AgentId {
         AgentId(Uuid::now_v7())
     }
+
+    /// Ambil referensi ke database store dasar.
+    pub fn store(&self) -> &Arc<dyn clawhive_store::Store> {
+        &self.store
+    }
 }
 
 #[cfg(test)]
