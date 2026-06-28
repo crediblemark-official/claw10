@@ -1,4 +1,4 @@
-use clawhive_domain::AgentState;
+use clawhive_domain::{AgentState, SpawnState};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -618,9 +618,18 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                             let req_id_prefix = &r.id.0.to_string()[..8];
                             let display_name = r.team.name.replace("-team", "");
                             let name = format!("  {:<12} ({})", display_name.chars().take(10).collect::<String>(), req_id_prefix);
+                            let (status_str, status_color) = match r.state {
+                                SpawnState::Pending => (" Pending", Color::Yellow),
+                                SpawnState::Approved => (" Approved", Color::Green),
+                                SpawnState::Denied => (" Denied", Color::Red),
+                                SpawnState::Validating => (" Validating", Color::Cyan),
+                                SpawnState::Provisioning => (" Provisioning", Color::Blue),
+                                SpawnState::Completed => (" Completed", Color::LightGreen),
+                                SpawnState::Failed => (" Failed", Color::LightRed),
+                            };
                             ListItem::new(Line::from(vec![
                                 Span::styled(name, Style::default().fg(Color::White).bg(Color::Rgb(0, 0, 0))),
-                                Span::styled(" Pending", Style::default().fg(Color::Yellow).bg(Color::Rgb(0, 0, 0))),
+                                Span::styled(status_str, Style::default().fg(status_color).bg(Color::Rgb(0, 0, 0))),
                             ]))
                         })
                         .collect();

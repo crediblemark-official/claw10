@@ -268,7 +268,7 @@ Type any message to start a chat with the active model.",
                                     on_parent_terminated: true,
                                     on_budget_exhausted: true,
                                 },
-                                state: SpawnState::Pending,
+                                state: SpawnState::Approved,
                                 created_at: chrono::Utc::now(),
                                 updated_at: chrono::Utc::now(),
                             };

@@ -227,7 +227,7 @@ impl SpawnBroker {
                 on_parent_terminated: true,
                 on_budget_exhausted: true,
             },
-            state: SpawnState::Pending,
+            state: SpawnState::Approved,
             created_at: now,
             updated_at: now,
         }
