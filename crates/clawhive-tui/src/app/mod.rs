@@ -394,7 +394,21 @@ impl TuiApp {
     }
 
     pub(crate) async fn clear_app_data(&mut self) {
-        // 1. Bersihkan memory history
+        use clawhive_domain::Agent;
+        use clawhive_store::StoreExt;
+
+        // Cari active_mission_id dari active_agent_id saat ini sebelum di-reset
+        let active_mission_id = if let Some(agent_id) = &self.active_agent_id {
+            if let Ok(Some(agent)) = self.state.kv_store.get::<Agent>(&format!("agent:{}", agent_id.0)).await {
+                Some(agent.mission_id)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        // 1. Bersihkan memory history & active agent ID
         self.chat_history.clear();
         self.active_agent_id = None;
         self.stop_streaming();
@@ -402,56 +416,41 @@ impl TuiApp {
         // 2. Inisialisasi ulang AgentRuntime agar memory context kosong
         self.init_agent_runtime().await;
         
-        // 3. Bersihkan cache database (Agent, Mission, SpawnRequest)
-        use clawhive_store::StoreExt;
-        
-        // Hapus semua agent
-        if let Ok(keys) = self.state.kv_store.scan_prefix::<clawhive_domain::Agent>("agent:").await {
-            for (key, _) in keys {
-                let _ = self.state.kv_store.delete(&key).await;
+        // 3. Bersihkan database yang terikat pada sesi aktif saat ini saja
+        if let Some(ref mission_id) = active_mission_id {
+            // Hapus agents yang terikat pada mission aktif ini
+            if let Ok(keys) = self.state.kv_store.scan_prefix::<clawhive_domain::Agent>("agent:").await {
+                for (key, agent) in keys {
+                    if agent.mission_id == *mission_id {
+                        let _ = self.state.kv_store.delete(&key).await;
+                        
+                        // Hapus always allow milik agent tersebut
+                        let allow_prefix = format!("always_allow:{}:", agent.id.0);
+                        if let Ok(allow_keys) = self.state.kv_store.scan_prefix::<serde_json::Value>(&allow_prefix).await {
+                            for (allow_key, _) in allow_keys {
+                                let _ = self.state.kv_store.delete(&allow_key).await;
+                            }
+                        }
+                    }
+                }
             }
-        }
-        
-        // Hapus semua mission
-        if let Ok(keys) = self.state.kv_store.scan_prefix::<clawhive_domain::Mission>("mission:").await {
-            for (key, _) in keys {
-                let _ = self.state.kv_store.delete(&key).await;
+            
+            // Hapus mission aktif ini
+            let mission_key = format!("mission:{}", mission_id.0);
+            let _ = self.state.kv_store.delete(&mission_key).await;
+            
+            // Hapus spawn requests yang terikat pada mission aktif ini
+            if let Ok(keys) = self.state.kv_store.scan_prefix::<clawhive_domain::SpawnRequest>("spawnreq:").await {
+                for (key, req) in keys {
+                    if req.mission_id == *mission_id {
+                        let _ = self.state.kv_store.delete(&key).await;
+                    }
+                }
             }
-        }
-        
-        // Hapus semua spawnreq
-        if let Ok(keys) = self.state.kv_store.scan_prefix::<clawhive_domain::SpawnRequest>("spawnreq:").await {
-            for (key, _) in keys {
-                let _ = self.state.kv_store.delete(&key).await;
-            }
-        }
-        
-        // Hapus semua worker
-        if let Ok(keys) = self.state.kv_store.scan_prefix::<clawhive_domain::Worker>("worker:").await {
-            for (key, _) in keys {
-                let _ = self.state.kv_store.delete(&key).await;
-            }
-        }
-
-        // Hapus semua session
-        if let Ok(keys) = self.state.kv_store.scan_prefix::<serde_json::Value>("session:").await {
-            for (key, _) in keys {
-                let _ = self.state.kv_store.delete(&key).await;
-            }
-        }
-
-        // Hapus semua tool approval
-        if let Ok(keys) = self.state.kv_store.scan_prefix::<serde_json::Value>("tool_approval:").await {
-            for (key, _) in keys {
-                let _ = self.state.kv_store.delete(&key).await;
-            }
-        }
-
-        // Hapus semua always allow
-        if let Ok(keys) = self.state.kv_store.scan_prefix::<serde_json::Value>("always_allow:").await {
-            for (key, _) in keys {
-                let _ = self.state.kv_store.delete(&key).await;
-            }
+            
+            // Hapus session terkait jika ada di database
+            let session_key = format!("session:{}", mission_id.0);
+            let _ = self.state.kv_store.delete(&session_key).await;
         }
         
         // Refresh data sidebar TUI agar kosong
@@ -460,7 +459,7 @@ impl TuiApp {
         self.chat_history.push((
             "System".to_string(),
             "".to_string(),
-            "Semua cache, history, dan context window berhasil dibersihkan.".to_string(),
+            "Cache, history, dan context untuk sesi ini berhasil dibersihkan.".to_string(),
         ));
     }
 
