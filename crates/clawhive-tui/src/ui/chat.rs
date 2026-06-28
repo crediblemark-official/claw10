@@ -32,10 +32,16 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
         // Sediakan ruang tinggi 4 baris untuk dialog approval
         vec![String::new(), String::new(), String::new(), String::new()]
     } else if app.input_buffer.is_empty() {
-        vec!["Ketik pesan di sini...".to_string()]
+        let placeholder = if let Some(ref ws) = app.active_workspace {
+            format!("[{}] Ketik pesan di sini...", ws.name)
+        } else {
+            "Ketik pesan di sini...".to_string()
+        };
+        vec![placeholder]
     } else {
         crate::ui::wrap_text(&app.input_buffer, input_inner_width.saturating_sub(2).max(1))
     };
+
     let input_lines: Vec<String> = raw_input_lines
         .into_iter()
         .map(|line| format!("  {}", line))
@@ -299,8 +305,15 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
     let status_color = if app.is_streaming { Color::Yellow } else { Color::Rgb(218, 165, 32) };
 
     let left_len = 2 + status_label.len() + 3 + active_model_name.len() + 1 + provider_name.len();
-    let right_len = 40; // panjang visual dari: "/ commands  : terminal  ctrl+p palette  "
-    
+    let workspace_label = if let Some(ref ws) = app.active_workspace {
+        format!("⬡ {} ", ws.name)
+    } else {
+        String::new()
+    };
+
+    // right_len: workspace label + shortcut hints
+    let right_len = workspace_label.len() + 40;
+
     let spacer_len = (input_inner.width as usize)
         .saturating_sub(left_len)
         .saturating_sub(right_len)
@@ -423,6 +436,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
         Span::styled(format!(" · {} ", active_model_name), Style::default()),
         Span::styled(provider_name, Style::default().fg(Color::DarkGray)),
         Span::raw(middle_spacer),
+        Span::styled(workspace_label, Style::default().fg(Color::Rgb(218, 165, 32)).add_modifier(Modifier::BOLD)),
         Span::styled("/", Style::default()),
         Span::styled(" commands  ", Style::default().fg(Color::DarkGray)),
         Span::styled(":", Style::default()),
