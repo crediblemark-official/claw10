@@ -294,6 +294,13 @@ impl TuiApp {
                                     self.workspace_input.clear();
                                     return;
                                 }
+                                KeyCode::Delete => {
+                                    if !self.workspaces.is_empty() {
+                                        let ws = self.workspaces[self.workspace_selected_index].clone();
+                                        self.delete_workspace(ws).await;
+                                        return;
+                                    }
+                                }
                                 _ => {}
                             }
                             return;
@@ -326,6 +333,7 @@ impl TuiApp {
                                         self.execute_command(cmd).await;
                                     } else {
                                         self.chat_history.push(("User".to_string(), "".to_string(), trimmed.to_string()));
+                                        self.save_chat_history().await;
                                         self.active_screen = Screen::Chat;
                                         self.chat_scroll_offset.set(0);
                                         self.chat_at_bottom = true;
@@ -341,6 +349,7 @@ impl TuiApp {
                                                     model_label.clone(),
                                                     String::new(),
                                                 ));
+                                                self.save_chat_history().await;
                                                 self.is_streaming = true;
                                                 self.stream_status = Some("Memulai agent...".to_string());
 
@@ -372,6 +381,7 @@ impl TuiApp {
                                                     "".into(),
                                                     "Gagal inisialisasi agent. Pastikan API key sudah di-set.".into(),
                                                 ));
+                                                self.save_chat_history().await;
                                             }
                                         } else {
                                             // ── Fallback: langsung ke model router (no agent) ──
@@ -404,11 +414,11 @@ impl TuiApp {
                                                                 label.clone(),
                                                                 String::new(),
                                                             ));
+                                                            self.save_chat_history().await;
                                                             self.is_streaming = true;
                                                             self.stream_status = Some("Menghubungi API model...".to_string());
 
-                                                            let (stream_tx, stream_rx) =
-                                                                tokio::sync::mpsc::unbounded_channel();
+                                                            let (stream_tx, stream_rx) = tokio::sync::mpsc::unbounded_channel();
                                                             self.stream_rx = Some(stream_rx);
 
                                                             let task_handle = tokio::spawn(async move {
@@ -426,6 +436,7 @@ impl TuiApp {
                                                                 "".into(),
                                                                 format!("Model error: {e}"),
                                                             ));
+                                                            self.save_chat_history().await;
                                                         }
                                                     }
                                                 }
@@ -435,6 +446,7 @@ impl TuiApp {
                                                         "".into(),
                                                         "Model router belum dikonfigurasi. Set API key via Ctrl+P → Set API Key".into(),
                                                     ));
+                                                    self.save_chat_history().await;
                                                 }
                                             }
                                         }
@@ -447,6 +459,7 @@ impl TuiApp {
                                 } else if self.active_screen == Screen::Chat {
                                     // Reset workspace aktif → kembali ke Workspace Selector
                                     self.active_workspace = None;
+                                    self.chat_history.clear();
                                     self.active_screen = Screen::Home;
                                     self.load_workspaces().await;
                                 } else {
@@ -612,13 +625,14 @@ impl TuiApp {
     }
 
     /// Process a single stream event, updating chat_history in place.
-    pub(crate) fn handle_stream_event(&mut self, event: StreamEvent) {
+    pub(crate) async fn handle_stream_event(&mut self, event: StreamEvent) {
         match event {
             StreamEvent::TextDelta(delta) => {
                 self.stream_status = Some("Menerima respon...".to_string());
                 if let Some((_, _, content)) = self.chat_history.last_mut() {
                     content.push_str(&delta);
                 }
+                self.save_chat_history().await;
             }
             StreamEvent::ToolCallDelta { name, .. } => {
                 let tool_name = name.clone().unwrap_or_else(|| "tool".to_string());
@@ -638,6 +652,7 @@ impl TuiApp {
                         content.push_str("(empty response)");
                     }
                 }
+                self.save_chat_history().await;
             }
             StreamEvent::Error(e) => {
                 self.is_streaming = false;
@@ -649,6 +664,7 @@ impl TuiApp {
                     String::new(),
                     format!("Stream error: {e}"),
                 ));
+                self.save_chat_history().await;
             }
         }
     }
@@ -667,7 +683,7 @@ impl TuiApp {
             .await
             {
                 Ok(Some(ev)) => {
-                    self.handle_stream_event(ev);
+                    self.handle_stream_event(ev).await;
                     if !self.is_streaming {
                         return; // rx already consumed by handle_stream_event
                     }
@@ -687,7 +703,7 @@ impl TuiApp {
     }
 
     /// Proses satu AgentEvent dan update chat_history + stream_status di TUI.
-    pub(crate) fn handle_agent_event(&mut self, event: AgentEvent) {
+    pub(crate) async fn handle_agent_event(&mut self, event: AgentEvent) {
         match event {
             AgentEvent::SessionStarted { agent_id, .. } => {
                 self.stream_status = Some(format!("Agent {} dimulai...", &agent_id[..8]));
@@ -700,6 +716,7 @@ impl TuiApp {
                 if let Some((_, _, chat_content)) = self.chat_history.last_mut() {
                     chat_content.push_str(&delta);
                 }
+                self.save_chat_history().await;
             }
             AgentEvent::Thought { content, .. } => {
                 // Sinkronisasi absolut thought di akhir turn agar rapi
@@ -707,6 +724,7 @@ impl TuiApp {
                 if let Some((_, _, chat_content)) = self.chat_history.last_mut() {
                     *chat_content = content;
                 }
+                self.save_chat_history().await;
             }
 
             AgentEvent::ToolCall { tool, args, result } => {
@@ -727,6 +745,7 @@ impl TuiApp {
                         format!("✓ {} selesai:\n{}", tool, format_tool_result(&tool, &result)),
                     ));
                 }
+                self.save_chat_history().await;
             }
             AgentEvent::ObjectiveComplete { summary, .. } => {
                 // Pastikan summary tampil di bubble agent (mungkin sudah dari Thought)
@@ -741,6 +760,7 @@ impl TuiApp {
                         content.push_str(&summary);
                     }
                 }
+                self.save_chat_history().await;
             }
             AgentEvent::BudgetWarning { remaining } => {
                 self.stream_status = Some(format!("⚠ Budget tersisa: ${:.4}", remaining));
@@ -749,6 +769,7 @@ impl TuiApp {
                     String::new(),
                     format!("⚠ Peringatan budget: sisa ${:.4}", remaining),
                 ));
+                self.save_chat_history().await;
             }
             AgentEvent::SessionPaused { reason } => {
                 self.stream_status = Some(format!("Agent dijeda: {}", reason));
@@ -756,6 +777,7 @@ impl TuiApp {
                 self.agent_rx = None;
                 self.agent_task = None;
                 self.active_agent_id = None;
+                self.save_chat_history().await;
             }
             AgentEvent::SessionTerminated { reason } => {
                 self.stream_status = None;
@@ -768,6 +790,7 @@ impl TuiApp {
                     String::new(),
                     format!("Agent dihentikan: {}", reason),
                 ));
+                self.save_chat_history().await;
             }
             AgentEvent::Error { message } => {
                 self.stream_status = None;
@@ -780,6 +803,7 @@ impl TuiApp {
                     String::new(),
                     format!("Error agent: {}", message),
                 ));
+                self.save_chat_history().await;
             }
         }
     }
@@ -798,7 +822,7 @@ impl TuiApp {
             .await
             {
                 Ok(Some(ev)) => {
-                    self.handle_agent_event(ev);
+                    self.handle_agent_event(ev).await;
                     if !self.is_streaming {
                         return; // agent selesai, rx sudah di-drop
                     }

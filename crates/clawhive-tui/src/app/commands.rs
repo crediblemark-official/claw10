@@ -335,6 +335,7 @@ Type any message to start a chat with the active model.",
             "home" | "workspace" | "ws" => {
                 // Kembali ke Home screen (Workspace Selector) dan reset workspace aktif
                 self.active_workspace = None;
+                self.chat_history.clear();
                 self.active_screen = crate::app::Screen::Home;
                 self.load_workspaces().await;
                 "Kembali ke Workspace Selector.".into()

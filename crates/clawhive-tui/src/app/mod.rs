@@ -221,6 +221,7 @@ impl TuiApp {
 
         // Reset runtime untuk sesi baru di workspace ini
         self.init_agent_runtime().await;
+        self.load_chat_history().await;
         self.active_screen = Screen::Chat;
     }
 
@@ -245,7 +246,31 @@ impl TuiApp {
 
         self.active_workspace = Some(ws_updated);
         self.init_agent_runtime().await;
+        self.load_chat_history().await;
         self.active_screen = Screen::Chat;
+    }
+
+    /// Hapus workspace terpilih dari database global.
+    pub async fn delete_workspace(&mut self, ws: Workspace) {
+        let _ = self.global_store.delete(&ws.store_key()).await;
+        self.workspaces.retain(|w| w.id != ws.id);
+        if self.workspace_selected_index >= self.workspaces.len() {
+            self.workspace_selected_index = self.workspaces.len().saturating_sub(1);
+        }
+        self.status_message = format!("Workspace '{}' berhasil dihapus.", ws.name);
+    }
+
+    /// Muat riwayat chat dari database workspace aktif.
+    pub async fn load_chat_history(&mut self) {
+        self.chat_history.clear();
+        if let Ok(Some(history)) = self.state.kv_store.get::<Vec<(String, String, String)>>("chat_history").await {
+            self.chat_history = history;
+        }
+    }
+
+    /// Simpan riwayat chat aktif ke database workspace aktif.
+    pub async fn save_chat_history(&self) {
+        let _ = self.state.kv_store.set("chat_history", &self.chat_history).await;
     }
 
     pub async fn refresh(&mut self) {
