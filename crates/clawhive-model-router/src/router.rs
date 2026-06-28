@@ -27,7 +27,7 @@ impl ModelRouter {
             .get_profile(profile_id)
             .ok_or_else(|| ModelError::ModelNotAvailable(profile_id.to_string()))?;
 
-        request.model = profile.model_name.clone();
+        request.model = profile.id.clone();
 
         let provider = self.registry.get_provider(&profile.provider)?;
         let result = provider.chat(request).await?;
@@ -45,7 +45,7 @@ impl ModelRouter {
             .get_profile(profile_id)
             .ok_or_else(|| ModelError::ModelNotAvailable(profile_id.to_string()))?;
 
-        request.model = profile.model_name.clone();
+        request.model = profile.id.clone();
 
         let provider = self.registry.get_provider(&profile.provider)?;
         let handle = provider.chat_stream(request).await?;
