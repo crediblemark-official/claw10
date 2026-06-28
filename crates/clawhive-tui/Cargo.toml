@@ -8,6 +8,10 @@ clawhive-control-api = { path = "../clawhive-control-api" }
 clawhive-domain = { path = "../clawhive-domain" }
 clawhive-store = { path = "../clawhive-store" }
 clawhive-model-router = { path = "../clawhive-model-router" }
+clawhive-agent = { path = "../clawhive-agent" }
+clawhive-budget = { path = "../clawhive-budget" }
+clawhive-tool = { path = "../clawhive-tool" }
+clawhive-worker = { path = "../clawhive-worker" }
 ratatui = { workspace = true }
 crossterm = { workspace = true }
 tokio = { workspace = true }

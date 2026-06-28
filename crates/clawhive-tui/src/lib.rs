@@ -1,4 +1,5 @@
 mod app;
+pub(crate) mod tui_agent;
 mod ui;
 
 use std::sync::Arc;

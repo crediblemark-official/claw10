@@ -155,6 +155,72 @@ impl AgentRuntime {
         Ok((session, events))
     }
 
+    /// Versi streaming dari `execute_agent` — AgentEvent langsung dikirim ke `event_tx`
+    /// sehingga TUI dapat menampilkan progres real-time (thinking, tool call, done).
+    ///
+    /// # Errors
+    ///
+    /// Sama dengan [`execute_agent`]: `AgentNotFound`, state/worker errors.
+    pub async fn execute_agent_streaming(
+        &self,
+        agent_id: &AgentId,
+        objective: String,
+        context: HashMap<String, String>,
+        worker_override: Option<WorkerId>,
+        event_tx: crate::executor::EventSender,
+    ) -> Result<AgentSession, AgentError> {
+        let mut agent = self.agent_store.get_or_not_found(agent_id).await?;
+
+        // ── Pre-flight checks ───────────────────────────────────
+        self.ensure_runnable(&agent, agent_id)?;
+
+        let worker_id = worker_override
+            .or_else(|| self.default_worker_id.clone())
+            .ok_or_else(|| {
+                AgentError::Other("no worker specified and no default worker configured".into())
+            })?;
+
+        // ── Assign runtime lease ─────────────────────────────────
+        if agent.current_runtime.is_none() {
+            LifecycleService::assign_lease(&mut agent, &worker_id.0.to_string(), DEFAULT_LEASE_SECONDS);
+            self.agent_store.save(&agent).await?;
+        }
+
+        // ── Build ToolContext ────────────────────────────────────
+        let tool_context = ToolContext {
+            tenant_id: agent.organization_id.0.to_string(),
+            mission_id: agent.mission_id.clone(),
+            task_id: TaskId(uuid::Uuid::now_v7()),
+            agent_id: agent.id.clone(),
+            worker_id: worker_id.clone(),
+            idempotency_key: uuid::Uuid::now_v7().to_string(),
+            risk_level: "medium".to_string(),
+            approval_id: None,
+            budget_remaining: agent.budget.remaining(),
+            workspace_dir: format!("/tmp/clawhive/{}", agent.id.0),
+        };
+
+        // ── Compute max turns from genome ────────────────────────
+        let max_turns = agent.genome.autonomy.max_children.max(1) * DEFAULT_TURNS_MULTIPLIER;
+
+        // ── Execute streaming ────────────────────────────────────
+        let session = self
+            .executor
+            .execute_streaming(&agent, &objective, context, tool_context, max_turns, event_tx)
+            .await?;
+
+        // ── Persist updated agent ────────────────────────────────
+        if session.state == SessionState::Completed {
+            agent.state = AgentState::Active;
+        }
+        agent.turn_count = session.turn_count as u64;
+        agent.total_cost_usd = session.total_cost_usd;
+        agent.updated_at = chrono::Utc::now();
+        self.agent_store.save(&agent).await?;
+
+        Ok(session)
+    }
+
     /// Hibernate an agent: creates checkpoint, releases lease, persists.
     ///
     /// # Errors

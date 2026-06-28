@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 
+use clawhive_agent::events::AgentEvent;
 use clawhive_model_router::types::{ChatRequest, MessageRole, ModelMessage, StreamEvent};
 use crate::app::{CommandMode, ModelSelectionStep, Screen, Tab, TuiApp};
 use crate::app::palette::{get_palette_items, provider_api_key_env};
@@ -62,6 +63,8 @@ impl TuiApp {
                                         self.model_sel_pending_provider = None;
                                         self.model_sel_provider = provider.clone();
                                         self.advance_to_model_list().await;
+                                        // Init agent runtime setelah provider baru terdaftar
+                                        self.init_agent_runtime().await;
                                         return;
                                     }
                                 } else if key.trim().is_empty() {
@@ -99,6 +102,8 @@ impl TuiApp {
                                             "{provider} API key set. {model_count} model(s) available."
                                         );
                                         self.command_mode = CommandMode::None;
+                                        // Init agent runtime setelah provider baru terdaftar
+                                        self.init_agent_runtime().await;
                                     }
                                 }
                             }
@@ -188,73 +193,113 @@ impl TuiApp {
                                     } else {
                                         self.chat_history.push(("User".to_string(), "".to_string(), trimmed.to_string()));
                                         self.active_screen = Screen::Chat;
-                                        // Reset scroll ke bawah agar respons baru langsung terlihat
                                         self.chat_scroll_offset.set(0);
                                         self.chat_at_bottom = true;
 
-                                        let router_opt = self
-                                            .state
-                                            .model_router
-                                            .as_ref()
-                                            .map(Arc::clone);
-                                        match router_opt {
-                                            Some(router) => {
-                                                let model_id = self.active_model.clone();
-                                                let request = ChatRequest {
-                                                    model: model_id.clone(),
-                                                    messages: vec![ModelMessage {
-                                                        role: MessageRole::User,
-                                                        content: trimmed.to_string(),
-                                                        tool_calls: None,
-                                                        tool_call_id: None,
-                                                        name: None,
-                                                    }],
-                                                    max_tokens: Some(4096),
-                                                    temperature: Some(0.7),
-                                                    tools: None,
-                                                    stop: None,
-                                                };
+                                        // ── Coba pakai AgentRuntime dulu ─────────────────────
+                                        if self.agent_runtime.is_some() {
+                                            let objective = trimmed.to_string();
+                                            let model_label = self.active_model.clone();
 
-                                                self.stop_streaming();
+                                            if let Some(agent_id) = self.ensure_agent().await {
+                                                self.chat_history.push((
+                                                    "Agent".to_string(),
+                                                    model_label.clone(),
+                                                    String::new(),
+                                                ));
+                                                self.is_streaming = true;
+                                                self.stream_status = Some("Memulai agent...".to_string());
 
-                                                match router.route_chat_stream(&model_id, request).await {
-                                                    Ok(handle) => {
-                                                        let label = model_id.clone();
-                                                        self.chat_history.push((
-                                                            "Agent".to_string(),
-                                                            label.clone(),
-                                                            String::new(),
-                                                        ));
-                                                        self.is_streaming = true;
-                                                        self.stream_status = Some("Menghubungi API model...".to_string());
+                                                let runtime = Arc::clone(self.agent_runtime.as_ref().unwrap());
+                                                let (agent_tx, agent_rx) = tokio::sync::mpsc::unbounded_channel();
+                                                self.agent_rx = Some(agent_rx);
 
-                                                        let (stream_tx, stream_rx) =
-                                                            tokio::sync::mpsc::unbounded_channel();
-                                                        self.stream_rx = Some(stream_rx);
-
-                                                        tokio::spawn(async move {
-                                                            while let Some(event) = handle.recv().await {
-                                                                if stream_tx.send(event).is_err() {
-                                                                    break;
-                                                                }
-                                                            }
-                                                        });
+                                                tokio::spawn(async move {
+                                                    let ctx = std::collections::HashMap::new();
+                                                    match runtime.execute_agent_streaming(
+                                                        &agent_id,
+                                                        objective,
+                                                        ctx,
+                                                        None,
+                                                        agent_tx.clone(),
+                                                    ).await {
+                                                        Ok(_) => {}
+                                                        Err(e) => {
+                                                            let _ = agent_tx.send(AgentEvent::Error {
+                                                                message: format!("AgentRuntime error: {e}"),
+                                                            });
+                                                        }
                                                     }
-                                                    Err(e) => {
-                                                        self.chat_history.push((
-                                                            "System".to_string(),
-                                                            "".into(),
-                                                            format!("Model error: {e}"),
-                                                        ));
-                                                    }
-                                                }
-                                            }
-                                            None => {
+                                                });
+                                            } else {
                                                 self.chat_history.push((
                                                     "System".to_string(),
                                                     "".into(),
-                                                    "Model router not configured. Set API key via Ctrl+P → Set API Key".into(),
+                                                    "Gagal inisialisasi agent. Pastikan API key sudah di-set.".into(),
                                                 ));
+                                            }
+                                        } else {
+                                            // ── Fallback: langsung ke model router (no agent) ──
+                                            let router_opt = self.state.model_router.as_ref().map(Arc::clone);
+                                            match router_opt {
+                                                Some(router) => {
+                                                    let model_id = self.active_model.clone();
+                                                    let request = ChatRequest {
+                                                        model: model_id.clone(),
+                                                        messages: vec![ModelMessage {
+                                                            role: MessageRole::User,
+                                                            content: trimmed.to_string(),
+                                                            tool_calls: None,
+                                                            tool_call_id: None,
+                                                            name: None,
+                                                        }],
+                                                        max_tokens: Some(4096),
+                                                        temperature: Some(0.7),
+                                                        tools: None,
+                                                        stop: None,
+                                                    };
+
+                                                    self.stop_streaming();
+
+                                                    match router.route_chat_stream(&model_id, request).await {
+                                                        Ok(handle) => {
+                                                            let label = model_id.clone();
+                                                            self.chat_history.push((
+                                                                "Agent".to_string(),
+                                                                label.clone(),
+                                                                String::new(),
+                                                            ));
+                                                            self.is_streaming = true;
+                                                            self.stream_status = Some("Menghubungi API model...".to_string());
+
+                                                            let (stream_tx, stream_rx) =
+                                                                tokio::sync::mpsc::unbounded_channel();
+                                                            self.stream_rx = Some(stream_rx);
+
+                                                            tokio::spawn(async move {
+                                                                while let Some(event) = handle.recv().await {
+                                                                    if stream_tx.send(event).is_err() {
+                                                                        break;
+                                                                    }
+                                                                }
+                                                            });
+                                                        }
+                                                        Err(e) => {
+                                                            self.chat_history.push((
+                                                                "System".to_string(),
+                                                                "".into(),
+                                                                format!("Model error: {e}"),
+                                                            ));
+                                                        }
+                                                    }
+                                                }
+                                                None => {
+                                                    self.chat_history.push((
+                                                        "System".to_string(),
+                                                        "".into(),
+                                                        "Model router belum dikonfigurasi. Set API key via Ctrl+P → Set API Key".into(),
+                                                    ));
+                                                }
                                             }
                                         }
                                     }
@@ -458,5 +503,123 @@ impl TuiApp {
     pub(crate) fn stop_streaming(&mut self) {
         self.is_streaming = false;
         self.stream_rx = None;
+    }
+
+    /// Proses satu AgentEvent dan update chat_history + stream_status di TUI.
+    pub(crate) fn handle_agent_event(&mut self, event: AgentEvent) {
+        match event {
+            AgentEvent::SessionStarted { agent_id, .. } => {
+                self.stream_status = Some(format!("Agent {} dimulai...", &agent_id[..8]));
+            }
+            AgentEvent::ModelCall { turn, .. } => {
+                self.stream_status = Some(format!("Giliran {} — memanggil model...", turn + 1));
+            }
+            AgentEvent::Thought { content, .. } => {
+                // Append konten berpikir ke bubble chat agent terakhir
+                self.stream_status = Some("Berpikir...".to_string());
+                if let Some((_, _, chat_content)) = self.chat_history.last_mut() {
+                    if !chat_content.is_empty() {
+                        chat_content.push('\n');
+                    }
+                    chat_content.push_str(&content);
+                }
+            }
+            AgentEvent::ToolCall { tool, args, result } => {
+                if result.is_null() {
+                    // Event "sedang memanggil tool"
+                    self.stream_status = Some(format!("Menjalankan tool: {}...", tool));
+                    self.chat_history.push((
+                        "Tool".to_string(),
+                        tool.clone(),
+                        format!("▶ {} ({})", tool, args),
+                    ));
+                } else {
+                    // Event "tool selesai"
+                    self.stream_status = Some(format!("Tool {} selesai.", tool));
+                    self.chat_history.push((
+                        "Tool".to_string(),
+                        tool.clone(),
+                        format!("✓ {} → {}", tool, result),
+                    ));
+                }
+            }
+            AgentEvent::ObjectiveComplete { summary, .. } => {
+                // Pastikan summary tampil di bubble agent (mungkin sudah dari Thought)
+                self.stream_status = None;
+                self.is_streaming = false;
+                self.agent_rx = None;
+                // Reset active_agent_id agar sesi berikutnya buat agent baru
+                self.active_agent_id = None;
+                if let Some((_, _, content)) = self.chat_history.last_mut() {
+                    if content.is_empty() {
+                        content.push_str(&summary);
+                    }
+                }
+            }
+            AgentEvent::BudgetWarning { remaining } => {
+                self.stream_status = Some(format!("⚠ Budget tersisa: ${:.4}", remaining));
+                self.chat_history.push((
+                    "System".to_string(),
+                    String::new(),
+                    format!("⚠ Peringatan budget: sisa ${:.4}", remaining),
+                ));
+            }
+            AgentEvent::SessionPaused { reason } => {
+                self.stream_status = Some(format!("Agent dijeda: {}", reason));
+                self.is_streaming = false;
+                self.agent_rx = None;
+                self.active_agent_id = None;
+            }
+            AgentEvent::SessionTerminated { reason } => {
+                self.stream_status = None;
+                self.is_streaming = false;
+                self.agent_rx = None;
+                self.active_agent_id = None;
+                self.chat_history.push((
+                    "System".to_string(),
+                    String::new(),
+                    format!("Agent dihentikan: {}", reason),
+                ));
+            }
+            AgentEvent::Error { message } => {
+                self.stream_status = None;
+                self.is_streaming = false;
+                self.agent_rx = None;
+                self.active_agent_id = None;
+                self.chat_history.push((
+                    "System".to_string(),
+                    String::new(),
+                    format!("Error agent: {}", message),
+                ));
+            }
+        }
+    }
+
+    /// Non-blocking drain semua AgentEvent yang pending sebelum render.
+    pub(crate) async fn try_flush_agent_events(&mut self) {
+        let mut rx = match self.agent_rx.take() {
+            Some(rx) => rx,
+            None => return,
+        };
+        loop {
+            match tokio::time::timeout(
+                std::time::Duration::from_millis(1),
+                rx.recv(),
+            )
+            .await
+            {
+                Ok(Some(ev)) => {
+                    self.handle_agent_event(ev);
+                    if !self.is_streaming {
+                        return; // agent selesai, rx sudah di-drop
+                    }
+                }
+                _ => break,
+            }
+        }
+        // Kembalikan receiver jika agent masih berjalan
+        if self.is_streaming {
+            self.agent_rx = Some(rx);
+        }
     }
 }

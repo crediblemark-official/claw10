@@ -1,7 +1,9 @@
 use crossterm::event::Event;
 
+use clawhive_agent::events::AgentEvent;
+use clawhive_agent::runtime::AgentRuntime;
 use clawhive_control_api::state::AppState;
-use clawhive_domain::{Agent, SpawnRequest, Worker};
+use clawhive_domain::{Agent, AgentId, MissionId, SpawnRequest, Worker};
 use clawhive_model_router::types::{ModelFamily, ModelProfile, StreamEvent};
 
 mod commands;
@@ -72,8 +74,7 @@ pub struct TuiApp {
     pub model_sel_variants: Vec<ModelProfile>,
     pub model_sel_search: String,
     pub model_sel_index: usize,
-    /// If set, model selection was interrupted to ask for API key.
-    /// After key is set, resume selecting models for this provider.
+    /// Jika set, model selection diminta API key dulu baru resume provider ini.
     pub model_sel_pending_provider: Option<String>,
     /// Receiver untuk streaming response events dari spawned task.
     pub(crate) stream_rx: Option<tokio::sync::mpsc::UnboundedReceiver<StreamEvent>>,
@@ -89,6 +90,13 @@ pub struct TuiApp {
     pub chat_at_bottom: bool,
     /// Waktu refresh sidebar terakhir
     pub last_refresh: std::time::Instant,
+    // ── Agent Runtime fields ─────────────────────────────────────
+    /// AgentRuntime yang digunakan untuk full agent reasoning loop.
+    pub(crate) agent_runtime: Option<std::sync::Arc<AgentRuntime>>,
+    /// ID agent aktif (root agent sesi TUI saat ini).
+    pub(crate) active_agent_id: Option<AgentId>,
+    /// Receiver AgentEvent dari running agent (untuk update TUI real-time).
+    pub(crate) agent_rx: Option<tokio::sync::mpsc::UnboundedReceiver<AgentEvent>>,
 }
 
 impl TuiApp {
@@ -123,6 +131,9 @@ impl TuiApp {
             chat_scroll_offset: std::cell::Cell::new(0),
             chat_at_bottom: true,
             last_refresh: std::time::Instant::now(),
+            agent_runtime: None,
+            active_agent_id: None,
+            agent_rx: None,
         }
     }
 
@@ -210,8 +221,9 @@ impl TuiApp {
                 self.last_refresh = std::time::Instant::now();
             }
 
-            // Flush stream events sebelum render
+            // Flush stream events dan agent events sebelum render
             self.try_flush_stream().await;
+            self.try_flush_agent_events().await;
 
             terminal
                 .draw(|f| {
@@ -234,5 +246,65 @@ impl TuiApp {
         disable_raw_mode().map_err(|e| crate::TuiError::Runtime(e.to_string()))?;
         let _ = std::io::stdout().execute(LeaveAlternateScreen);
         Ok(())
+    }
+
+    /// Inisialisasi AgentRuntime dari services yang tersedia di AppState.
+    /// Dipanggil setelah model router berhasil dikonfigurasi.
+    pub(crate) async fn init_agent_runtime(&mut self) {
+        let router = match self.state.model_router.as_ref() {
+            Some(r) => std::sync::Arc::clone(r),
+            None => return, // belum ada model router, skip
+        };
+        let tool_registry = match self.state.tool_registry.as_ref() {
+            Some(t) => std::sync::Arc::clone(t),
+            None => {
+                // Buat registry kosong jika belum ada
+                std::sync::Arc::new(clawhive_tool::registry::ToolRegistry::new())
+            }
+        };
+        let worker_service = std::sync::Arc::clone(&self.state.worker_service);
+        let kv_store = std::sync::Arc::clone(&self.state.kv_store);
+
+        match crate::tui_agent::build_tui_runtime(kv_store, router, tool_registry, worker_service).await {
+            Ok((runtime, _worker_id)) => {
+                self.agent_runtime = Some(std::sync::Arc::new(runtime));
+            }
+            Err(e) => {
+                tracing::warn!("Gagal init AgentRuntime: {e}");
+            }
+        }
+    }
+
+    /// Pastikan agent aktif sudah ada di store. Jika belum, buat dan simpan.
+    /// Mengembalikan AgentId yang siap digunakan.
+    pub(crate) async fn ensure_agent(&mut self) -> Option<AgentId> {
+        if let Some(id) = self.active_agent_id.clone() {
+            return Some(id);
+        }
+
+        // Pastikan runtime sudah ada
+        if self.agent_runtime.is_none() {
+            return None;
+        }
+
+        let agent_id = AgentId(uuid::Uuid::now_v7());
+        let mission_id = MissionId(uuid::Uuid::now_v7());
+        let agent = crate::tui_agent::make_default_agent(
+            agent_id.clone(),
+            &self.active_model,
+            mission_id,
+        );
+
+        // Simpan agent ke store melalui AgentStore yang disimpan di runtime
+        // Kita perlu menyimpan via KV store langsung
+        use clawhive_store::StoreExt;
+        let key = format!("agent:{}", agent_id.0);
+        if let Err(e) = self.state.kv_store.set(&key, &agent).await {
+            tracing::warn!("Gagal simpan agent TUI: {e}");
+            return None;
+        }
+
+        self.active_agent_id = Some(agent_id.clone());
+        Some(agent_id)
     }
 }

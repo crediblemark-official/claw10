@@ -833,10 +833,14 @@ name = "clawhive-tui"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "clawhive-agent",
+ "clawhive-budget",
  "clawhive-control-api",
  "clawhive-domain",
  "clawhive-model-router",
  "clawhive-store",
+ "clawhive-tool",
+ "clawhive-worker",
  "crossterm",
  "ratatui",
  "serde",
