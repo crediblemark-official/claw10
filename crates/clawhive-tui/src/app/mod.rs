@@ -126,8 +126,6 @@ pub struct TuiApp {
     pub workspace_selected_index: usize,
     /// Menentukan apakah proses internal agent di-expand atau di-collapse.
     pub show_internal_process: bool,
-    /// Konfigurasi pemetaan prefix model dari models/mappings.json
-    pub model_mappings: std::collections::HashMap<String, std::collections::HashMap<String, String>>,
 }
 
 impl TuiApp {
@@ -177,13 +175,6 @@ impl TuiApp {
             workspace_input: String::new(),
             workspace_selected_index: 0,
             show_internal_process: false,
-            model_mappings: {
-                if let Ok(content) = std::fs::read_to_string("models/mappings.json") {
-                    serde_json::from_str(&content).unwrap_or_default()
-                } else {
-                    std::collections::HashMap::new()
-                }
-            },
         }
     }
 
@@ -460,9 +451,6 @@ impl TuiApp {
             None => return, // belum ada model router, skip
         };
 
-        // Muat model dari folder models/ secara statis ke registry model_router
-        self.load_static_models();
-
         // Picu pembaruan latar belakang secara asinkron untuk mengambil profile model riil dari API server
         let router_clone = std::sync::Arc::clone(&router);
         tokio::spawn(async move {
@@ -496,103 +484,6 @@ impl TuiApp {
         }
     }
 
-    /// Muat semua model dari folder `models/` secara statis ke registry model_router.
-    pub(crate) fn load_static_models(&self) {
-        let router = match self.state.model_router.as_ref() {
-            Some(r) => r,
-            None => return,
-        };
-
-        if let Ok(entries) = std::fs::read_dir("models") {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.extension().is_some_and(|ext| ext == "json") {
-                    let provider_name = path
-                        .file_stem()
-                        .and_then(|s| s.to_str())
-                        .unwrap_or("")
-                        .to_string();
-
-                    let provider_key = match provider_name.to_lowercase().as_str() {
-                        "nvidia" => "nvidia".to_string(),
-                        "openrouter" => "openrouter".to_string(),
-                        other => other.to_string(),
-                    };
-
-                    if let Ok(content) = std::fs::read_to_string(&path) {
-                        if let Ok(names) = serde_json::from_str::<Vec<String>>(&content) {
-                            let mut models = Vec::new();
-                            for name in names {
-                                let exists = router.registry().list_profiles().iter().any(|p| {
-                                    p.id == name || p.model_name == name
-                                });
-                                if !exists {
-                                    let id = self.resolve_model_id(&name, &provider_key);
-
-                                    models.push(clawhive_model_router::types::ModelProfile {
-                                        id,
-                                        provider: provider_key.clone(),
-                                        model_name: name,
-                                        context_window: 128_000,
-                                        max_output_tokens: 8_192,
-                                        cost_per_1m_input: 0.0,
-                                        cost_per_1m_output: 0.0,
-                                        suitable_for: vec!["general".to_string()],
-                                    });
-                                }
-                            }
-                            if !models.is_empty() {
-                                router.inject_profiles(models);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    /// Resolves a dynamic model ID by trying to match prefix from registry or fallback.
-    pub(crate) fn resolve_model_id(&self, name: &str, provider_key: &str) -> String {
-        let router = match self.state.model_router.as_ref() {
-            Some(r) => r,
-            None => return name.to_string(),
-        };
-
-        let matched_id = router.registry().list_profiles().iter().find(|p| {
-            let p_id_lower = p.id.to_lowercase();
-            let name_lower = name.to_lowercase();
-            p_id_lower.contains(&name_lower) || name_lower.contains(&p_id_lower)
-        }).map(|p| p.id.clone());
-
-        if name.contains('/') {
-            name.to_string()
-        } else if let Some(mid) = matched_id {
-            mid
-        } else {
-            // Cek pemetaan dari model_mappings secara dinamis
-            let mut resolved = None;
-            let name_lower = name.to_lowercase();
-            if let Some(rules) = self.model_mappings.get(provider_key) {
-                for (pattern, prefix) in rules {
-                    if name_lower.starts_with(pattern) {
-                        resolved = Some(format!("{}/{}", prefix, name));
-                        break;
-                    }
-                }
-            }
-
-            if let Some(res) = resolved {
-                res
-            } else if provider_key == "nvidia" {
-                format!("nvidia/{}", name)
-            } else if provider_key == "openrouter" {
-                format!("openrouter/{}", name)
-            } else {
-                name.to_string()
-            }
-        }
-    }
-
     /// Resolves a dynamic model ID by trying to match prefix from registry or fallback (iterating over all mapping rules).
     pub(crate) fn resolve_model_id_without_provider(&self, name: &str) -> String {
         if name.contains('/') {
@@ -611,18 +502,15 @@ impl TuiApp {
             }
         }
 
-        // 2. Jika tidak ada, iterasi semua provider di model_mappings untuk mencari pattern kecocokan
-        let name_lower = name.to_lowercase();
-        for (_provider_key, rules) in &self.model_mappings {
-            for (pattern, prefix) in rules {
-                if name_lower.starts_with(pattern) {
-                    return format!("{}/{}", prefix, name);
-                }
+        // 2. Jika tidak ada, panggil compile-time static resolver
+        let resolved = clawhive_model_router::models::resolve_static_model(name, "nvidia");
+        if resolved.starts_with("nvidia/") {
+            let openrouter_resolved = clawhive_model_router::models::resolve_static_model(name, "openrouter");
+            if !openrouter_resolved.starts_with("openrouter/") {
+                return openrouter_resolved;
             }
         }
-
-        // 3. Fallback generic (default nvidia)
-        format!("nvidia/{}", name)
+        resolved
     }
 
     pub(crate) fn set_active_model(&mut self, model_id: String) {

@@ -53,9 +53,41 @@ pub struct ModelRegistry {
 impl ModelRegistry {
     #[must_use]
     pub fn new() -> Self {
+        let mut profiles = Vec::new();
+        
+        // Load model nvidia statis secara compile-time
+        for &name in crate::models::nvidia::MODELS {
+            let id = crate::models::resolve_static_model(name, "nvidia");
+            profiles.push(ModelProfile {
+                id,
+                provider: "nvidia".to_string(),
+                model_name: name.to_string(),
+                context_window: 128_000,
+                max_output_tokens: 8_192,
+                cost_per_1m_input: 0.0,
+                cost_per_1m_output: 0.0,
+                suitable_for: vec!["general".to_string()],
+            });
+        }
+        
+        // Load model openrouter statis secara compile-time
+        for &name in crate::models::openrouter::MODELS {
+            let id = crate::models::resolve_static_model(name, "openrouter");
+            profiles.push(ModelProfile {
+                id,
+                provider: "openrouter".to_string(),
+                model_name: name.to_string(),
+                context_window: 128_000,
+                max_output_tokens: 8_192,
+                cost_per_1m_input: 0.0,
+                cost_per_1m_output: 0.0,
+                suitable_for: vec!["general".to_string()],
+            });
+        }
+
         Self {
             providers: HashMap::new(),
-            profiles: RwLock::new(Vec::new()),
+            profiles: RwLock::new(profiles),
         }
     }
 

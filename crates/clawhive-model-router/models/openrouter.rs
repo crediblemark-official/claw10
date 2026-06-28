@@ -1,4 +1,4 @@
-[
+pub const MODELS: &[&str] = &[
   "nousresearch/hermes-3-llama-3.1-405b:free",
   "nousresearch/hermes-3-llama-3.1-405b",
   "sao10k/llama-3-8b-lunaris",
@@ -19,4 +19,4 @@
   "mistralai/mistral-large",
   "openai/gpt-3.5-turbo",
   "openai/gpt-4"
-]
+];

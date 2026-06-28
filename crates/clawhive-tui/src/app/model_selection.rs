@@ -118,7 +118,7 @@ impl TuiApp {
                                     || name_lower.contains(&m.id.to_lowercase())
                             });
                             if !exists {
-                                let id = self.resolve_model_id(&name, &provider_name);
+                                let id = clawhive_model_router::models::resolve_static_model(&name, &provider_name);
                                 models.push(clawhive_model_router::types::ModelProfile {
                                     id,
                                     provider: provider_name.clone(),
@@ -164,7 +164,7 @@ impl TuiApp {
                                     || name_lower.contains(&p.id.to_lowercase())
                             });
                             if !exists {
-                                let id = self.resolve_model_id(&name, &provider_name);
+                                let id = clawhive_model_router::models::resolve_static_model(&name, &provider_name);
                                 profiles.push(clawhive_model_router::types::ModelProfile {
                                     id,
                                     provider: provider_name.clone(),
