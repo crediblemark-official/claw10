@@ -52,6 +52,7 @@ struct CompatFunction {
 }
 
 #[derive(Deserialize, Clone)]
+#[allow(dead_code)]
 struct CompatToolCall {
     id: String,
     r#type: String,
