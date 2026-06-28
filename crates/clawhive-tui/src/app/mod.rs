@@ -426,6 +426,34 @@ impl TuiApp {
             }
         }
         
+        // Hapus semua worker
+        if let Ok(keys) = self.state.kv_store.scan_prefix::<clawhive_domain::Worker>("worker:").await {
+            for (key, _) in keys {
+                let _ = self.state.kv_store.delete(&key).await;
+            }
+        }
+
+        // Hapus semua session
+        if let Ok(keys) = self.state.kv_store.scan_prefix::<serde_json::Value>("session:").await {
+            for (key, _) in keys {
+                let _ = self.state.kv_store.delete(&key).await;
+            }
+        }
+
+        // Hapus semua tool approval
+        if let Ok(keys) = self.state.kv_store.scan_prefix::<serde_json::Value>("tool_approval:").await {
+            for (key, _) in keys {
+                let _ = self.state.kv_store.delete(&key).await;
+            }
+        }
+
+        // Hapus semua always allow
+        if let Ok(keys) = self.state.kv_store.scan_prefix::<serde_json::Value>("always_allow:").await {
+            for (key, _) in keys {
+                let _ = self.state.kv_store.delete(&key).await;
+            }
+        }
+        
         // Refresh data sidebar TUI agar kosong
         self.refresh().await;
         
