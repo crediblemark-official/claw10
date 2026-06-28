@@ -26,11 +26,24 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
             .split(area)
     };
 
+    // Hitung tinggi input box secara dinamis berdasarkan wrap_text dari input_buffer
+    let input_inner_width = (main_chunks[0].width as usize).saturating_sub(5).max(1);
+    let raw_input_lines = if app.input_buffer.is_empty() {
+        vec!["Ketik pesan di sini...".to_string()]
+    } else {
+        wrap_text(&app.input_buffer, input_inner_width.saturating_sub(2).max(1))
+    };
+    let input_lines: Vec<String> = raw_input_lines
+        .into_iter()
+        .map(|line| format!("  {}", line))
+        .collect();
+    let input_height = (input_lines.len() + 2) as u16; // input lines + 1 spacer + 1 status bar
+
     let left_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Min(0),    // Chat history
-            Constraint::Length(4), // Input Box (height 4 untuk text + model info di dalam)
+            Constraint::Length(input_height), // Input Box dinamis
             Constraint::Length(1), // Spacer bawah agar tidak mepet ke footer/batas bawah
         ])
         .split(main_chunks[0]);
@@ -246,70 +259,49 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
     let status_label = if app.is_streaming { "TUI (Streaming...)" } else { "TUI" };
     let status_color = if app.is_streaming { Color::Yellow } else { Color::Rgb(218, 165, 32) };
 
-    let chat_input_lines = if app.input_buffer.is_empty() {
-        vec![
-            Line::from(Span::styled(
-                "  Ketik pesan di sini...",
-                Style::default().fg(Color::DarkGray),
-            )),
-            Line::from(""), // Spacer
-            Line::from(""), // Spacer
-            Line::from(vec![
-                Span::raw("  "),
-                Span::styled(
-                    status_label,
-                    Style::default()
-                        .fg(status_color)
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::styled(format!(" · {} ", active_model_name), Style::default()),
-                Span::styled(provider_name.clone(), Style::default().fg(Color::DarkGray)),
-                Span::raw(middle_spacer.clone()),
-                Span::styled("/", Style::default()),
-                Span::styled(" commands  ", Style::default().fg(Color::DarkGray)),
-                Span::styled(":", Style::default()),
-                Span::styled(" terminal  ", Style::default().fg(Color::DarkGray)),
-                Span::styled("ctrl+p", Style::default()),
-                Span::styled(" palette  ", Style::default().fg(Color::DarkGray)),
-            ]),
-        ]
+    let mut chat_input_lines = Vec::new();
+    let text_style = if app.input_buffer.is_empty() {
+        Style::default().fg(Color::DarkGray)
     } else {
-        vec![
-            Line::from(Span::styled(
-                format!("  {}", app.input_buffer),
-                Style::default(),
-            )),
-            Line::from(""), // Spacer
-            Line::from(""), // Spacer
-            Line::from(vec![
-                Span::raw("  "),
-                Span::styled(
-                    status_label,
-                    Style::default()
-                        .fg(status_color)
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::styled(format!(" · {} ", active_model_name), Style::default()),
-                Span::styled(provider_name, Style::default().fg(Color::DarkGray)),
-                Span::raw(middle_spacer),
-                Span::styled("/", Style::default()),
-                Span::styled(" commands  ", Style::default().fg(Color::DarkGray)),
-                Span::styled(":", Style::default()),
-                Span::styled(" terminal  ", Style::default().fg(Color::DarkGray)),
-                Span::styled("ctrl+p", Style::default()),
-                Span::styled(" palette  ", Style::default().fg(Color::DarkGray)),
-            ]),
-        ]
+        Style::default()
     };
+    for line in &input_lines {
+        chat_input_lines.push(Line::from(Span::styled(line.clone(), text_style)));
+    }
+    chat_input_lines.push(Line::from("")); // Spacer
+    chat_input_lines.push(Line::from(vec![
+        Span::raw("  "),
+        Span::styled(
+            status_label,
+            Style::default()
+                .fg(status_color)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(format!(" · {} ", active_model_name), Style::default()),
+        Span::styled(provider_name, Style::default().fg(Color::DarkGray)),
+        Span::raw(middle_spacer),
+        Span::styled("/", Style::default()),
+        Span::styled(" commands  ", Style::default().fg(Color::DarkGray)),
+        Span::styled(":", Style::default()),
+        Span::styled(" terminal  ", Style::default().fg(Color::DarkGray)),
+        Span::styled("ctrl+p", Style::default()),
+        Span::styled(" palette  ", Style::default().fg(Color::DarkGray)),
+    ]));
 
     let input_widget = Paragraph::new(chat_input_lines)
         .block(input_block);
     frame.render_widget(input_widget, active_input_area);
 
-    frame.set_cursor_position((
-        input_inner.x + 2 + app.input_buffer.len() as u16,
-        input_inner.y,
-    ));
+    let cursor_pos = if app.input_buffer.is_empty() {
+        (input_inner.x + 2, input_inner.y)
+    } else {
+        let last_line = input_lines.last().cloned().unwrap_or_default();
+        (
+            input_inner.x + last_line.len() as u16,
+            input_inner.y + (input_lines.len() - 1) as u16,
+        )
+    };
+    frame.set_cursor_position(cursor_pos);
 
     if show_sidebar {
         // --- KOLOM KANAN (SIDEBAR) ---
