@@ -98,6 +98,10 @@ Type any message to start a chat with the active model.",
                     }
                 }
             }
+            "clear" => {
+                self.clear_app_data().await;
+                "Semua cache, history, dan context window berhasil dibersihkan.".into()
+            }
             "model" => {
                 if parts.len() < 2 {
                     if let Some(router) = &self.state.model_router {

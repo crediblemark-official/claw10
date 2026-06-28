@@ -477,6 +477,9 @@ impl TuiApp {
                 self.model_sel_step = ModelSelectionStep::SelectProvider;
                 self.command_mode = CommandMode::ModelSelection;
             }
+            "/clear_all" => {
+                self.clear_app_data().await;
+            }
             "/session_share" => {
                 self.chat_history.push(("System".into(), "".into(), "Tautan sesi berhasil disalin ke clipboard!".into()));
                 self.active_screen = Screen::Chat;

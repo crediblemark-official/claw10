@@ -337,6 +337,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                         ("/model <id>", "   - Ganti model aktif secara cepat"),
                         ("/help", "         - Tampilkan daftar perintah lengkap"),
                         ("/refresh", "      - Segarkan database agen dan task"),
+                        ("/clear", "        - Bersihkan cache, history, dan context"),
                         ("/q", "            - Keluar dari aplikasi TUI"),
                     ];
                     

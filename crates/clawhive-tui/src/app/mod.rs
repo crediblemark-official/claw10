@@ -376,6 +376,7 @@ impl TuiApp {
                     ("/model <id>".to_string(), "/model ".to_string()),
                     ("/help".to_string(), "/help".to_string()),
                     ("/refresh".to_string(), "/refresh".to_string()),
+                    ("/clear".to_string(), "/clear".to_string()),
                     ("/q".to_string(), "/q".to_string()),
                 ];
                 
@@ -390,6 +391,49 @@ impl TuiApp {
         if self.suggestion_index > max {
             self.suggestion_index = 0;
         }
+    }
+
+    pub(crate) async fn clear_app_data(&mut self) {
+        // 1. Bersihkan memory history
+        self.chat_history.clear();
+        self.active_agent_id = None;
+        self.stop_streaming();
+        
+        // 2. Inisialisasi ulang AgentRuntime agar memory context kosong
+        self.init_agent_runtime().await;
+        
+        // 3. Bersihkan cache database (Agent, Mission, SpawnRequest)
+        use clawhive_store::StoreExt;
+        
+        // Hapus semua agent
+        if let Ok(keys) = self.state.kv_store.scan_prefix::<clawhive_domain::Agent>("agent:").await {
+            for (key, _) in keys {
+                let _ = self.state.kv_store.delete(&key).await;
+            }
+        }
+        
+        // Hapus semua mission
+        if let Ok(keys) = self.state.kv_store.scan_prefix::<clawhive_domain::Mission>("mission:").await {
+            for (key, _) in keys {
+                let _ = self.state.kv_store.delete(&key).await;
+            }
+        }
+        
+        // Hapus semua spawnreq
+        if let Ok(keys) = self.state.kv_store.scan_prefix::<clawhive_domain::SpawnRequest>("spawnreq:").await {
+            for (key, _) in keys {
+                let _ = self.state.kv_store.delete(&key).await;
+            }
+        }
+        
+        // Refresh data sidebar TUI agar kosong
+        self.refresh().await;
+        
+        self.chat_history.push((
+            "System".to_string(),
+            "".to_string(),
+            "Semua cache, history, dan context window berhasil dibersihkan.".to_string(),
+        ));
     }
 
     /// Pastikan agent aktif sudah ada di store. Jika belum, buat dan simpan.
