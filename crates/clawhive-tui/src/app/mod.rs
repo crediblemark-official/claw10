@@ -9,8 +9,6 @@ mod events;
 mod model_selection;
 pub(crate) mod palette;
 
-pub use palette::get_palette_items;
-
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Tab {
     Session,
