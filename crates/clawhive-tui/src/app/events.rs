@@ -348,7 +348,7 @@ impl TuiApp {
                                                 let (agent_tx, agent_rx) = tokio::sync::mpsc::unbounded_channel();
                                                 self.agent_rx = Some(agent_rx);
 
-                                                tokio::spawn(async move {
+                                                let task_handle = tokio::spawn(async move {
                                                     let ctx = std::collections::HashMap::new();
                                                     match runtime.execute_agent_streaming(
                                                         &agent_id,
@@ -365,6 +365,7 @@ impl TuiApp {
                                                         }
                                                     }
                                                 });
+                                                self.agent_task = Some(task_handle);
                                             } else {
                                                 self.chat_history.push((
                                                     "System".to_string(),
@@ -410,13 +411,14 @@ impl TuiApp {
                                                                 tokio::sync::mpsc::unbounded_channel();
                                                             self.stream_rx = Some(stream_rx);
 
-                                                            tokio::spawn(async move {
+                                                            let task_handle = tokio::spawn(async move {
                                                                 while let Some(event) = handle.recv().await {
                                                                     if stream_tx.send(event).is_err() {
                                                                         break;
                                                                     }
                                                                 }
                                                             });
+                                                            self.agent_task = Some(task_handle);
                                                         }
                                                         Err(e) => {
                                                             self.chat_history.push((
@@ -440,7 +442,9 @@ impl TuiApp {
                                 }
                             }
                             KeyCode::Esc => {
-                                if self.active_screen == Screen::Chat {
+                                if self.is_streaming {
+                                    self.interrupt_agent();
+                                } else if self.active_screen == Screen::Chat {
                                     // Reset workspace aktif → kembali ke Workspace Selector
                                     self.active_workspace = None;
                                     self.active_screen = Screen::Home;
@@ -627,6 +631,7 @@ impl TuiApp {
                 self.is_streaming = false;
                 self.stream_status = None;
                 self.stream_rx = None;
+                self.agent_task = None;
                 // Ensure non-empty response
                 if let Some((_, _, content)) = self.chat_history.last_mut() {
                     if content.is_empty() {
@@ -638,6 +643,7 @@ impl TuiApp {
                 self.is_streaming = false;
                 self.stream_status = None;
                 self.stream_rx = None;
+                self.agent_task = None;
                 self.chat_history.push((
                     "System".to_string(),
                     String::new(),
@@ -677,6 +683,7 @@ impl TuiApp {
     pub(crate) fn stop_streaming(&mut self) {
         self.is_streaming = false;
         self.stream_rx = None;
+        self.agent_task = None;
     }
 
     /// Proses satu AgentEvent dan update chat_history + stream_status di TUI.
@@ -726,6 +733,7 @@ impl TuiApp {
                 self.stream_status = None;
                 self.is_streaming = false;
                 self.agent_rx = None;
+                self.agent_task = None;
                 // Reset active_agent_id agar sesi berikutnya buat agent baru
                 self.active_agent_id = None;
                 if let Some((_, _, content)) = self.chat_history.last_mut() {
@@ -746,12 +754,14 @@ impl TuiApp {
                 self.stream_status = Some(format!("Agent dijeda: {}", reason));
                 self.is_streaming = false;
                 self.agent_rx = None;
+                self.agent_task = None;
                 self.active_agent_id = None;
             }
             AgentEvent::SessionTerminated { reason } => {
                 self.stream_status = None;
                 self.is_streaming = false;
                 self.agent_rx = None;
+                self.agent_task = None;
                 self.active_agent_id = None;
                 self.chat_history.push((
                     "System".to_string(),
@@ -763,6 +773,7 @@ impl TuiApp {
                 self.stream_status = None;
                 self.is_streaming = false;
                 self.agent_rx = None;
+                self.agent_task = None;
                 self.active_agent_id = None;
                 self.chat_history.push((
                     "System".to_string(),

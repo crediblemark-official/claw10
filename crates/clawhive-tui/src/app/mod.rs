@@ -107,6 +107,8 @@ pub struct TuiApp {
     pub(crate) agent_rx: Option<tokio::sync::mpsc::UnboundedReceiver<AgentEvent>>,
     /// Request approval tool yang sedang tertunda (pending).
     pub pending_tool_approval: Option<clawhive_domain::approval::ToolApprovalRequest>,
+    /// Handle tokio spawn task dari agen yang sedang berjalan untuk interrupt/abort
+    pub(crate) agent_task: Option<tokio::task::JoinHandle<()>>,
     /// Indeks item suggestion autocomplete yang sedang dipilih (selected).
     pub suggestion_index: usize,
     /// Daftar suggestions aktif: (teks tampilan, nilai autocomplete/command)
@@ -164,6 +166,7 @@ impl TuiApp {
             active_agent_id: None,
             agent_rx: None,
             pending_tool_approval: None,
+            agent_task: None,
             suggestion_index: 0,
             active_suggestions: Vec::new(),
             global_store,

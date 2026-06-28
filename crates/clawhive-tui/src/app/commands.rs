@@ -348,4 +348,23 @@ Type any message to start a chat with the active model.",
 
         self.status_message = result;
     }
+
+    pub(crate) fn interrupt_agent(&mut self) {
+        if self.is_streaming {
+            if let Some(task) = self.agent_task.take() {
+                task.abort();
+            }
+            self.is_streaming = false;
+            self.stream_status = None;
+            self.agent_rx = None;
+            self.stream_rx = None;
+            self.active_agent_id = None;
+            self.chat_history.push((
+                "System".to_string(),
+                String::new(),
+                "Agent diinterupsi oleh user (proses dibatalkan).".to_string(),
+            ));
+            self.status_message = "Agent execution interrupted.".into();
+        }
+    }
 }
