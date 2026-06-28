@@ -10,6 +10,12 @@ pub mod bus;
 pub mod events;
 pub mod inmemory;
 
+#[cfg(feature = "nats")]
+pub mod nats;
+
 pub use bus::{EventBus, EventBusError, EventHandler, SubscriptionId};
 pub use events::ClawHiveEvent;
 pub use inmemory::InMemoryEventBus;
+
+#[cfg(feature = "nats")]
+pub use nats::NatsEventBus;
