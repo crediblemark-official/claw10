@@ -32,7 +32,12 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
         // Sediakan ruang tinggi 4 baris untuk dialog approval
         vec![String::new(), String::new(), String::new(), String::new()]
     } else if app.input_buffer.is_empty() {
-        vec!["Ketik pesan di sini...".to_string()]
+        let placeholder = if let Some(ref ws) = app.active_workspace {
+            format!("[{}] Ketik pesan di sini...", ws.name)
+        } else {
+            "Ketik pesan di sini...".to_string()
+        };
+        vec![placeholder]
     } else {
         crate::ui::wrap_text(&app.input_buffer, input_inner_width.saturating_sub(2).max(1))
     };
@@ -471,7 +476,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
     chat_input_lines.push(Line::from("")); // Spacer
     let ctrl_i_hint_label = if app.show_internal_process { " collapse  " } else { " expand  " };
     let left_len = 2 + status_label.len() + 3 + active_model_name.len() + 1 + provider_name.len();
-    let right_len = workspace_label.len() + 56 + 18 + ctrl_i_hint_label.len();
+    let right_len = 56 + 18 + ctrl_i_hint_label.len();
     let spacer_len = (input_inner.width as usize)
         .saturating_sub(left_len)
         .saturating_sub(right_len)
@@ -489,7 +494,6 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
         Span::styled(format!(" · {} ", active_model_name), Style::default()),
         Span::styled(provider_name, Style::default().fg(Color::DarkGray)),
         Span::raw(middle_spacer),
-        Span::styled(workspace_label, Style::default().fg(Color::Rgb(218, 165, 32)).add_modifier(Modifier::BOLD)),
         Span::styled("esc", Style::default()),
         Span::styled(" workspace  ", Style::default().fg(Color::DarkGray)),
         Span::styled("/", Style::default()),
