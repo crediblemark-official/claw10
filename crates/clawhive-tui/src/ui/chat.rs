@@ -97,23 +97,11 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
         max_scroll.saturating_sub(clamped_scroll_offset)
     };
 
-    // Constraints per bubble untuk layout
-    let constraints: Vec<Constraint> = app.chat_history.iter()
-        .map(|(sender, _, msg)| Constraint::Length(bubble_height(sender, msg) as u16))
-        .collect();
-
-    let bubble_layout = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints(constraints)
-        .split(chat_area);
-
     let mut current_y_offset = 0;
 
-    for (idx, (sender, model, msg)) in app.chat_history.iter().enumerate() {
-        let bubble_area = bubble_layout[idx];
-
-        // Hitung range y visual setelah dikurangi scroll offset
-        let item_height = bubble_area.height as usize;
+    for (sender, model, msg) in &app.chat_history {
+        // Hitung tinggi asli bubble
+        let item_height = bubble_height(sender, msg);
         let item_start = current_y_offset;
         let item_end = item_start + item_height;
 
@@ -136,9 +124,9 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
         }
 
         let render_area = Rect {
-            x: bubble_area.x,
+            x: chat_area.x,
             y: chat_area.y + relative_y,
-            width: bubble_area.width,
+            width: chat_area.width,
             height: visible_height as u16,
         };
 
