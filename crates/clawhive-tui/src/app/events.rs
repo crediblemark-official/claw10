@@ -27,8 +27,8 @@ impl TuiApp {
                     return;
                 }
 
-                // 2b. Handle Ctrl+I to toggle show_internal_process
-                if key.code == KeyCode::Char('i') && key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
+                // 2b. Handle Ctrl+I / Ctrl+T to toggle show_internal_process
+                if (key.code == KeyCode::Char('i') || key.code == KeyCode::Char('t')) && key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
                     self.show_internal_process = !self.show_internal_process;
                     return;
                 }

@@ -212,10 +212,10 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                 lines.push(Line::from(vec![
                     Span::raw("  "),
                     Span::styled("🔧 ", Style::default().fg(Color::LightBlue)),
-                    Span::styled(format!("Tool: {model} (click Ctrl+I to collapse)", model = model), Style::default().fg(Color::DarkGray).add_modifier(Modifier::ITALIC)),
+                    Span::styled(format!("Tool: {model} (Ctrl+T to collapse)", model = model), Style::default().fg(Color::DarkGray).add_modifier(Modifier::ITALIC)),
                 ]));
                 lines.push(Line::from(""));
-
+ 
                 // Teks konten tool (bisa multiline, kita wrap_text)
                 for line_str in crate::ui::wrap_text(msg, asst_wrap_w) {
                     if line_str.is_empty() {
@@ -232,7 +232,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                 lines.push(Line::from(vec![
                     Span::raw("  "),
                     Span::styled("🔧 ", Style::default().fg(Color::DarkGray)),
-                    Span::styled(format!("Tool: {model} {status_icon} (Ctrl+I to expand)", model = model), Style::default().fg(Color::DarkGray).add_modifier(Modifier::ITALIC)),
+                    Span::styled(format!("Tool: {model} {status_icon} (Ctrl+T to expand)", model = model), Style::default().fg(Color::DarkGray).add_modifier(Modifier::ITALIC)),
                 ]));
             }
 
@@ -301,7 +301,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                             Span::raw("  "),
                             Span::styled(format!("{} ", spinner), Style::default().fg(Color::Yellow)),
                             Span::styled(status_text, Style::default().fg(Color::Rgb(254, 192, 126)).add_modifier(Modifier::ITALIC)),
-                            Span::styled(" (Ctrl+I to expand processes)", Style::default().fg(Color::DarkGray)),
+                            Span::styled(" (Ctrl+T to expand processes)", Style::default().fg(Color::DarkGray)),
                         ]));
                         lines.push(Line::from("")); // Spacer bawah
 
@@ -474,9 +474,9 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
         }
     }
     chat_input_lines.push(Line::from("")); // Spacer
-    let ctrl_i_hint_label = if app.show_internal_process { " collapse  " } else { " expand  " };
+    let ctrl_t_hint_label = if app.show_internal_process { " collapse  " } else { " expand  " };
     let left_len = 2 + status_label.len() + 3 + active_model_name.len() + 1 + provider_name.len();
-    let right_len = 56 + 18 + ctrl_i_hint_label.len();
+    let right_len = 56 + 18 + ctrl_t_hint_label.len();
     let spacer_len = (input_inner.width as usize)
         .saturating_sub(left_len)
         .saturating_sub(right_len)
@@ -502,8 +502,8 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
         Span::styled(" terminal  ", Style::default().fg(Color::DarkGray)),
         Span::styled("ctrl+p", Style::default()),
         Span::styled(" palette  ", Style::default().fg(Color::DarkGray)),
-        Span::styled("ctrl+i", Style::default()),
-        Span::styled(ctrl_i_hint_label, Style::default().fg(Color::DarkGray)),
+        Span::styled("ctrl+t", Style::default()),
+        Span::styled(ctrl_t_hint_label, Style::default().fg(Color::DarkGray)),
     ]));
 
     let input_widget = Paragraph::new(chat_input_lines)
