@@ -13,8 +13,21 @@ pub fn draw_home(frame: &mut Frame, area: Rect, app: &TuiApp) {
     let banner_content = include_str!("../../../../assets/clawhive.txt");
     let banner_lines_count = banner_content.lines().count();
     
-    // Hitung tinggi konten utama (logo + spacer + input + spacer + tip)
-    let content_height = banner_lines_count as u16 + 9;
+    // Hitung tinggi input box secara dinamis berdasarkan wrap_text dari input_buffer
+    let input_inner_width = (((area.width as usize * 60) / 100).saturating_sub(1)).max(1);
+    let raw_input_lines = if app.input_buffer.is_empty() {
+        vec!["Ask anything... \"Spawn a new research agent\"".to_string()]
+    } else {
+        crate::ui::wrap_text(&app.input_buffer, input_inner_width.saturating_sub(2).max(1))
+    };
+    let input_lines: Vec<String> = raw_input_lines
+        .into_iter()
+        .map(|line| format!("  {}", line))
+        .collect();
+    let input_height = (input_lines.len() + 2) as u16; // input lines + 1 spacer + 1 status bar
+
+    // Hitung tinggi konten utama (logo + spacer + input + spacer + tip) secara dinamis
+    let content_height = banner_lines_count as u16 + 5 + input_height;
 
     // 1. Pisahkan Area Footer terlebih dahulu di bagian paling bawah
     let main_chunks = Layout::default()
@@ -44,7 +57,7 @@ pub fn draw_home(frame: &mut Frame, area: Rect, app: &TuiApp) {
         .constraints([
             Constraint::Length(banner_lines_count as u16), // Logo
             Constraint::Length(2),                         // Spacer logo-input
-            Constraint::Length(4),                         // Input Box
+            Constraint::Length(input_height),              // Input Box dinamis
             Constraint::Length(2),                         // Spacer input-tip
             Constraint::Length(1),                         // Tip
         ])
@@ -118,71 +131,49 @@ pub fn draw_home(frame: &mut Frame, area: Rect, app: &TuiApp) {
         .max(1);
     let middle_spacer = " ".repeat(spacer_len);
 
-    let lines = if app.input_buffer.is_empty() {
-        vec![
-            Line::from(Span::styled(
-                "  Ask anything... \"Spawn a new research agent\"",
-                Style::default().fg(Color::DarkGray),
-            )),
-            Line::from(""), // Spacer
-            Line::from(""), // Spacer
-            Line::from(vec![
-                Span::raw("  "),
-                Span::styled(
-                    "TUI",
-                    Style::default()
-                        .fg(Color::Rgb(218, 165, 32))
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::styled(format!(" · {} ", active_model_name), Style::default()),
-                Span::styled(provider_name.clone(), Style::default().fg(Color::DarkGray)),
-                Span::raw(middle_spacer.clone()),
-                Span::styled("/", Style::default()),
-                Span::styled(" commands  ", Style::default().fg(Color::DarkGray)),
-                Span::styled(":", Style::default()),
-                Span::styled(" terminal  ", Style::default().fg(Color::DarkGray)),
-                Span::styled("ctrl+p", Style::default()),
-                Span::styled(" palette  ", Style::default().fg(Color::DarkGray)),
-            ]),
-        ]
+    let mut input_widget_lines = Vec::new();
+    let text_style = if app.input_buffer.is_empty() {
+        Style::default().fg(Color::DarkGray)
     } else {
-        vec![
-            Line::from(Span::styled(
-                format!("  {}", app.input_buffer),
-                Style::default(),
-            )),
-            Line::from(""), // Spacer
-            Line::from(""), // Spacer
-            Line::from(vec![
-                Span::raw("  "),
-                Span::styled(
-                    "TUI",
-                    Style::default()
-                        .fg(Color::Rgb(218, 165, 32))
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::styled(format!(" · {} ", active_model_name), Style::default()),
-                Span::styled(provider_name, Style::default().fg(Color::DarkGray)),
-                Span::raw(middle_spacer),
-                Span::styled("/", Style::default()),
-                Span::styled(" commands  ", Style::default().fg(Color::DarkGray)),
-                Span::styled(":", Style::default()),
-                Span::styled(" terminal  ", Style::default().fg(Color::DarkGray)),
-                Span::styled("ctrl+p", Style::default()),
-                Span::styled(" palette  ", Style::default().fg(Color::DarkGray)),
-            ]),
-        ]
+        Style::default()
     };
+    for line in &input_lines {
+        input_widget_lines.push(Line::from(Span::styled(line.clone(), text_style)));
+    }
+    input_widget_lines.push(Line::from("")); // Spacer
+    input_widget_lines.push(Line::from(vec![
+        Span::raw("  "),
+        Span::styled(
+            "TUI",
+            Style::default()
+                .fg(Color::Rgb(218, 165, 32))
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(format!(" · {} ", active_model_name), Style::default()),
+        Span::styled(provider_name, Style::default().fg(Color::DarkGray)),
+        Span::raw(middle_spacer),
+        Span::styled("/", Style::default()),
+        Span::styled(" commands  ", Style::default().fg(Color::DarkGray)),
+        Span::styled(":", Style::default()),
+        Span::styled(" terminal  ", Style::default().fg(Color::DarkGray)),
+        Span::styled("ctrl+p", Style::default()),
+        Span::styled(" palette  ", Style::default().fg(Color::DarkGray)),
+    ]));
 
-    let input_widget = Paragraph::new(lines)
+    let input_widget = Paragraph::new(input_widget_lines)
         .block(input_block);
     frame.render_widget(input_widget, input_box_area);
 
-    // Set cursor position di baris atas (karena input placeholder/buffer berada di index 0)
-    frame.set_cursor_position((
-        input_inner.x + 2 + app.input_buffer.len() as u16,
-        input_inner.y,
-    ));
+    let cursor_pos = if app.input_buffer.is_empty() {
+        (input_inner.x + 2, input_inner.y)
+    } else {
+        let last_line = input_lines.last().cloned().unwrap_or_default();
+        (
+            input_inner.x + last_line.len() as u16,
+            input_inner.y + (input_lines.len() - 1) as u16,
+        )
+    };
+    frame.set_cursor_position(cursor_pos);
 
     // 4. Tip
     let tip_line = Line::from(vec![

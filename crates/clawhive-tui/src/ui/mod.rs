@@ -26,3 +26,40 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &TuiApp) {
         draw_model_selection(frame, area, app);
     }
 }
+
+/// Melakukan word-wrap manual per baris teks ke lebar maksimal `max_width`.
+/// Menjaga line breaks yang ditulis secara eksplisit dari input.
+pub fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
+    let mut lines = Vec::new();
+    for paragraph in text.lines() {
+        if paragraph.is_empty() {
+            lines.push(String::new());
+            continue;
+        }
+
+        let words: Vec<&str> = paragraph.split_whitespace().collect();
+        if words.is_empty() {
+            lines.push(String::new());
+            continue;
+        }
+
+        let mut current_line = String::new();
+        for word in words {
+            let space_needed = if current_line.is_empty() { 0 } else { 1 };
+            if current_line.chars().count() + space_needed + word.chars().count() > max_width {
+                // Baris penuh, flush ke lines
+                lines.push(current_line);
+                current_line = word.to_string();
+            } else {
+                if !current_line.is_empty() {
+                    current_line.push(' ');
+                }
+                current_line.push_str(word);
+            }
+        }
+        if !current_line.is_empty() {
+            lines.push(current_line);
+        }
+    }
+    lines
+}

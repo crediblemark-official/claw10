@@ -31,7 +31,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
     let raw_input_lines = if app.input_buffer.is_empty() {
         vec!["Ketik pesan di sini...".to_string()]
     } else {
-        wrap_text(&app.input_buffer, input_inner_width.saturating_sub(2).max(1))
+        crate::ui::wrap_text(&app.input_buffer, input_inner_width.saturating_sub(2).max(1))
     };
     let input_lines: Vec<String> = raw_input_lines
         .into_iter()
@@ -77,7 +77,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
 
     // Helper: hitung visual line count sebuah pesan dengan wrap_width tertentu menggunakan wrap_text helper
     let count_lines = |msg: &str, wrap_w: usize| -> usize {
-        wrap_text(msg, wrap_w).len().max(1)
+        crate::ui::wrap_text(msg, wrap_w).len().max(1)
     };
 
     // Helper: hitung tinggi bubble (visual lines + chrome)
@@ -196,7 +196,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
             lines.push(Line::from(""));
 
             // Pre-wrap menggunakan word-wrap helper dan parse markdown bold
-            for line_str in wrap_text(msg, asst_wrap_w) {
+            for line_str in crate::ui::wrap_text(msg, asst_wrap_w) {
                 if line_str.is_empty() {
                     lines.push(Line::from(Span::raw("  ")));
                 } else {
@@ -545,42 +545,6 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
     }
 }
 
-/// Melakukan word-wrap manual per baris teks ke lebar maksimal `max_width`.
-/// Menjaga line breaks yang ditulis secara eksplisit dari input.
-fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
-    let mut lines = Vec::new();
-    for paragraph in text.lines() {
-        if paragraph.is_empty() {
-            lines.push(String::new());
-            continue;
-        }
-
-        let words: Vec<&str> = paragraph.split_whitespace().collect();
-        if words.is_empty() {
-            lines.push(String::new());
-            continue;
-        }
-
-        let mut current_line = String::new();
-        for word in words {
-            let space_needed = if current_line.is_empty() { 0 } else { 1 };
-            if current_line.chars().count() + space_needed + word.chars().count() > max_width {
-                // Baris penuh, flush ke lines
-                lines.push(current_line);
-                current_line = word.to_string();
-            } else {
-                if !current_line.is_empty() {
-                    current_line.push(' ');
-                }
-                current_line.push_str(word);
-            }
-        }
-        if !current_line.is_empty() {
-            lines.push(current_line);
-        }
-    }
-    lines
-}
 
 /// Melakukan parsing markdown bold sederhana (**text**) menjadi kumpulan Span.
 /// Karakter asterisk (**) tidak ikut ditampilkan, melainkan diganti dengan Modifier::BOLD.
