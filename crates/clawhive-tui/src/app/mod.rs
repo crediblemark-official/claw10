@@ -83,6 +83,8 @@ pub struct TuiApp {
     pub chat_scroll_offset: std::cell::Cell<usize>,
     /// True = auto-scroll ke bawah. False = user sedang scroll manual ke atas.
     pub chat_at_bottom: bool,
+    /// Waktu refresh sidebar terakhir
+    pub last_refresh: std::time::Instant,
 }
 
 impl TuiApp {
@@ -114,6 +116,7 @@ impl TuiApp {
             is_streaming: false,
             chat_scroll_offset: std::cell::Cell::new(0),
             chat_at_bottom: true,
+            last_refresh: std::time::Instant::now(),
         }
     }
 
@@ -194,6 +197,12 @@ impl TuiApp {
         self.load_saved_api_key().await;
 
         while !self.should_quit {
+            // Refresh data dari database secara periodik setiap 1 detik
+            if self.last_refresh.elapsed() >= std::time::Duration::from_secs(1) {
+                self.refresh().await;
+                self.last_refresh = std::time::Instant::now();
+            }
+
             // Flush stream events sebelum render
             self.try_flush_stream().await;
 
