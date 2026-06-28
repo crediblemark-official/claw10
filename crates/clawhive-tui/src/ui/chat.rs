@@ -51,7 +51,28 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
     let mut suggestion_height = 0;
     if app.input_buffer.starts_with('/') {
         if app.input_buffer.starts_with("/model") {
-            suggestion_height = 2 + app.active_suggestions.len().max(1) + 1; // Header + suggestions + footer + spacer
+            let total_items = app.active_suggestions.len();
+            let max_visible = 10;
+            let visible_count = total_items.min(max_visible);
+            let mut height = 2 + visible_count + 1; // Header + visible suggestions + footer + spacer
+            if total_items > max_visible {
+                // start_idx > 0 akan menambah 1 baris info atas jika index berada di bawah
+                if app.suggestion_index >= max_visible {
+                    height += 1;
+                }
+                // remaining > 0 akan menambah 1 baris info bawah jika ada sisa di bawah viewport
+                let start_idx = if app.suggestion_index >= max_visible {
+                    app.suggestion_index - max_visible + 1
+                } else {
+                    0
+                };
+                let start_idx = start_idx.min(total_items.saturating_sub(max_visible));
+                let end_idx = (start_idx + max_visible).min(total_items);
+                if total_items.saturating_sub(end_idx) > 0 {
+                    height += 1;
+                }
+            }
+            suggestion_height = height;
         } else {
             if !app.active_suggestions.is_empty() {
                 suggestion_height = 2 + app.active_suggestions.len() + 1; // Header + suggestions + footer + spacer
@@ -435,11 +456,49 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                     chat_input_lines.push(Line::from(""));
                 }
             } else if app.input_buffer.starts_with("/model") {
-                chat_input_lines.push(Line::from(Span::styled("   [Select Model] -----------------------------------------", Style::default().fg(Color::DarkGray))));
-                if app.active_suggestions.is_empty() {
+                let search_query = if app.input_buffer.len() > 7 {
+                    app.input_buffer[7..].trim()
+                } else {
+                    ""
+                };
+                let total_items = app.active_suggestions.len();
+                let max_visible = 10;
+                let mut start_idx = 0;
+                if app.suggestion_index >= max_visible {
+                    start_idx = app.suggestion_index - max_visible + 1;
+                }
+                start_idx = start_idx.min(total_items.saturating_sub(max_visible));
+                let end_idx = (start_idx + max_visible).min(total_items);
+
+                let search_indicator = if search_query.is_empty() {
+                    String::new()
+                } else {
+                    format!(" Cari: '{}' |", search_query)
+                };
+
+                let pagination = if total_items > 0 {
+                    format!(" {} {} - {} dari {} ", search_indicator, start_idx + 1, end_idx, total_items)
+                } else {
+                    String::new()
+                };
+
+                chat_input_lines.push(Line::from(Span::styled(
+                    format!("   [Select Model]{}---------------------------------", pagination),
+                    Style::default().fg(Color::DarkGray),
+                )));
+
+                if total_items == 0 {
                     chat_input_lines.push(Line::from(Span::styled("     (Tidak ada model terkonfigurasi cocok)", Style::default().fg(Color::Red))));
                 } else {
-                    for (idx, (model_id, _)) in app.active_suggestions.iter().enumerate() {
+                    if start_idx > 0 {
+                        chat_input_lines.push(Line::from(Span::styled(
+                            format!("     ▲ (Ada {} model sebelumnya...)", start_idx),
+                            Style::default().fg(Color::DarkGray).add_modifier(Modifier::ITALIC),
+                        )));
+                    }
+
+                    for idx in start_idx..end_idx {
+                        let (model_id, _) = &app.active_suggestions[idx];
                         let is_selected = idx == app.suggestion_index;
                         let is_active = model_id == &app.active_model;
                         
@@ -456,7 +515,6 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                             Style::default().fg(Color::Cyan)
                         };
                         
-                        // Dapatkan nama provider dari router registry (jika ada)
                         let provider = app.state.model_router.as_ref()
                             .and_then(|r| r.registry().list_profiles().iter().find(|p| &p.id == model_id).map(|p| p.provider.clone()))
                             .unwrap_or_else(|| "Unknown".to_string());
@@ -465,6 +523,14 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                             Span::styled(format!("{}{:<25}", prefix, model_id), style),
                             Span::styled(format!(" ({})", provider), Style::default().fg(Color::DarkGray)),
                         ]));
+                    }
+
+                    let remaining = total_items.saturating_sub(end_idx);
+                    if remaining > 0 {
+                        chat_input_lines.push(Line::from(Span::styled(
+                            format!("     ▼ (Ada {} model lainnya...)", remaining),
+                            Style::default().fg(Color::DarkGray).add_modifier(Modifier::ITALIC),
+                        )));
                     }
                 }
                 chat_input_lines.push(Line::from(Span::styled("   --------------------------------------------------------", Style::default().fg(Color::DarkGray))));
