@@ -450,6 +450,10 @@ impl TuiApp {
             Some(r) => std::sync::Arc::clone(r),
             None => return, // belum ada model router, skip
         };
+
+        // Muat model dari folder models/ secara statis ke registry model_router
+        self.load_static_models();
+
         let tool_registry = match self.state.tool_registry.as_ref() {
             Some(t) => std::sync::Arc::clone(t),
             None => {
@@ -466,6 +470,79 @@ impl TuiApp {
             }
             Err(e) => {
                 tracing::warn!("Gagal init AgentRuntime: {e}");
+            }
+        }
+    }
+
+    /// Muat semua model dari folder `models/` secara statis ke registry model_router.
+    pub(crate) fn load_static_models(&self) {
+        let router = match self.state.model_router.as_ref() {
+            Some(r) => r,
+            None => return,
+        };
+
+        if let Ok(entries) = std::fs::read_dir("models") {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().is_some_and(|ext| ext == "json") {
+                    let provider_name = path
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("")
+                        .to_string();
+
+                    let provider_key = match provider_name.to_lowercase().as_str() {
+                        "nvidia" => "nvidia".to_string(),
+                        "openrouter" => "openrouter".to_string(),
+                        other => other.to_string(),
+                    };
+
+                    if let Ok(content) = std::fs::read_to_string(&path) {
+                        if let Ok(names) = serde_json::from_str::<Vec<String>>(&content) {
+                            let mut models = Vec::new();
+                            for name in names {
+                                let exists = router.registry().list_profiles().iter().any(|p| {
+                                    p.id == name || p.model_name == name
+                                });
+                                if !exists {
+                                    let id = if name.contains('/') {
+                                        name.clone()
+                                    } else if provider_key == "nvidia" {
+                                        if name.starts_with("llama") {
+                                            format!("meta/{}", name)
+                                        } else if name.starts_with("mistral") {
+                                            format!("mistralai/{}", name)
+                                        } else if name.starts_with("kimi") {
+                                            format!("moonshotai/{}", name)
+                                        } else if name.starts_with("gemma") {
+                                            format!("google/{}", name)
+                                        } else if name.starts_with("qwen") {
+                                            format!("qwen/{}", name)
+                                        } else {
+                                            format!("nvidia/{}", name)
+                                        }
+                                    } else {
+                                        name.clone()
+                                    };
+
+                                    models.push(clawhive_model_router::types::ModelProfile {
+                                        id,
+                                        provider: provider_key.clone(),
+                                        model_name: name,
+                                        context_window: 128_000,
+                                        max_output_tokens: 8_192,
+                                        cost_per_1m_input: 0.0,
+                                        cost_per_1m_output: 0.0,
+                                        suitable_for: vec!["general".to_string()],
+                                    });
+                                }
+                            }
+                            if !models.is_empty() {
+                                router.inject_profiles(models);
+                            }
+                        }
+                    }
+                }
             }
         }
     }
