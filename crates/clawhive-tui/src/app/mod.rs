@@ -451,6 +451,7 @@ impl TuiApp {
                     ("/help".to_string(), "/help".to_string()),
                     ("/refresh".to_string(), "/refresh".to_string()),
                     ("/clear".to_string(), "/clear".to_string()),
+                    ("/workspace".to_string(), "/workspace".to_string()),
                     ("/q".to_string(), "/q".to_string()),
                 ];
                 

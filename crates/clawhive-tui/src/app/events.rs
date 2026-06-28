@@ -393,7 +393,10 @@ impl TuiApp {
                             }
                             KeyCode::Esc => {
                                 if self.active_screen == Screen::Chat {
+                                    // Reset workspace aktif → kembali ke Workspace Selector
+                                    self.active_workspace = None;
                                     self.active_screen = Screen::Home;
+                                    self.load_workspaces().await;
                                 } else {
                                     self.should_quit = true;
                                 }

@@ -35,6 +35,7 @@ Commands:
   :spawn <mission> <role> <objective> <budget>  Create spawn request
   :goto <agents|workers|spawn>       Switch tab
   :save <filename.md>                Save last assistant response to a markdown file
+  :workspace / :home / :ws           Kembali ke Workspace Selector
   :q                                 Quit TUI
 
 Available providers ({} total):
@@ -330,6 +331,13 @@ Type any message to start a chat with the active model.",
                         None => "Tidak ada jawaban asisten yang bisa disimpan.".into()
                     }
                 }
+            }
+            "home" | "workspace" | "ws" => {
+                // Kembali ke Home screen (Workspace Selector) dan reset workspace aktif
+                self.active_workspace = None;
+                self.active_screen = crate::app::Screen::Home;
+                self.load_workspaces().await;
+                "Kembali ke Workspace Selector.".into()
             }
             "q" => {
                 self.should_quit = true;

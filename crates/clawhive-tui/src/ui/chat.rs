@@ -311,8 +311,8 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
         String::new()
     };
 
-    // right_len: workspace label + shortcut hints
-    let right_len = workspace_label.len() + 40;
+    // right_len: workspace label + shortcut hints + esc hint
+    let right_len = workspace_label.len() + 56;
 
     let spacer_len = (input_inner.width as usize)
         .saturating_sub(left_len)
@@ -351,6 +351,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                         ("/help", "         - Tampilkan daftar perintah lengkap"),
                         ("/refresh", "      - Segarkan database agen dan task"),
                         ("/clear", "        - Bersihkan cache, history, dan context"),
+                        ("/workspace", "    - Kembali ke Workspace Selector"),
                         ("/q", "            - Keluar dari aplikasi TUI"),
                     ];
                     
@@ -437,6 +438,8 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
         Span::styled(provider_name, Style::default().fg(Color::DarkGray)),
         Span::raw(middle_spacer),
         Span::styled(workspace_label, Style::default().fg(Color::Rgb(218, 165, 32)).add_modifier(Modifier::BOLD)),
+        Span::styled("esc", Style::default()),
+        Span::styled(" workspace  ", Style::default().fg(Color::DarkGray)),
         Span::styled("/", Style::default()),
         Span::styled(" commands  ", Style::default().fg(Color::DarkGray)),
         Span::styled(":", Style::default()),
