@@ -404,7 +404,7 @@ impl TuiApp {
         
         // Load model aktif terakhir dari database
         if let Ok(Some(last_model)) = self.global_store.get::<String>("last_active_model").await {
-            self.active_model = last_model;
+            self.active_model = self.resolve_model_id_without_provider(&last_model);
         } else {
             // Fallback ke model pertama jika ada
             if let Some(router) = &self.state.model_router {
@@ -593,11 +593,44 @@ impl TuiApp {
         }
     }
 
+    /// Resolves a dynamic model ID by trying to match prefix from registry or fallback (iterating over all mapping rules).
+    pub(crate) fn resolve_model_id_without_provider(&self, name: &str) -> String {
+        if name.contains('/') {
+            return name.to_string();
+        }
+
+        // 1. Coba cari kecocokan di registry model_router
+        if let Some(router) = &self.state.model_router {
+            let matched = router.registry().list_profiles().iter().find(|p| {
+                let p_id_lower = p.id.to_lowercase();
+                let name_lower = name.to_lowercase();
+                p_id_lower.contains(&name_lower) || name_lower.contains(&p_id_lower)
+            }).map(|p| p.id.clone());
+            if let Some(mid) = matched {
+                return mid;
+            }
+        }
+
+        // 2. Jika tidak ada, iterasi semua provider di model_mappings untuk mencari pattern kecocokan
+        let name_lower = name.to_lowercase();
+        for (_provider_key, rules) in &self.model_mappings {
+            for (pattern, prefix) in rules {
+                if name_lower.starts_with(pattern) {
+                    return format!("{}/{}", prefix, name);
+                }
+            }
+        }
+
+        // 3. Fallback generic (default nvidia)
+        format!("nvidia/{}", name)
+    }
+
     pub(crate) fn set_active_model(&mut self, model_id: String) {
-        self.active_model = model_id.clone();
+        let resolved = self.resolve_model_id_without_provider(&model_id);
+        self.active_model = resolved.clone();
         let store = std::sync::Arc::clone(&self.global_store);
         tokio::spawn(async move {
-            let _ = store.set("last_active_model", &model_id).await;
+            let _ = store.set("last_active_model", &resolved).await;
         });
     }
 
@@ -772,9 +805,11 @@ impl TuiApp {
                 // Eksekusi setiap anak di spec
                 for child in &req.children {
                     let child_id = AgentId(uuid::Uuid::now_v7());
+                    let raw_model = if child.model_profile == "default" { &self.active_model } else { &child.model_profile };
+                    let resolved_model = self.resolve_model_id_without_provider(raw_model);
                     let mut child_agent = crate::tui_agent::make_default_agent(
                         child_id.clone(),
-                        if child.model_profile == "default" { &self.active_model } else { &child.model_profile },
+                        &resolved_model,
                         req.mission_id.clone(),
                     );
                     child_agent.name = format!("Child ({})", child.role);
