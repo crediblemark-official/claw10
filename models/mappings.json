@@ -3,14 +3,21 @@
     "llama": "meta",
     "mistral": "mistralai",
     "ministral": "mistralai",
+    "mixtral": "mistralai",
     "kimi": "moonshotai",
     "gemma": "google",
     "diffusiongemma": "google",
     "qwen": "qwen",
     "minimax": "minimaxai",
-    "deepseek": "deepseek",
+    "deepseek": "deepseek-ai",
     "phi": "microsoft",
-    "cohere": "cohere"
+    "cohere": "cohere",
+    "step": "stepfun-ai",
+    "glm": "z-ai",
+    "sarvam": "sarvamai",
+    "dracarys": "abacusai",
+    "stockmark": "stockmark",
+    "seed-oss": "bytedance"
   },
   "openrouter": {
     "gpt-4": "openai",
