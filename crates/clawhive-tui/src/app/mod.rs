@@ -126,6 +126,8 @@ pub struct TuiApp {
     pub workspace_selected_index: usize,
     /// Menentukan apakah proses internal agent di-expand atau di-collapse.
     pub show_internal_process: bool,
+    /// Konfigurasi pemetaan prefix model dari models/mappings.json
+    pub model_mappings: std::collections::HashMap<String, std::collections::HashMap<String, String>>,
 }
 
 impl TuiApp {
@@ -175,6 +177,13 @@ impl TuiApp {
             workspace_input: String::new(),
             workspace_selected_index: 0,
             show_internal_process: false,
+            model_mappings: {
+                if let Ok(content) = std::fs::read_to_string("models/mappings.json") {
+                    serde_json::from_str(&content).unwrap_or_default()
+                } else {
+                    std::collections::HashMap::new()
+                }
+            },
         }
     }
 
@@ -559,31 +568,26 @@ impl TuiApp {
             name.to_string()
         } else if let Some(mid) = matched_id {
             mid
-        } else if provider_key == "nvidia" {
-            let name_lower = name.to_lowercase();
-            if name_lower.starts_with("llama") {
-                format!("meta/{}", name)
-            } else if name_lower.starts_with("mistral") || name_lower.starts_with("ministral") {
-                format!("mistralai/{}", name)
-            } else if name_lower.starts_with("kimi") {
-                format!("moonshotai/{}", name)
-            } else if name_lower.starts_with("gemma") || name_lower.starts_with("diffusiongemma") {
-                format!("google/{}", name)
-            } else if name_lower.starts_with("qwen") {
-                format!("qwen/{}", name)
-            } else if name_lower.starts_with("minimax") {
-                format!("minimaxai/{}", name)
-            } else if name_lower.starts_with("deepseek") {
-                format!("deepseek/{}", name)
-            } else if name_lower.starts_with("phi") {
-                format!("microsoft/{}", name)
-            } else if name_lower.starts_with("cohere") {
-                format!("cohere/{}", name)
-            } else {
-                format!("nvidia/{}", name)
-            }
         } else {
-            name.to_string()
+            // Cek pemetaan dari model_mappings secara dinamis
+            let mut resolved = None;
+            let name_lower = name.to_lowercase();
+            if let Some(rules) = self.model_mappings.get(provider_key) {
+                for (pattern, prefix) in rules {
+                    if name_lower.starts_with(pattern) {
+                        resolved = Some(format!("{}/{}", prefix, name));
+                        break;
+                    }
+                }
+            }
+
+            if let Some(res) = resolved {
+                res
+            } else if provider_key == "nvidia" {
+                format!("nvidia/{}", name)
+            } else {
+                name.to_string()
+            }
         }
     }
 

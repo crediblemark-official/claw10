@@ -1,0 +1,15 @@
+{
+  "nvidia": {
+    "llama": "meta",
+    "mistral": "mistralai",
+    "ministral": "mistralai",
+    "kimi": "moonshotai",
+    "gemma": "google",
+    "diffusiongemma": "google",
+    "qwen": "qwen",
+    "minimax": "minimaxai",
+    "deepseek": "deepseek",
+    "phi": "microsoft",
+    "cohere": "cohere"
+  }
+}
