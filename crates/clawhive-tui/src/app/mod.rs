@@ -141,8 +141,18 @@ impl TuiApp {
         use clawhive_control_api::store::{AGENT_PREFIX, SPAWNREQ_PREFIX};
         use clawhive_store::StoreExt;
 
+        use clawhive_domain::{Agent, AgentState};
+
         // Proses spawn request yang Approved sebelum refresh data list
         self.process_approved_spawns().await;
+
+        // Dapatkan mission_id dari agent aktif saat ini (jika ada)
+        let current_mission_id = if let Some(ref active_id) = self.active_agent_id {
+            let key = format!("{AGENT_PREFIX}{}", active_id.0);
+            self.state.kv_store.get::<Agent>(&key).await.ok().flatten().map(|a| a.mission_id)
+        } else {
+            None
+        };
 
         self.agents = self
             .state
@@ -152,6 +162,23 @@ impl TuiApp {
             .unwrap_or_default()
             .into_iter()
             .map(|(_, a)| a)
+            .filter(|a| {
+                // Sembunyikan agent yang sudah Terminated
+                if a.state == AgentState::Terminated {
+                    return false;
+                }
+                // Tampilkan agen global "cli-agent"
+                if a.name == "cli-agent" {
+                    return true;
+                }
+                // Jika sudah ada sesi aktif, tampilkan hanya agen yang memiliki mission_id sama
+                if let Some(ref mid) = current_mission_id {
+                    a.mission_id == *mid
+                } else {
+                    // Jika belum ada agent aktif (startup), sembunyikan Root Agent lama
+                    a.name != "TUI Root Agent"
+                }
+            })
             .collect();
 
         self.workers = match self.state.worker_service.list(None).await {
