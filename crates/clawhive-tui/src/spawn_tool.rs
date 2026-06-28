@@ -115,23 +115,39 @@ impl Tool for SpawnTool {
                 on_parent_terminated: true,
                 on_budget_exhausted: true,
             },
-            state: SpawnState::Approved,
+            state: SpawnState::Pending,
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
         };
-
 
         let key = format!("spawnreq:{}", request_id.0);
         self.kv_store.set(&key, &spawn_request).await
             .map_err(|e| ToolError::Other(format!("gagal simpan spawn request: {e}")))?;
 
-        Ok(ToolOutput::ok(json!({
-            "spawn_request_id": request_id.0.to_string(),
-            "status": "Approved",
-            "message": format!(
-                "Spawn request untuk child '{}' berhasil dibuat dan disetujui secara otomatis.",
-                role
-            )
-        })))
+        // Loop memantau database untuk menunggu keputusan persetujuan user di TUI
+        loop {
+            if let Ok(Some(current_req)) = self.kv_store.get::<SpawnRequest>(&key).await {
+                match current_req.state {
+                    SpawnState::Completed => {
+                        return Ok(ToolOutput::ok(json!({
+                            "spawn_request_id": request_id.0.to_string(),
+                            "status": "Approved",
+                            "message": format!(
+                                "Spawn request untuk child '{}' disetujui oleh user dan agen berhasil diluncurkan.",
+                                role
+                            )
+                        })));
+                    }
+                    SpawnState::Denied => {
+                        return Ok(ToolOutput::fail(format!(
+                            "Spawn request untuk child '{}' ditolak oleh user.",
+                            role
+                        )));
+                    }
+                    _ => {}
+                }
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        }
     }
 }

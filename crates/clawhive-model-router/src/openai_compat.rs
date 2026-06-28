@@ -623,9 +623,18 @@ impl ModelProvider for OpenAiCompatibleProvider {
                         }
                     }
                     Err(e) => {
-                        let _ = tx.send(StreamEvent::Error(format!(
-                            "stream read error: {e}"
-                        )));
+                        let err_msg = e.to_string();
+                        if err_msg.contains("decoding response body")
+                            || err_msg.contains("connection closed")
+                            || err_msg.contains("aborted")
+                            || err_msg.contains("premature")
+                        {
+                            let _ = tx.send(StreamEvent::Done);
+                        } else {
+                            let _ = tx.send(StreamEvent::Error(format!(
+                                "stream read error: {err_msg}"
+                            )));
+                        }
                         break;
                     }
                 }
