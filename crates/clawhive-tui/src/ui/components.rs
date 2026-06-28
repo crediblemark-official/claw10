@@ -318,9 +318,19 @@ pub fn draw_model_selection(frame: &mut Frame, area: Rect, app: &TuiApp) {
     .style(Style::default().bg(Color::Rgb(25, 25, 25)));
     frame.render_widget(search_para, chunks[2]);
 
-    // Items list
+    // Items list dengan windowed scrolling
+    let visible_height = chunks[3].height as usize;
+    let total_items = items.len();
+    
+    let mut start_idx = 0;
+    if app.model_sel_index >= visible_height {
+        start_idx = app.model_sel_index - visible_height + 1;
+    }
+    let end_idx = (start_idx + visible_height).min(total_items);
+
     let mut list_lines: Vec<Line> = Vec::new();
-    for (i, item) in items.iter().enumerate() {
+    for i in start_idx..end_idx {
+        let item = &items[i];
         let is_selected = i == app.model_sel_index;
         let line = if is_selected {
             Line::from(vec![
