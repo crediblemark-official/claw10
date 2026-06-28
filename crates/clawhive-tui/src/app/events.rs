@@ -349,7 +349,15 @@ impl TuiApp {
                                         }
                                     }
                                 } else {
-                                    self.input_buffer.push(c);
+                                    if c == '/' && self.input_buffer.is_empty() {
+                                        self.command_mode = CommandMode::CommandPalette {
+                                            search_query: String::new(),
+                                            selected_index: 0,
+                                            filtered_items: get_palette_items(),
+                                        };
+                                    } else {
+                                        self.input_buffer.push(c);
+                                    }
                                 }
                             }
                             KeyCode::Tab => {
