@@ -97,7 +97,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
 
     let mut current_y_offset = 0;
 
-    for (sender, model, msg) in &app.chat_history {
+    for (idx, (sender, model, msg)) in app.chat_history.iter().enumerate() {
         // Hitung tinggi asli bubble
         let item_height = bubble_height(sender, msg);
         let item_start = current_y_offset;
@@ -166,11 +166,19 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
             // Agent / Assistant: padding kiri 2 spasi, pre-wrap manual agar indentasi konsisten
             let mut lines = Vec::new();
 
+            // Cek apakah item asisten ini adalah item terakhir dan sedang streaming
+            let is_last_item = idx == app.chat_history.len().saturating_sub(1);
+            let model_display = if is_last_item && app.is_streaming {
+                format!("{} (Merespons...)", model)
+            } else {
+                model.clone()
+            };
+
             // Header: ikon + model
             lines.push(Line::from(vec![
                 Span::raw("  "),
                 Span::styled("■ ", Style::default().fg(Color::Rgb(218, 165, 32))),
-                Span::styled(model.as_str(), Style::default().fg(Color::DarkGray)),
+                Span::styled(model_display, Style::default().fg(Color::DarkGray)),
             ]));
             lines.push(Line::from(""));
 
@@ -235,6 +243,9 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
         .max(1);
     let middle_spacer = " ".repeat(spacer_len);
 
+    let status_label = if app.is_streaming { "TUI (Streaming...)" } else { "TUI" };
+    let status_color = if app.is_streaming { Color::Yellow } else { Color::Rgb(218, 165, 32) };
+
     let chat_input_lines = if app.input_buffer.is_empty() {
         vec![
             Line::from(Span::styled(
@@ -246,9 +257,9 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
             Line::from(vec![
                 Span::raw("  "),
                 Span::styled(
-                    "TUI",
+                    status_label,
                     Style::default()
-                        .fg(Color::Rgb(218, 165, 32))
+                        .fg(status_color)
                         .add_modifier(Modifier::BOLD),
                 ),
                 Span::styled(format!(" · {} ", active_model_name), Style::default()),
@@ -273,9 +284,9 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
             Line::from(vec![
                 Span::raw("  "),
                 Span::styled(
-                    "TUI",
+                    status_label,
                     Style::default()
-                        .fg(Color::Rgb(218, 165, 32))
+                        .fg(status_color)
                         .add_modifier(Modifier::BOLD),
                 ),
                 Span::styled(format!(" · {} ", active_model_name), Style::default()),
