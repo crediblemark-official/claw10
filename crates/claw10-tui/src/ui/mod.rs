@@ -43,22 +43,20 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &TuiApp) {
         return;
     }
 
-    // Bagi area menjadi Pembatas Atas, Top Bar, Pembatas Bawah, dan Content Area secara padat dan efisien
+    // Bagi area menjadi Spacer Atas, Top Bar, Pembatas Bawah, dan Content Area secara padat dan efisien
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(1), // Pembatas Atas
+            Constraint::Length(1), // Spacer Atas
             Constraint::Length(1), // Top Bar
             Constraint::Length(1), // Pembatas Bawah
             Constraint::Min(0),    // Content Area
         ])
         .split(area);
 
-    // Garis horizontal pembatas atas yang sleek & minimalis
-    let top_border = Block::default()
-        .borders(Borders::BOTTOM)
-        .border_style(Style::default().fg(Color::Rgb(40, 40, 40)).bg(Color::Rgb(0, 0, 0)));
-    frame.render_widget(top_border, chunks[0]);
+    // Render spacer atas hitam pekat absolute (#000000) tanpa garis/border pembatas
+    let top_spacer = Block::default().style(Style::default().bg(Color::Rgb(0, 0, 0)));
+    frame.render_widget(top_spacer, chunks[0]);
 
     draw_top_bar(frame, chunks[1], app);
 
