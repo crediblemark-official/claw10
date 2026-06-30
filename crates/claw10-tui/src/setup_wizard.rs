@@ -500,7 +500,7 @@ impl SetupWizard {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(8),
+                Constraint::Length(9),
                 Constraint::Min(0),
                 Constraint::Length(3),
             ])
@@ -513,7 +513,9 @@ impl SetupWizard {
 
     fn draw_logo(&self, frame: &mut Frame, area: Rect) {
         let banner_content = include_str!("../../../assets/claw10.txt");
-        let mut lines: Vec<Line> = banner_content
+        let mut lines = vec![Line::from("")]; // Baris kosong pertama sebagai padding atas
+
+        let mut banner_lines: Vec<Line> = banner_content
             .lines()
             .map(|line| {
                 Line::from(vec![
@@ -521,6 +523,7 @@ impl SetupWizard {
                 ])
             })
             .collect();
+        lines.append(&mut banner_lines);
 
         lines.push(Line::from(""));
         lines.push(Line::from(vec![
