@@ -220,7 +220,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
             let mut lines = Vec::new();
             lines.push(Line::from("")); // Padding vertikal atas
             for part in msg.lines() {
-                lines.push(parse_markdown_line(part, Style::default()));
+                lines.push(parse_markdown_line(part, Style::default().fg(Color::White)));
             }
             lines.push(Line::from("")); // Padding vertikal bawah
 
@@ -290,7 +290,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                 if line_str.is_empty() {
                     lines.push(Line::from(Span::raw("  ")));
                 } else {
-                    let mut markdown_line = parse_markdown_line(&line_str, Style::default());
+                    let mut markdown_line = parse_markdown_line(&line_str, Style::default().fg(Color::White));
                     markdown_line.spans.insert(0, Span::raw("  "));
                     lines.push(markdown_line);
                 }
@@ -413,9 +413,9 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
         chat_input_lines.push(Line::from(vec![
             Span::styled("     Ketik di form input: ", Style::default().fg(Color::White)),
             Span::styled(":approve", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
-            Span::styled(" / ", Style::default()),
+            Span::styled(" / ", Style::default().fg(Color::Gray)),
             Span::styled(":approve always", Style::default().fg(Color::LightGreen).add_modifier(Modifier::BOLD)),
-            Span::styled(" / ", Style::default()),
+            Span::styled(" / ", Style::default().fg(Color::Gray)),
             Span::styled(":deny", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
         ]));
     } else {
@@ -543,7 +543,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
         let text_style = if app.input_buffer.is_empty() {
             Style::default().fg(Color::Gray)
         } else {
-            Style::default()
+            Style::default().fg(Color::White)
         };
         for line in &input_lines {
             chat_input_lines.push(Line::from(Span::styled(line.clone(), text_style)));

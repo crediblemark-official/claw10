@@ -37,7 +37,7 @@ fn draw_footer(frame: &mut Frame, area: Rect, app: &TuiApp, title: &str) {
 }
 
 fn empty_rows(message: &str) -> Vec<Row<'static>> {
-    vec![Row::new(vec![Cell::from(message.to_string())])]
+    vec![Row::new(vec![Cell::from(message.to_string()).style(Style::default().fg(Color::Rgb(140, 140, 140)))])]
 }
 
 pub fn draw_missions(frame: &mut Frame, area: Rect, app: &TuiApp) {
@@ -45,7 +45,7 @@ pub fn draw_missions(frame: &mut Frame, area: Rect, app: &TuiApp) {
     draw_tab_bar(frame, chunks[0], app);
 
     let header = Row::new(vec!["Objective", "State", "Budget"])
-        .style(Style::default().add_modifier(Modifier::BOLD))
+        .style(Style::default().fg(Color::Rgb(218, 165, 32)).add_modifier(Modifier::BOLD))
         .height(1);
 
     let rows: Vec<Row> = if app.missions.is_empty() {
@@ -103,7 +103,7 @@ pub fn draw_tasks(frame: &mut Frame, area: Rect, app: &TuiApp) {
     draw_tab_bar(frame, chunks[0], app);
 
     let header = Row::new(vec!["Objective", "State", "Mission ID"])
-        .style(Style::default().add_modifier(Modifier::BOLD))
+        .style(Style::default().fg(Color::Rgb(218, 165, 32)).add_modifier(Modifier::BOLD))
         .height(1);
 
     let rows: Vec<Row> = if app.tasks.is_empty() {
@@ -158,7 +158,7 @@ pub fn draw_memory(frame: &mut Frame, area: Rect, app: &TuiApp) {
     draw_tab_bar(frame, chunks[0], app);
 
     let header = Row::new(vec!["Content Preview", "Status", "Scope"])
-        .style(Style::default().add_modifier(Modifier::BOLD))
+        .style(Style::default().fg(Color::Rgb(218, 165, 32)).add_modifier(Modifier::BOLD))
         .height(1);
 
     let rows: Vec<Row> = if app.memories.is_empty() {
@@ -212,7 +212,7 @@ pub fn draw_approvals(frame: &mut Frame, area: Rect, app: &TuiApp) {
     draw_tab_bar(frame, chunks[0], app);
 
     let header = Row::new(vec!["Tool Name", "Status", "Created"])
-        .style(Style::default().add_modifier(Modifier::BOLD))
+        .style(Style::default().fg(Color::Rgb(218, 165, 32)).add_modifier(Modifier::BOLD))
         .height(1);
 
     let rows: Vec<Row> = if app.approvals.is_empty() {
@@ -286,7 +286,7 @@ pub fn draw_costs(frame: &mut Frame, area: Rect, app: &TuiApp) {
     );
 
     let header = Row::new(vec!["Agent Name", "State", "Total Cost (USD)"])
-        .style(Style::default().add_modifier(Modifier::BOLD))
+        .style(Style::default().fg(Color::Rgb(218, 165, 32)).add_modifier(Modifier::BOLD))
         .height(1);
 
     let rows: Vec<Row> = if app.agents.is_empty() {
@@ -346,7 +346,7 @@ pub fn draw_policies(frame: &mut Frame, area: Rect, app: &TuiApp) {
     draw_tab_bar(frame, chunks[0], app);
 
     let header = Row::new(vec!["Name", "Active", "Rules"])
-        .style(Style::default().add_modifier(Modifier::BOLD))
+        .style(Style::default().fg(Color::Rgb(218, 165, 32)).add_modifier(Modifier::BOLD))
         .height(1);
 
     let rows: Vec<Row> = if app.policies.is_empty() {
@@ -399,7 +399,7 @@ pub fn draw_skills(frame: &mut Frame, area: Rect, app: &TuiApp) {
     draw_tab_bar(frame, chunks[0], app);
 
     let header = Row::new(vec!["Name", "Version", "State", "Tools"])
-        .style(Style::default().add_modifier(Modifier::BOLD))
+        .style(Style::default().fg(Color::Rgb(218, 165, 32)).add_modifier(Modifier::BOLD))
         .height(1);
 
     let rows: Vec<Row> = if app.skills.is_empty() {
@@ -455,7 +455,7 @@ pub fn draw_artifacts(frame: &mut Frame, area: Rect, app: &TuiApp) {
     draw_tab_bar(frame, chunks[0], app);
 
     let header = Row::new(vec!["Name", "MIME Type", "Size", "Agent / Task"])
-        .style(Style::default().add_modifier(Modifier::BOLD))
+        .style(Style::default().fg(Color::Rgb(218, 165, 32)).add_modifier(Modifier::BOLD))
         .height(1);
 
     let rows: Vec<Row> = if app.artifacts.is_empty() {
@@ -516,7 +516,7 @@ pub fn draw_incidents(frame: &mut Frame, area: Rect, app: &TuiApp) {
     draw_tab_bar(frame, chunks[0], app);
 
     let header = Row::new(vec!["Severity", "State", "Description"])
-        .style(Style::default().add_modifier(Modifier::BOLD))
+        .style(Style::default().fg(Color::Rgb(218, 165, 32)).add_modifier(Modifier::BOLD))
         .height(1);
 
     let rows: Vec<Row> = if app.incidents.is_empty() {

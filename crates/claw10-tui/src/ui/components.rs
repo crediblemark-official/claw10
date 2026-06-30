@@ -137,6 +137,7 @@ pub fn draw_command_palette(frame: &mut Frame, area: Rect, app: &TuiApp) {
 
         let header_left = Paragraph::new("Commands").style(
             Style::default()
+                .fg(Color::White)
                 .add_modifier(Modifier::BOLD),
         );
         let header_right = Paragraph::new("esc")
@@ -150,7 +151,7 @@ pub fn draw_command_palette(frame: &mut Frame, area: Rect, app: &TuiApp) {
         let search_text = if search_query.is_empty() {
             Span::styled("Search", Style::default().fg(Color::Rgb(120, 120, 120)))
         } else {
-            Span::styled(search_query.as_str(), Style::default())
+            Span::styled(search_query.as_str(), Style::default().fg(Color::White))
         };
         let search_para = Paragraph::new(Line::from(vec![
             Span::raw(" "), // Padding kiri 1 spasi
@@ -206,7 +207,7 @@ pub fn draw_command_palette(frame: &mut Frame, area: Rect, app: &TuiApp) {
                     (inner_area.width as usize).saturating_sub(name.len() + shortcut.len() + 6);
                 let padding = " ".repeat(spaces_needed);
                 Line::from(vec![
-                    Span::styled(format!("  {}", name), Style::default()),
+                    Span::styled(format!("  {}", name), Style::default().fg(Color::White)),
                     Span::raw(padding),
                     Span::styled(
                         format!("{}  ", shortcut),
@@ -309,7 +310,7 @@ pub fn draw_model_selection(frame: &mut Frame, area: Rect, app: &TuiApp) {
     let search_text = if app.model_sel_search.is_empty() {
         Span::styled("Search...", Style::default().fg(Color::Rgb(120, 120, 120)))
     } else {
-        Span::styled(app.model_sel_search.as_str(), Style::default())
+        Span::styled(app.model_sel_search.as_str(), Style::default().fg(Color::White))
     };
     let search_para = Paragraph::new(Line::from(vec![
         Span::raw(" "),
@@ -344,7 +345,7 @@ pub fn draw_model_selection(frame: &mut Frame, area: Rect, app: &TuiApp) {
             ])
         } else {
             Line::from(vec![
-                Span::styled(format!("  {}", item), Style::default()),
+                Span::styled(format!("  {}", item), Style::default().fg(Color::White)),
             ])
         };
         list_lines.push(line);
