@@ -26,4 +26,5 @@ chrono = { workspace = true }
 thiserror = { workspace = true }
 uuid = { workspace = true }
 async-trait = "0.1"
+reqwest = { workspace = true, features = ["blocking"] }
 

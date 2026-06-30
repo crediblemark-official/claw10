@@ -95,7 +95,7 @@ impl SetupWizard {
         loop {
             terminal.draw(|f| self.draw(f))?;
 
-            // Auto-fetch when entering ModelFetch step, fallback to static list or manual
+            // Auto-fetch saat masuk ke ModelFetch step
             if matches!(self.step, Step::ModelFetch) {
                 self.do_fetch_models();
                 if self.fetch_failed {
@@ -126,7 +126,6 @@ impl SetupWizard {
     }
 
     fn do_fetch_models(&mut self) {
-        // Always load static models as fallback
         self.static_models = self.load_static_models();
 
         let provider = self.current_provider();
@@ -136,7 +135,6 @@ impl SetupWizard {
             provider.base_url
         };
 
-        // If no API key and no base URL (custom), skip fetch entirely
         if base_url.is_empty() || self.api_key.is_empty() {
             if !self.static_models.is_empty() {
                 self.fetched_models = self.static_models.clone();
@@ -290,8 +288,6 @@ impl SetupWizard {
         }
     }
 
-    // ── Input Handlers ──
-
     fn handle_welcome(&mut self, key: crossterm::event::KeyEvent) {
         match key.code {
             KeyCode::Enter | KeyCode::Char(' ') => self.next_step(),
@@ -377,7 +373,6 @@ impl SetupWizard {
             KeyCode::Enter => {
                 let filtered = self.filtered_models();
                 if !self.model_search.is_empty() && filtered.is_empty() {
-                    // Typed a custom name not in list → use it directly
                     self.custom_model = self.model_search.clone();
                 } else if !filtered.is_empty() {
                     self.custom_model = filtered[self.model_list_selected].to_string();
@@ -396,7 +391,6 @@ impl SetupWizard {
                 self.model_list_selected = 0;
             }
             KeyCode::Tab | KeyCode::F(2) => {
-                // Switch to manual input
                 self.error_msg = "Beralih ke input manual.".to_string();
                 self.step = Step::ModelSelect;
             }
@@ -490,12 +484,9 @@ impl SetupWizard {
         Ok(())
     }
 
-    // ── Draw ──
-
     fn draw(&self, frame: &mut Frame) {
         let area = frame.area();
 
-        // Membuat frame utama pembungkus Setup Wizard
         let wizard_block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(Color::Rgb(218, 165, 32)).add_modifier(Modifier::BOLD))
@@ -506,7 +497,6 @@ impl SetupWizard {
         let inner_area = wizard_block.inner(area);
         frame.render_widget(wizard_block, area);
 
-        // Membagi area dalam menjadi: Logo (tinggi 8), Content (min 0), Footer (tinggi 3)
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
@@ -813,7 +803,6 @@ impl SetupWizard {
             frame.set_cursor_position((cursor_x.min(search_inner.x + search_inner.width.saturating_sub(1)), search_inner.y));
         }
 
-        // Model list
         let filtered = self.filtered_models();
 
         let items: Vec<ListItem> = filtered
@@ -984,44 +973,43 @@ impl SetupWizard {
     fn draw_footer(&self, frame: &mut Frame, area: Rect) {
         let (hint, color) = match self.step {
             Step::Welcome => (
-                "  Enter/Space: mulai  |  q/Esc: keluar",
-                Color::Rgb(100, 100, 100),
+                "Enter/Space: mulai  |  q/Esc: keluar",
+                Color::Rgb(150, 150, 150),
             ),
             Step::ProviderSelect => (
-                "  j/k/\u{2191}/\u{2193}: pilih  |  Enter: lanjut  |  Esc: kembali",
-                Color::Rgb(100, 100, 100),
+                "j/k/\u{2191}/\u{2193}: pilih  |  Enter: lanjut  |  Esc: kembali",
+                Color::Rgb(150, 150, 150),
             ),
             Step::ApiKeyInput => (
-                "  Ketik API key  |  Enter: lanjut  |  Esc: kembali",
-                Color::Rgb(100, 100, 100),
+                "Ketik API key  |  Enter: lanjut  |  Esc: kembali",
+                Color::Rgb(150, 150, 150),
             ),
             Step::BaseUrlInput => (
-                "  Ketik Base URL  |  Enter: lanjut  |  Esc: kembali",
-                Color::Rgb(100, 100, 100),
+                "Ketik Base URL  |  Enter: lanjut  |  Esc: kembali",
+                Color::Rgb(150, 150, 150),
             ),
             Step::ModelFetch => (
-                "  Mengambil daftar model...",
-                Color::Rgb(100, 100, 100),
+                "Mengambil daftar model...",
+                Color::Rgb(150, 150, 150),
             ),
             Step::ModelList => (
-                "  j/k/\u{2191}/\u{2193}: pilih  |  ketik: cari/filter  |  Enter: pilih/ketik manual  |  Esc: kembali",
-                Color::Rgb(100, 100, 100),
+                "j/k/\u{2191}/\u{2193}: pilih  |  ketik: cari/filter  |  Enter: pilih/ketik manual  |  Esc: kembali",
+                Color::Rgb(150, 150, 150),
             ),
             Step::ModelSelect => (
-                "  Ketik nama model  |  Enter: lanjut  |  Esc: kembali",
-                Color::Rgb(100, 100, 100),
+                "Ketik nama model  |  Enter: lanjut  |  Esc: kembali",
+                Color::Rgb(150, 150, 150),
             ),
             Step::Review => (
-                "  Enter: simpan  |  Esc: kembali",
-                Color::Rgb(100, 100, 100),
+                "Enter: simpan  |  Esc: kembali",
+                Color::Rgb(150, 150, 150),
             ),
             Step::Complete => (
-                "  Tekan tombol apa pun untuk keluar",
-                Color::Rgb(100, 100, 100),
+                "Tekan tombol apa pun untuk keluar",
+                Color::Rgb(150, 150, 150),
             ),
         };
 
-        // Membuat block dengan border top tipis sebagai pembatas di atas footer
         let block = Block::default()
             .borders(Borders::TOP)
             .border_style(Style::default().fg(Color::Rgb(50, 50, 50)))
@@ -1030,18 +1018,16 @@ impl SetupWizard {
         let inner = block.inner(area);
         frame.render_widget(block, area);
 
-        // Render teks bantuan di tengah-tengah footer
         let para = Paragraph::new(Line::from(vec![
             Span::styled(hint, Style::default().fg(color)),
         ]))
         .alignment(ratatui::layout::Alignment::Center);
 
-        // Membagi layout agar hint berada di baris tengah footer area secara vertikal
         let layout = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(1), // Spacer
-                Constraint::Length(1), // Hint text
+                Constraint::Length(1),
+                Constraint::Length(1),
             ])
             .split(inner);
 

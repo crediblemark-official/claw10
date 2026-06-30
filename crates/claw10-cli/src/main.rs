@@ -8,7 +8,6 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Registry;
 
-mod setup_wizard;
 mod telemetry_layer;
 
 /// Load environment variables from `~/.claw10/.env` if the file exists.
@@ -584,7 +583,7 @@ async fn run_setup_wizard(force: bool) -> Result<(), Box<dyn std::error::Error>>
         default_path
     };
 
-    let mut wizard = setup_wizard::SetupWizard::new(target_path);
+    let mut wizard = claw10_tui::SetupWizard::new(target_path);
     wizard.run()?;
     Ok(())
 }
