@@ -43,25 +43,34 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &TuiApp) {
         return;
     }
 
-    // Bagi area menjadi Top Bar, Pembatas, dan Content Area
+    // Bagi area menjadi Spacer Atas, Top Bar, Spacer Bawah, Pembatas, dan Content Area
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
+            Constraint::Length(1), // Spacer Atas
             Constraint::Length(1), // Top Bar
+            Constraint::Length(1), // Spacer Bawah
             Constraint::Length(1), // Border pembatas
             Constraint::Min(0),    // Content Area
         ])
         .split(area);
 
-    draw_top_bar(frame, chunks[0], app);
+    // Render spacer atas hitam pekat
+    let black_spacer = Block::default().style(Style::default().bg(Color::Black));
+    frame.render_widget(black_spacer.clone(), chunks[0]);
+
+    draw_top_bar(frame, chunks[1], app);
+
+    // Render spacer bawah hitam pekat
+    frame.render_widget(black_spacer, chunks[2]);
 
     // Garis horizontal pembatas top bar yang sleek & minimalis dengan background hitam pekat
     let border = Block::default()
         .borders(Borders::BOTTOM)
         .border_style(Style::default().fg(Color::Rgb(40, 40, 40)).bg(Color::Black));
-    frame.render_widget(border, chunks[1]);
+    frame.render_widget(border, chunks[3]);
 
-    let content_area = chunks[2];
+    let content_area = chunks[4];
 
     match app.active_screen {
         Screen::Home | Screen::WorkspaceSelect => unreachable!(),
