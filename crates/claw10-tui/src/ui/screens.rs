@@ -6,13 +6,13 @@ use ratatui::{
     Frame,
 };
 
-use crate::app::{Tab, TuiApp};
+use crate::app::TuiApp;
 
 fn default_layout(area: Rect) -> Vec<Rect> {
     Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3), // tab bar
+            Constraint::Length(0), // Dinonaktifkan (diganti Top Bar global)
             Constraint::Min(0),    // content
             Constraint::Length(1), // footer
         ])
@@ -20,58 +20,9 @@ fn default_layout(area: Rect) -> Vec<Rect> {
         .to_vec()
 }
 
-fn tab_index(tab: Tab) -> usize {
-    match tab {
-        Tab::Session => 0,
-        Tab::Agents => 1,
-        Tab::Workers => 2,
-        Tab::SpawnRequests => 3,
-        Tab::Missions => 4,
-        Tab::Tasks => 5,
-        Tab::Memory => 6,
-        Tab::Approvals => 7,
-        Tab::Costs => 8,
-        Tab::Policies => 9,
-        Tab::Skills => 10,
-        Tab::Artifacts => 11,
-        Tab::Incidents => 12,
-    }
-}
 
-pub fn draw_tab_bar(frame: &mut Frame, area: Rect, app: &TuiApp) {
-    let titles = vec![
-        "Sess",
-        "Agents",
-        "Pool",
-        "Broker",
-        "Msn",
-        "Tasks",
-        "Mem",
-        "Aprv",
-        "Cost",
-        "Pol",
-        "Skl",
-        "Art",
-        "Logs",
-        "Inc",
-    ];
-    let tabs = ratatui::widgets::Tabs::new(titles)
-        .select(tab_index(app.selected_tab))
-        .block(
-            Block::default()
-                .borders(Borders::BOTTOM)
-                .border_style(Style::default().fg(Color::Rgb(200, 200, 200)).bg(Color::Rgb(0, 0, 0)))
-                .style(Style::default().bg(Color::Rgb(0, 0, 0))),
-        )
-        .style(Style::default().fg(Color::Rgb(200, 200, 200)).bg(Color::Rgb(0, 0, 0)))
-        .highlight_style(
-            Style::default()
-                .fg(Color::Rgb(218, 165, 32))
-                .bg(Color::Rgb(0, 0, 0))
-                .add_modifier(Modifier::BOLD),
-        )
-        .divider(" ");
-    frame.render_widget(tabs, area);
+pub fn draw_tab_bar(_frame: &mut Frame, _area: Rect, _app: &TuiApp) {
+    // No-op: dinonaktifkan karena sudah digantikan oleh Top Bar global di ui/mod.rs
 }
 
 fn draw_footer(frame: &mut Frame, area: Rect, app: &TuiApp, title: &str) {
