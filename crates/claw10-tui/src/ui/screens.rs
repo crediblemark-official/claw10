@@ -44,7 +44,7 @@ pub fn draw_missions(frame: &mut Frame, area: Rect, app: &TuiApp) {
     let chunks = default_layout(area);
     draw_tab_bar(frame, chunks[0], app);
 
-    let header = Row::new(vec!["Objective", "State", "Budget"])
+    let header = Row::new(vec!["  Objective", "│  State", "│  Budget"])
         .style(Style::default().fg(Color::Rgb(218, 165, 32)).add_modifier(Modifier::BOLD))
         .height(1);
 
@@ -69,9 +69,9 @@ pub fn draw_missions(frame: &mut Frame, area: Rect, app: &TuiApp) {
                     m.budget.spent_usd, m.budget.allocated_usd
                 );
                 Row::new(vec![
-                    Cell::from(objective),
-                    Cell::from(format!("{:?}", m.state)),
-                    Cell::from(budget),
+                    Cell::from(format!("  {}", objective)),
+                    Cell::from(format!("│  {:?}", m.state)),
+                    Cell::from(format!("│  {}", budget)),
                 ])
                 .style(style)
             })
@@ -102,7 +102,7 @@ pub fn draw_tasks(frame: &mut Frame, area: Rect, app: &TuiApp) {
     let chunks = default_layout(area);
     draw_tab_bar(frame, chunks[0], app);
 
-    let header = Row::new(vec!["Objective", "State", "Mission ID"])
+    let header = Row::new(vec!["  Objective", "│  State", "│  Mission ID"])
         .style(Style::default().fg(Color::Rgb(218, 165, 32)).add_modifier(Modifier::BOLD))
         .height(1);
 
@@ -124,9 +124,9 @@ pub fn draw_tasks(frame: &mut Frame, area: Rect, app: &TuiApp) {
                 let objective = t.objective.chars().take(45).collect::<String>();
                 let mission_id = t.mission_id.0.to_string();
                 Row::new(vec![
-                    Cell::from(objective),
-                    Cell::from(format!("{:?}", t.state)),
-                    Cell::from(mission_id),
+                    Cell::from(format!("  {}", objective)),
+                    Cell::from(format!("│  {:?}", t.state)),
+                    Cell::from(format!("│  {}", mission_id)),
                 ])
                 .style(style)
             })
@@ -157,7 +157,7 @@ pub fn draw_memory(frame: &mut Frame, area: Rect, app: &TuiApp) {
     let chunks = default_layout(area);
     draw_tab_bar(frame, chunks[0], app);
 
-    let header = Row::new(vec!["Content Preview", "Status", "Scope"])
+    let header = Row::new(vec!["  Content Preview", "│  Status", "│  Scope"])
         .style(Style::default().fg(Color::Rgb(218, 165, 32)).add_modifier(Modifier::BOLD))
         .height(1);
 
@@ -178,9 +178,9 @@ pub fn draw_memory(frame: &mut Frame, area: Rect, app: &TuiApp) {
                 };
                 let preview = m.content.chars().take(50).collect::<String>();
                 Row::new(vec![
-                    Cell::from(preview),
-                    Cell::from(format!("{:?}", m.status)),
-                    Cell::from(m.scope.clone()),
+                    Cell::from(format!("  {}", preview)),
+                    Cell::from(format!("│  {:?}", m.status)),
+                    Cell::from(format!("│  {}", m.scope)),
                 ])
                 .style(style)
             })
@@ -211,7 +211,7 @@ pub fn draw_approvals(frame: &mut Frame, area: Rect, app: &TuiApp) {
     let chunks = default_layout(area);
     draw_tab_bar(frame, chunks[0], app);
 
-    let header = Row::new(vec!["Tool Name", "Status", "Created"])
+    let header = Row::new(vec!["  Tool Name", "│  Status", "│  Created"])
         .style(Style::default().fg(Color::Rgb(218, 165, 32)).add_modifier(Modifier::BOLD))
         .height(1);
 
@@ -232,9 +232,9 @@ pub fn draw_approvals(frame: &mut Frame, area: Rect, app: &TuiApp) {
                 };
                 let created = a.created_at.format("%Y-%m-%d %H:%M").to_string();
                 Row::new(vec![
-                    Cell::from(a.tool_name.clone()),
-                    Cell::from(format!("{:?}", a.state)),
-                    Cell::from(created),
+                    Cell::from(format!("  {}", a.tool_name)),
+                    Cell::from(format!("│  {:?}", a.state)),
+                    Cell::from(format!("│  {}", created)),
                 ])
                 .style(style)
             })
@@ -285,7 +285,7 @@ pub fn draw_costs(frame: &mut Frame, area: Rect, app: &TuiApp) {
             .border_style(Style::default().fg(Color::Rgb(150, 120, 50))),
     );
 
-    let header = Row::new(vec!["Agent Name", "State", "Total Cost (USD)"])
+    let header = Row::new(vec!["  Agent Name", "│  State", "│  Total Cost (USD)"])
         .style(Style::default().fg(Color::Rgb(218, 165, 32)).add_modifier(Modifier::BOLD))
         .height(1);
 
@@ -305,9 +305,9 @@ pub fn draw_costs(frame: &mut Frame, area: Rect, app: &TuiApp) {
                     Style::default().fg(Color::White)
                 };
                 Row::new(vec![
-                    Cell::from(a.name.clone()),
-                    Cell::from(format!("{:?}", a.state)),
-                    Cell::from(format!("${:.4}", a.total_cost_usd)),
+                    Cell::from(format!("  {}", a.name)),
+                    Cell::from(format!("│  {:?}", a.state)),
+                    Cell::from(format!("│  ${:.4}", a.total_cost_usd)),
                 ])
                 .style(style)
             })
@@ -345,7 +345,7 @@ pub fn draw_policies(frame: &mut Frame, area: Rect, app: &TuiApp) {
     let chunks = default_layout(area);
     draw_tab_bar(frame, chunks[0], app);
 
-    let header = Row::new(vec!["Name", "Active", "Rules"])
+    let header = Row::new(vec!["  Name", "│  Active", "│  Rules"])
         .style(Style::default().fg(Color::Rgb(218, 165, 32)).add_modifier(Modifier::BOLD))
         .height(1);
 
@@ -365,9 +365,9 @@ pub fn draw_policies(frame: &mut Frame, area: Rect, app: &TuiApp) {
                     Style::default().fg(Color::White)
                 };
                 Row::new(vec![
-                    Cell::from(p.name.clone()),
-                    Cell::from(if p.is_active { "Yes" } else { "No" }),
-                    Cell::from(p.rules.len().to_string()),
+                    Cell::from(format!("  {}", p.name)),
+                    Cell::from(format!("│  {}", if p.is_active { "Yes" } else { "No" })),
+                    Cell::from(format!("│  {}", p.rules.len())),
                 ])
                 .style(style)
             })
@@ -398,7 +398,7 @@ pub fn draw_skills(frame: &mut Frame, area: Rect, app: &TuiApp) {
     let chunks = default_layout(area);
     draw_tab_bar(frame, chunks[0], app);
 
-    let header = Row::new(vec!["Name", "Version", "State", "Tools"])
+    let header = Row::new(vec!["  Name", "│  Version", "│  State", "│  Tools"])
         .style(Style::default().fg(Color::Rgb(218, 165, 32)).add_modifier(Modifier::BOLD))
         .height(1);
 
@@ -419,10 +419,10 @@ pub fn draw_skills(frame: &mut Frame, area: Rect, app: &TuiApp) {
                 };
                 let tools = s.required_tools.join(", ");
                 Row::new(vec![
-                    Cell::from(s.name.clone()),
-                    Cell::from(s.version.clone()),
-                    Cell::from(format!("{:?}", s.state)),
-                    Cell::from(tools),
+                    Cell::from(format!("  {}", s.name)),
+                    Cell::from(format!("│  {}", s.version)),
+                    Cell::from(format!("│  {:?}", s.state)),
+                    Cell::from(format!("│  {}", tools)),
                 ])
                 .style(style)
             })
@@ -454,7 +454,7 @@ pub fn draw_artifacts(frame: &mut Frame, area: Rect, app: &TuiApp) {
     let chunks = default_layout(area);
     draw_tab_bar(frame, chunks[0], app);
 
-    let header = Row::new(vec!["Name", "MIME Type", "Size", "Agent / Task"])
+    let header = Row::new(vec!["  Name", "│  MIME Type", "│  Size", "│  Agent / Task"])
         .style(Style::default().fg(Color::Rgb(218, 165, 32)).add_modifier(Modifier::BOLD))
         .height(1);
 
@@ -480,10 +480,10 @@ pub fn draw_artifacts(frame: &mut Frame, area: Rect, app: &TuiApp) {
                 );
                 let size = format_size(a.size_bytes);
                 Row::new(vec![
-                    Cell::from(a.name.clone()),
-                    Cell::from(a.mime_type.clone()),
-                    Cell::from(size),
-                    Cell::from(owner),
+                    Cell::from(format!("  {}", a.name)),
+                    Cell::from(format!("│  {}", a.mime_type)),
+                    Cell::from(format!("│  {}", size)),
+                    Cell::from(format!("│  {}", owner)),
                 ])
                 .style(style)
             })
@@ -515,7 +515,7 @@ pub fn draw_incidents(frame: &mut Frame, area: Rect, app: &TuiApp) {
     let chunks = default_layout(area);
     draw_tab_bar(frame, chunks[0], app);
 
-    let header = Row::new(vec!["Severity", "State", "Description"])
+    let header = Row::new(vec!["  Severity", "│  State", "│  Description"])
         .style(Style::default().fg(Color::Rgb(218, 165, 32)).add_modifier(Modifier::BOLD))
         .height(1);
 
@@ -536,9 +536,9 @@ pub fn draw_incidents(frame: &mut Frame, area: Rect, app: &TuiApp) {
                 };
                 let desc = inc.description.chars().take(50).collect::<String>();
                 Row::new(vec![
-                    Cell::from(inc.severity.clone()),
-                    Cell::from(format!("{:?}", inc.state)),
-                    Cell::from(desc),
+                    Cell::from(format!("  {}", inc.severity)),
+                    Cell::from(format!("│  {:?}", inc.state)),
+                    Cell::from(format!("│  {}", desc)),
                 ])
                 .style(style)
             })
