@@ -316,6 +316,15 @@ impl SetupWizard {
                     self.selected += 1;
                 }
             }
+            KeyCode::Left | KeyCode::Char('h') => {
+                self.selected = self.selected.saturating_sub(5);
+            }
+            KeyCode::Right | KeyCode::Char('l') => {
+                let next = self.selected + 5;
+                if next < self.providers.len() {
+                    self.selected = next;
+                }
+            }
             KeyCode::Enter => self.next_step(),
             KeyCode::Esc => self.prev_step(),
             _ => {}
