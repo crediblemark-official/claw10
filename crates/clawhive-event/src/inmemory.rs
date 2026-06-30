@@ -5,7 +5,7 @@
 //!
 //! Pattern matching subject menggunakan wildcard `*` (satu segment) dan `>` (semua segment).
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::pin::Pin;
 use std::sync::Arc;
 
@@ -21,56 +21,57 @@ struct Subscription {
     handler: EventHandler,
 }
 
+/// Kapasitas default history event yang disimpan (ring buffer).
+const DEFAULT_HISTORY_CAPACITY: usize = 1000;
+
 /// In-memory event bus untuk testing dan local dev.
 /// Thread-safe melalui `Arc<RwLock<...>>`.
 pub struct InMemoryEventBus {
     subscriptions: Arc<RwLock<HashMap<String, Subscription>>>,
-    /// Semua event yang pernah dipublish (untuk inspeksi dalam test).
-    published: Arc<RwLock<Vec<ClawHiveEvent>>>,
+    /// History event terakhir yang dipublish (ring buffer, bounded).
+    published: Arc<RwLock<VecDeque<ClawHiveEvent>>>,
+    history_capacity: usize,
 }
 
 impl InMemoryEventBus {
     #[must_use]
     pub fn new() -> Self {
+        Self::with_capacity(DEFAULT_HISTORY_CAPACITY)
+    }
+
+    /// Buat bus dengan kapasitas history tertentu.
+    /// Set ke 0 untuk menonaktifkan penyimpanan history.
+    #[must_use]
+    pub fn with_capacity(history_capacity: usize) -> Self {
         Self {
             subscriptions: Arc::new(RwLock::new(HashMap::new())),
-            published: Arc::new(RwLock::new(Vec::new())),
+            published: Arc::new(RwLock::new(VecDeque::with_capacity(
+                history_capacity.min(DEFAULT_HISTORY_CAPACITY),
+            ))),
+            history_capacity,
         }
     }
 
-    /// Ambil semua event yang sudah dipublish (untuk inspeksi dalam test).
+    /// Ambil event yang sudah dipublish (terbaru sampai kapasitas history).
     pub async fn published_events(&self) -> Vec<ClawHiveEvent> {
-        self.published.read().await.clone()
+        self.published.read().await.iter().cloned().collect()
     }
 
     /// Cek apakah subject event cocok dengan pattern subscriber.
     /// Mendukung `*` (satu segment) dan `>` (sisa semua segment).
     fn matches(pattern: &str, subject: &str) -> bool {
-        let pattern_parts: Vec<&str> = pattern.split('.').collect();
-        let subject_parts: Vec<&str> = subject.split('.').collect();
+        let mut pattern_parts = pattern.split('.');
+        let mut subject_parts = subject.split('.');
 
-        let mut p_idx = 0;
-        let mut s_idx = 0;
-
-        while p_idx < pattern_parts.len() && s_idx < subject_parts.len() {
-            let p = pattern_parts[p_idx];
-
-            if p == ">" {
-                // `>` cocok dengan sisa semua segment
-                return true;
-            } else if p == "*" {
-                // `*` cocok dengan satu segment apapun
-                p_idx += 1;
-                s_idx += 1;
-            } else if p == subject_parts[s_idx] {
-                p_idx += 1;
-                s_idx += 1;
-            } else {
-                return false;
+        loop {
+            match (pattern_parts.next(), subject_parts.next()) {
+                (Some(">"), _) => return true,
+                (Some("*"), Some(_)) => continue,
+                (Some(p), Some(s)) if p == s => continue,
+                (None, None) => return true,
+                _ => return false,
             }
         }
-
-        p_idx == pattern_parts.len() && s_idx == subject_parts.len()
     }
 }
 
@@ -83,23 +84,33 @@ impl Default for InMemoryEventBus {
 #[async_trait]
 impl EventBus for InMemoryEventBus {
     async fn publish(&self, event: ClawHiveEvent) -> Result<(), EventBusError> {
-        // Simpan ke history
-        self.published.write().await.push(event.clone());
+        // Simpan ke history (bounded ring buffer)
+        if self.history_capacity > 0 {
+            let mut published = self.published.write().await;
+            if published.len() >= self.history_capacity {
+                published.pop_front();
+            }
+            published.push_back(event.clone());
+        }
 
         let subject = event.subject();
-        let subs = self.subscriptions.read().await;
 
-        for sub in subs.values() {
-            if Self::matches(&sub.pattern, subject) {
-                let handler = Arc::clone(&sub.handler);
-                let event_clone = event.clone();
-                // Fire-and-forget: spawn task untuk tiap handler
-                tokio::spawn(async move {
-                    let fut: Pin<Box<dyn std::future::Future<Output = ()> + Send>> =
-                        handler(event_clone);
-                    fut.await;
-                });
-            }
+        // Snapshot matching handlers supaya lock tidak dipegang saat spawn task
+        let handlers: Vec<EventHandler> = {
+            let subs = self.subscriptions.read().await;
+            subs.values()
+                .filter(|sub| Self::matches(&sub.pattern, subject))
+                .map(|sub| Arc::clone(&sub.handler))
+                .collect()
+        };
+
+        for handler in handlers {
+            let event_clone = event.clone();
+            tokio::spawn(async move {
+                let fut: Pin<Box<dyn std::future::Future<Output = ()> + Send>> =
+                    handler(event_clone);
+                fut.await;
+            });
         }
 
         Ok(())
@@ -131,4 +142,3 @@ impl EventBus for InMemoryEventBus {
 #[cfg(test)]
 #[path = "inmemory_test.rs"]
 mod tests;
-

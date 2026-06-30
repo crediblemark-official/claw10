@@ -23,6 +23,7 @@ pub struct SpawnBroker {
     limits: SwarmLimitsConfig,
     agent_store: Arc<AgentStore>,
     event_bus: Arc<dyn EventBus>,
+    budget_service: BudgetService,
 }
 
 impl SpawnBroker {
@@ -36,6 +37,7 @@ impl SpawnBroker {
             limits,
             agent_store,
             event_bus,
+            budget_service: BudgetService,
         }
     }
 
@@ -68,7 +70,7 @@ impl SpawnBroker {
         let total_cost = SpawnValidator::calculate_total_cost(request);
 
         // Step 2: Reserve budget
-        BudgetService::reserve(&mut parent.budget, total_cost).map_err(|_e| {
+        self.budget_service.reserve(&mut parent.budget, total_cost).map_err(|_e| {
             SpawnError::BudgetInsufficient {
                 remaining: parent.budget.remaining(),
                 required: total_cost,
@@ -124,12 +126,7 @@ impl SpawnBroker {
     ) -> Agent {
         let now = Utc::now();
 
-        let identity = IdentityService::create_agent_identity(
-            &parent.organization_id,
-            &parent.id,
-            vec![],
-            permissions.clone(),
-        );
+        let identity = IdentityService::create_agent_identity(&parent.id);
 
         let agent_id = AgentId(Uuid::now_v7());
 
@@ -164,7 +161,6 @@ impl SpawnBroker {
         Agent {
             id: agent_id.clone(),
             identity_id: identity.id,
-            organization_id: parent.organization_id.clone(),
             mission_id: parent.mission_id.clone(),
             parent_agent_id: Some(parent.id.clone()),
             lineage_id: parent.lineage_id.clone(),
@@ -227,7 +223,7 @@ impl SpawnBroker {
                 on_parent_terminated: true,
                 on_budget_exhausted: true,
             },
-            state: SpawnState::Approved,
+            state: SpawnState::Pending,
             created_at: now,
             updated_at: now,
         }

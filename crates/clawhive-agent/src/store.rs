@@ -72,7 +72,7 @@ impl AgentStore {
 
     /// List semua agent, dengan optional filter.
     pub async fn list(&self, query: AgentQuery) -> Result<Vec<Agent>, AgentStoreError> {
-        let all: Vec<(String, Agent)> = self.store.scan_prefix(KEY_PREFIX).await?;
+        let all: Vec<(String, Agent)> = self.store.scan_prefix_unsorted(KEY_PREFIX).await?;
 
         let agents = all
             .into_iter()

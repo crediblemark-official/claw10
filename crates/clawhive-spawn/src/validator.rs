@@ -27,7 +27,7 @@ impl SpawnValidator {
         Self::check_duplicate_objective(request, all_agents)?;
         Self::check_child_budget(parent, request)?;
         Self::check_permissions_delegable(parent, request)?;
-        Self::check_child_spawn_policy(request)?;
+        Self::check_child_spawn_policy(request, current_depth)?;
         Self::check_mission_active(mission)?;
 
         Ok(())
@@ -128,13 +128,52 @@ impl SpawnValidator {
         Ok(())
     }
 
-    /// If child spawn policy disallows further spawning, check that children
-    /// don't request spawn permission
-    fn check_child_spawn_policy(request: &SpawnRequest) -> Result<(), SpawnError> {
-        if !request.child_spawn_policy.allowed {
-            // Children are not allowed to spawn further - this is informational
-            // The actual enforcement happens when children try to spawn
+    /// Validate child spawn policy constraints.
+    /// - Jika `allowed=false`, children tidak boleh spawn lebih lanjut.
+    /// - `max_children` membatasi jumlah children dalam request ini.
+    /// - `max_depth` membatasi depth relatif dari children terhadap root.
+    fn check_child_spawn_policy(
+        request: &SpawnRequest,
+        current_depth: u32,
+    ) -> Result<(), SpawnError> {
+        let policy = &request.child_spawn_policy;
+
+        if !policy.allowed {
+            // Cek apakah ada child yang request spawn permission
+            for child in &request.children {
+                if let Some(perms) = &child.custom_permissions {
+                    let can_spawn_perm = clawhive_domain::Permission("spawn".into());
+                    if perms.contains(&can_spawn_perm) {
+                        return Err(SpawnError::ChildSpawnDenied(format!(
+                            "child role '{}' requests spawn permission but child_spawn_policy disallows it",
+                            child.role
+                        )));
+                    }
+                }
+            }
         }
+
+        if let Some(max_children) = policy.max_children {
+            let requested = request.children.len() as u32;
+            if requested > max_children {
+                return Err(SpawnError::MaxChildrenExceeded {
+                    max: max_children,
+                    requested,
+                });
+            }
+        }
+
+        if let Some(max_depth) = policy.max_depth {
+            // current_depth adalah depth parent; children akan berada di current_depth + 1
+            let child_depth = current_depth + 1;
+            if child_depth > max_depth {
+                return Err(SpawnError::ChildSpawnDepthExceeded {
+                    max: max_depth,
+                    current: child_depth,
+                });
+            }
+        }
+
         Ok(())
     }
 

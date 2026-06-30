@@ -22,12 +22,18 @@ pub struct NatsEventBus {
 
 impl NatsEventBus {
     /// Membuat instance baru NatsEventBus dan menghubungkan ke NATS server.
+    /// Menggunakan env var `NATS_URL` jika tersedia, fallback ke `url` parameter.
     ///
     /// # Errors
     /// Mengembalikan error jika gagal terhubung ke server NATS.
     pub fn new(url: &str) -> Result<Self, EventBusError> {
-        let client = nats::connect(url)
-            .map_err(|e| EventBusError::Other(format!("Gagal terhubung ke NATS di {url}: {e}")))?;
+        let nats_url = std::env::var("NATS_URL").unwrap_or_else(|_| url.to_string());
+        let client = nats::Options::new()
+            .max_reconnects(10)
+            .reconnect_buffer_size(100)
+            .connect(&nats_url)
+            .map_err(|e| EventBusError::Other(format!("Gagal terhubung ke NATS di {nats_url}: {e}")))?;
+        tracing::info!("Terhubung ke NATS server di {nats_url}");
 
         Ok(Self {
             client,

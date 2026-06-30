@@ -85,10 +85,13 @@ impl ModelRegistry {
             });
         }
 
-        Self {
+        #[allow(unused_mut)]
+        let mut registry = Self {
             providers: HashMap::new(),
             profiles: RwLock::new(profiles),
-        }
+        };
+
+        registry
     }
 
     pub fn register(&mut self, provider: Box<dyn ModelProvider>) {

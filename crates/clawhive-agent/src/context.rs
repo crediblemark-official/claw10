@@ -34,7 +34,7 @@ impl ContextBuilder {
                 id: agent.id.0.to_string(),
                 role: agent.role.clone(),
                 lifecycle_mode: format!("{:?}", agent.lifecycle_mode),
-                organization_id: agent.organization_id.0.to_string(),
+                organization_id: "default".to_string(),
                 memory_scopes: agent.genome.memory.default_read_scopes.clone(),
             },
             mission: clawhive_prompt::MissionPromptInput {

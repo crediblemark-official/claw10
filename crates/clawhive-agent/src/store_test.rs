@@ -1,7 +1,7 @@
 use super::*;
 use clawhive_domain::{
     AgentGenome, AgentState, AutonomyConfig, Budget, LifecycleMode, LineageId, MemoryConfig,
-    MissionId, ModelPolicy, NetworkPolicy, OrganizationId, PolicyBundle,
+    MissionId, ModelPolicy, NetworkPolicy, PolicyBundle,
     RuntimeConfig,
 };
 use clawhive_store::InMemoryStore;
@@ -12,7 +12,6 @@ fn agent_fixture() -> Agent {
     Agent {
         id: AgentId(Uuid::now_v7()),
         identity_id: IdentityId(Uuid::now_v7()),
-        organization_id: OrganizationId(Uuid::now_v7()),
         mission_id: MissionId(Uuid::now_v7()),
         parent_agent_id: None,
         lineage_id: LineageId(Uuid::now_v7()),

@@ -6,6 +6,7 @@
 //!
 //! Dedicated providers (Anthropic, Gemini, etc.) are in their own modules.
 
+use crate::provider::ModelProvider;
 use crate::types::ModelProfile;
 
 /// A descriptor for creating an OpenAI-compatible provider.
@@ -15,6 +16,10 @@ pub struct ProviderConfig {
     pub api_key_env: &'static str,
     pub notes: &'static str,
     pub models: Vec<ModelProfile>,
+    /// Optional native factory for providers that are not OpenAI-compatible.
+    /// When set, callers should register the provider via this factory instead
+    /// of instantiating an `OpenAiCompatibleProvider`.
+    pub factory: Option<fn() -> Box<dyn ModelProvider>>,
 }
 
 /// Return configurations for every known OpenAI-compatible provider.
@@ -98,8 +103,6 @@ fn all_configs() -> Vec<ProviderConfig> {
         sense_audio(),
         vydra(),
         azure_speech(),
-        amazon_bedrock_compat(),
-        amazon_bedrock_mantle_compat(),
         nvidia(),
 
         // ─── OpenCode variants ─────────────────────────────
@@ -152,6 +155,7 @@ fn config(
         api_key_env,
         notes,
         models,
+        factory: None,
     }
 }
 
@@ -880,27 +884,4 @@ fn azure_speech() -> ProviderConfig {
     )
 }
 
-fn amazon_bedrock_compat() -> ProviderConfig {
-    config(
-        "amazon-bedrock",
-        "https://bedrock-runtime.{region}.amazonaws.com",
-        "AWS_ACCESS_KEY_ID",
-        "Amazon Bedrock — requires AWS SDK, this is a placeholder",
-        vec![
-            model("bedrock/claude-4-sonnet", 200_000, 8_192, 3.00, 15.00, vec!["general", "reasoning"]),
-            model("bedrock/claude-3.5-sonnet", 200_000, 8_192, 3.00, 15.00, vec!["general"]),
-        ],
-    )
-}
 
-fn amazon_bedrock_mantle_compat() -> ProviderConfig {
-    config(
-        "bedrock-mantle",
-        "https://bedrock-runtime.{region}.amazonaws.com",
-        "AWS_ACCESS_KEY_ID",
-        "Amazon Bedrock Mantle — placeholder",
-        vec![
-            model("bedrock/mantle-v1", 128_000, 8_192, 1.00, 4.00, vec!["general"]),
-        ],
-    )
-}

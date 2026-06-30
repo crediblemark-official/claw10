@@ -25,8 +25,10 @@ use std::sync::Arc;
 use clawhive_domain::{
     Agent, AgentId, AgentState, RuntimeLease, TaskId, WorkerId,
 };
+use clawhive_context::{ContextPipeline, ContextSources, PipelineConfig};
 use clawhive_lifecycle::LifecycleService;
 use clawhive_model_router::router::ModelRouter;
+use clawhive_store::StoreExt;
 use clawhive_tool::context::ToolContext;
 use clawhive_tool::registry::ToolRegistry;
 use clawhive_worker::WorkerService;
@@ -125,7 +127,7 @@ impl AgentRuntime {
 
         // ── Build ToolContext ────────────────────────────────────
         let tool_context = ToolContext {
-            tenant_id: agent.organization_id.0.to_string(),
+            tenant_id: "default".to_string(),
             mission_id: agent.mission_id.clone(),
             task_id: TaskId(uuid::Uuid::now_v7()),
             agent_id: agent.id.clone(),
@@ -140,10 +142,16 @@ impl AgentRuntime {
         // ── Compute max turns from genome ────────────────────────
         let max_turns = agent.genome.autonomy.max_children.max(1) * DEFAULT_TURNS_MULTIPLIER;
 
+        // ── Build and inject system context ──────────────────────
+        let mut context = context;
+        if let Some(system_context) = self.build_context_for_agent(&agent).await {
+            context.insert("system_context".to_string(), system_context);
+        }
+
         // ── Execute ──────────────────────────────────────────────
         let (session, events) = self
             .executor
-            .execute(&agent, &objective, context, tool_context, max_turns)
+            .execute(&mut agent, &objective, context, tool_context, max_turns)
             .await?;
 
         // ── Persist updated agent ────────────────────────────────
@@ -194,7 +202,7 @@ impl AgentRuntime {
 
         // ── Build ToolContext ────────────────────────────────────
         let tool_context = ToolContext {
-            tenant_id: agent.organization_id.0.to_string(),
+            tenant_id: "default".to_string(),
             mission_id: agent.mission_id.clone(),
             task_id: TaskId(uuid::Uuid::now_v7()),
             agent_id: agent.id.clone(),
@@ -209,10 +217,16 @@ impl AgentRuntime {
         // ── Compute max turns from genome ────────────────────────
         let max_turns = agent.genome.autonomy.max_children.max(1) * DEFAULT_TURNS_MULTIPLIER;
 
+        // ── Build and inject system context ──────────────────────
+        let mut context = context;
+        if let Some(system_context) = self.build_context_for_agent(&agent).await {
+            context.insert("system_context".to_string(), system_context);
+        }
+
         // ── Execute streaming ────────────────────────────────────
         let session = self
             .executor
-            .execute_streaming(&agent, &objective, context, tool_context, max_turns, event_tx)
+            .execute_streaming(&mut agent, &objective, context, tool_context, max_turns, event_tx)
             .await?;
 
         // ── Persist updated agent ────────────────────────────────
@@ -314,14 +328,19 @@ impl AgentRuntime {
     /// Delegates to [`AgentExecutor::execute`].
     pub async fn run_session(
         &self,
-        agent: &Agent,
+        agent: &mut Agent,
         objective: &str,
         context: HashMap<String, String>,
         worker_id: &WorkerId,
         max_turns: u32,
     ) -> Result<(AgentSession, Vec<AgentEvent>), AgentError> {
+        let mut context = context;
+        if let Some(system_context) = self.build_context_for_agent(agent).await {
+            context.insert("system_context".to_string(), system_context);
+        }
+
         let tool_context = ToolContext {
-            tenant_id: agent.organization_id.0.to_string(),
+            tenant_id: "default".to_string(),
             mission_id: agent.mission_id.clone(),
             task_id: TaskId(uuid::Uuid::now_v7()),
             agent_id: agent.id.clone(),
@@ -337,6 +356,63 @@ impl AgentRuntime {
     }
 
     // ── Helpers ─────────────────────────────────────────────────
+
+    /// Build a system context string for an agent using the context pipeline.
+    async fn build_context_for_agent(&self, agent: &Agent) -> Option<String> {
+        let store = Arc::clone(self.agent_store.store());
+
+        let mission: Option<clawhive_domain::Mission> = store
+            .get::<clawhive_domain::Mission>(&format!("mission:{}", agent.mission_id.0))
+            .await
+            .ok()
+            .flatten();
+
+        let lineage: Option<clawhive_domain::Lineage> = store
+            .get::<clawhive_domain::Lineage>(&format!("lineage:{}", agent.lineage_id.0))
+            .await
+            .ok()
+            .flatten();
+
+        let agents: Vec<clawhive_domain::Agent> = store
+            .scan_prefix_unsorted::<clawhive_domain::Agent>("agent:")
+            .await
+            .map(|v| v.into_iter().map(|(_, a)| a).collect())
+            .unwrap_or_default();
+
+        let skills: Vec<clawhive_domain::Skill> = store
+            .scan_prefix_unsorted::<clawhive_domain::Skill>("skill:")
+            .await
+            .map(|v| {
+                v.into_iter()
+                    .map(|(_, s)| s)
+                    .filter(|s| matches!(s.state, clawhive_domain::SkillState::Active))
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        let memories: Vec<clawhive_domain::Memory> = store
+            .scan_prefix_unsorted::<clawhive_domain::Memory>("memory:")
+            .await
+            .map(|v| v.into_iter().map(|(_, m)| m).collect())
+            .unwrap_or_default();
+
+        let pipeline = ContextPipeline::new(PipelineConfig::default());
+        let sources = ContextSources {
+            task: None,
+            mission: mission.as_ref(),
+            memories: &memories,
+            policies: &[agent.policy_bundle.clone()],
+            skills: &skills,
+            history: &[],
+            tools: &[],
+            agents: &agents,
+            lineage: lineage.as_ref(),
+            workers: &[],
+            evidence: &[],
+        };
+
+        pipeline.build_context(sources).await.ok()
+    }
 
     fn ensure_runnable(&self, agent: &Agent, id: &AgentId) -> Result<(), AgentError> {
         if agent.state != AgentState::Active && agent.state != AgentState::Ready {
@@ -357,7 +433,7 @@ mod tests {
     use clawhive_domain::{
         Agent, AgentGenome, AgentId, AgentState, AutonomyConfig, Budget,
         IdentityId, LifecycleMode, LineageId, MemoryConfig, MissionId,
-        ModelPolicy, NetworkPolicy, OrganizationId, PolicyBundle, RuntimeConfig, WorkerId,
+        ModelPolicy, NetworkPolicy, PolicyBundle, RuntimeConfig, WorkerId,
     };
     use clawhive_lifecycle::LifecycleService;
     use clawhive_store::Store;
@@ -372,7 +448,6 @@ mod tests {
         Agent {
             id: AgentId(uuid::Uuid::now_v7()),
             identity_id: IdentityId(uuid::Uuid::now_v7()),
-            organization_id: OrganizationId(uuid::Uuid::now_v7()),
             mission_id: MissionId(uuid::Uuid::now_v7()),
             parent_agent_id: None,
             lineage_id: LineageId(uuid::Uuid::now_v7()),
@@ -658,13 +733,13 @@ mod tests {
         let memory = Arc::new(clawhive_store::InMemoryStore::new());
         let (runtime, _) = make_runtime(memory);
 
-        let agent = sample_agent();
+        let mut agent = sample_agent();
         let worker_id = WorkerId(uuid::Uuid::now_v7());
 
         // run_session on an agent with no model provider configured will fail gracefully
         let result = runtime
             .run_session(
-                &agent,
+                &mut agent,
                 "test objective",
                 HashMap::new(),
                 &worker_id,

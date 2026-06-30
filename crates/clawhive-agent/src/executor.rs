@@ -21,7 +21,7 @@ pub type EventSender = mpsc::UnboundedSender<AgentEvent>;
 pub struct AgentExecutor {
     model_router: Arc<ModelRouter>,
     tool_registry: Arc<ToolRegistry>,
-    _budget_service: Arc<BudgetService>,
+    budget_service: Arc<BudgetService>,
     kv_store: Arc<dyn clawhive_store::Store>,
 }
 
@@ -36,20 +36,23 @@ impl AgentExecutor {
         Self {
             model_router,
             tool_registry,
-            _budget_service: budget_service,
+            budget_service,
             kv_store,
         }
     }
 
     pub async fn execute(
         &self,
-        agent: &Agent,
+        agent: &mut Agent,
         objective: &str,
         context: HashMap<String, String>,
         tool_context: ToolContext,
         max_turns: u32,
     ) -> Result<(AgentSession, Vec<AgentEvent>), AgentError> {
-        let mut session = AgentSession::new(agent.id.clone());
+        let mut session = AgentSession::with_context_limit(
+            agent.id.clone(),
+            Some(agent.genome.model_policy.max_context_tokens),
+        );
         let (event_tx, mut event_rx) = mpsc::unbounded_channel();
         let mut events = Vec::new();
 
@@ -107,6 +110,16 @@ impl AgentExecutor {
                 .await?;
 
             session.record_turn(response.usage.total_tokens, response.usage.cost_usd);
+
+            // Enforce budget per turn
+            if let Err(e) = self.budget_service.reserve(&mut agent.budget, response.usage.cost_usd) {
+                event_tx
+                    .send(AgentEvent::BudgetWarning {
+                        remaining: agent.budget.remaining(),
+                    })
+                    .ok();
+                return Err(AgentError::from(e));
+            }
 
             let msg = response.message.clone();
             let has_tool_calls = response.finish_reason == FinishReason::ToolCalls
@@ -215,7 +228,7 @@ impl AgentExecutor {
     /// - AgentEvent::Thought berisi teks lengkap setelah turn selesai
     pub async fn execute_streaming(
         &self,
-        agent: &Agent,
+        agent: &mut Agent,
         objective: &str,
         context: HashMap<String, String>,
         tool_context: ToolContext,
@@ -226,7 +239,10 @@ impl AgentExecutor {
         use std::collections::HashMap as ToolMap;
 
 
-        let mut session = AgentSession::new(agent.id.clone());
+        let mut session = AgentSession::with_context_limit(
+            agent.id.clone(),
+            Some(agent.genome.model_policy.max_context_tokens),
+        );
 
         event_tx
             .send(AgentEvent::SessionStarted {
@@ -335,6 +351,16 @@ impl AgentExecutor {
                     }
 
                     session.record_turn(total_tokens, total_cost);
+
+                    // Enforce budget per turn
+                    if let Err(e) = self.budget_service.reserve(&mut agent.budget, total_cost) {
+                        event_tx
+                            .send(AgentEvent::BudgetWarning {
+                                remaining: agent.budget.remaining(),
+                            })
+                            .ok();
+                        return Err(AgentError::from(e));
+                    }
 
                     // Tentukan apakah ada tool calls
                     let has_tool_calls = !tool_chunks.is_empty();
@@ -493,6 +519,16 @@ impl AgentExecutor {
 
                     session.record_turn(response.usage.total_tokens, response.usage.cost_usd);
 
+                    // Enforce budget per turn
+                    if let Err(e) = self.budget_service.reserve(&mut agent.budget, response.usage.cost_usd) {
+                        event_tx
+                            .send(AgentEvent::BudgetWarning {
+                                remaining: agent.budget.remaining(),
+                            })
+                            .ok();
+                        return Err(AgentError::from(e));
+                    }
+
                     let has_tool_calls = response.finish_reason == FinishReason::ToolCalls
                         || response.message.tool_calls.is_some();
 
@@ -626,8 +662,19 @@ impl AgentExecutor {
             return Err(AgentError::Other(format!("gagal simpan request approval: {e}")));
         }
 
-        // Loop menunggu approval
+        // Loop menunggu approval dengan exponential backoff dan timeout
+        let timeout = std::time::Duration::from_secs(300);
+        let start = std::time::Instant::now();
+        let mut interval_ms = 100_u64;
+        const MAX_INTERVAL_MS: u64 = 2000;
+
         loop {
+            if start.elapsed() > timeout {
+                return Err(AgentError::Other(
+                    "timeout menunggu approval tool (300 detik)".into(),
+                ));
+            }
+
             // Cek status approval
             if let Ok(Some(current_req)) = self.kv_store.get::<ToolApprovalRequest>(&approval_key).await {
                 match current_req.state {
@@ -645,7 +692,8 @@ impl AgentExecutor {
                     ToolApprovalState::Pending => {}
                 }
             }
-            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(interval_ms)).await;
+            interval_ms = (interval_ms * 2).min(MAX_INTERVAL_MS);
         }
     }
 }

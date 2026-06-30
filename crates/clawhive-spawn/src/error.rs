@@ -26,6 +26,15 @@ pub enum SpawnError {
     #[error("duplicate objective: {0}")]
     DuplicateObjective(String),
 
+    #[error("child spawn denied: {0}")]
+    ChildSpawnDenied(String),
+
+    #[error("max children exceeded: max {max}, requested {requested}")]
+    MaxChildrenExceeded { max: u32, requested: u32 },
+
+    #[error("child spawn depth exceeded: max {max}, current {current}")]
+    ChildSpawnDepthExceeded { max: u32, current: u32 },
+
     #[error("policy denied: {0}")]
     PolicyDenied(String),
 

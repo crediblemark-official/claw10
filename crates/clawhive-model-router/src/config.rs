@@ -217,6 +217,13 @@ pub fn resolve_providers(
                 }
             };
 
+            // Native providers (e.g. Bedrock) are registered directly by the runtime
+            // and do not resolve to an OpenAI-compatible descriptor.
+            if slot.factory.is_some() {
+                accounted_slots.insert(alias.slot.as_str());
+                continue;
+            }
+
             // Resolve API key: try alias.api_key first (with $ENV expansion),
             // then fall through to slot's env var / KV
             let api_key = resolve_api_key(&alias.api_key, &slot.api_key_env, &kv_get);
@@ -307,9 +314,10 @@ pub fn resolve_providers(
         }
     }
 
-    // 3. Register bare slots (no alias defined) if they have API keys
+    // 3. Register bare slots (no alias defined) if they have API keys.
+    // Native providers are skipped here; they register themselves outside config resolution.
     for slot in &builtin {
-        if accounted_slots.contains(slot.name) {
+        if accounted_slots.contains(slot.name) || slot.factory.is_some() {
             continue;
         }
         let api_key = resolve_api_key("", slot.api_key_env, &kv_get);
