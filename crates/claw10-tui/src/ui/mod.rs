@@ -118,7 +118,7 @@ fn draw_top_bar(frame: &mut Frame, area: Rect, app: &TuiApp) {
     let tabs = ratatui::widgets::Tabs::new(titles)
         .select(active_idx)
         .block(Block::default().style(Style::default().bg(Color::Rgb(15, 15, 15))))
-        .style(Style::default().fg(Color::DarkGray).bg(Color::Rgb(15, 15, 15)))
+        .style(Style::default().fg(Color::Gray).bg(Color::Rgb(15, 15, 15)))
         .highlight_style(
             Style::default()
                 .fg(Color::Rgb(254, 192, 126))

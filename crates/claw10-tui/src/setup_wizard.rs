@@ -792,7 +792,7 @@ impl SetupWizard {
             self.custom_url.as_str()
         };
         let input_para = Paragraph::new(Line::from(vec![
-            Span::styled(display, Style::default().fg(if self.custom_url.is_empty() { Color::DarkGray } else { Color::Rgb(218, 165, 32) })),
+            Span::styled(display, Style::default().fg(if self.custom_url.is_empty() { Color::Gray } else { Color::Rgb(218, 165, 32) })),
         ]))
         .alignment(ratatui::layout::Alignment::Center)
         .style(Style::default().bg(Color::Rgb(25, 25, 25)));
@@ -874,7 +874,7 @@ impl SetupWizard {
             self.model_search.as_str()
         };
         let search_para = Paragraph::new(Line::from(vec![
-            Span::styled(search_display, Style::default().fg(if self.model_search.is_empty() { Color::DarkGray } else { Color::Rgb(218, 165, 32) })),
+            Span::styled(search_display, Style::default().fg(if self.model_search.is_empty() { Color::Gray } else { Color::Rgb(218, 165, 32) })),
         ]))
         .alignment(ratatui::layout::Alignment::Center)
         .style(Style::default().bg(Color::Rgb(25, 25, 25)));
@@ -980,7 +980,7 @@ impl SetupWizard {
             self.custom_model.as_str()
         };
         let input_para = Paragraph::new(Line::from(vec![
-            Span::styled(display, Style::default().fg(if self.custom_model.is_empty() { Color::DarkGray } else { Color::Rgb(218, 165, 32) })),
+            Span::styled(display, Style::default().fg(if self.custom_model.is_empty() { Color::Gray } else { Color::Rgb(218, 165, 32) })),
         ]))
         .alignment(ratatui::layout::Alignment::Center)
         .style(Style::default().bg(Color::Rgb(25, 25, 25)));

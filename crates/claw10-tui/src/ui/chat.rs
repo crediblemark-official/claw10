@@ -232,7 +232,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                 lines.push(Line::from(vec![
                     Span::raw("  "),
                     Span::styled("🔧 ", Style::default().fg(Color::LightBlue)),
-                    Span::styled(format!("Tool: {model} (F3/Ctrl+G to collapse)", model = model), Style::default().fg(Color::DarkGray).add_modifier(Modifier::ITALIC)),
+                    Span::styled(format!("Tool: {model} (F3/Ctrl+G to collapse)", model = model), Style::default().fg(Color::Gray).add_modifier(Modifier::ITALIC)),
                 ]));
                 lines.push(Line::from(""));
  
@@ -251,8 +251,8 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                 let status_icon = if msg.contains("selesai") { "✓" } else { "▶" };
                 lines.push(Line::from(vec![
                     Span::raw("  "),
-                    Span::styled("🔧 ", Style::default().fg(Color::DarkGray)),
-                    Span::styled(format!("Tool: {model} {status_icon} (F3/Ctrl+G to expand)", model = model), Style::default().fg(Color::DarkGray).add_modifier(Modifier::ITALIC)),
+                    Span::styled("🔧 ", Style::default().fg(Color::Gray)),
+                    Span::styled(format!("Tool: {model} {status_icon} (F3/Ctrl+G to expand)", model = model), Style::default().fg(Color::Gray).add_modifier(Modifier::ITALIC)),
                 ]));
             }
 
@@ -276,7 +276,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
             lines.push(Line::from(vec![
                 Span::raw("  "),
                 Span::styled("■ ", Style::default().fg(Color::Rgb(218, 165, 32))),
-                Span::styled(model_display, Style::default().fg(Color::DarkGray)),
+                Span::styled(model_display, Style::default().fg(Color::Gray)),
             ]));
             lines.push(Line::from(""));
 
@@ -325,7 +325,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                             Span::raw("  "),
                             Span::styled(format!("{} ", spinner), Style::default().fg(Color::Yellow)),
                             Span::styled(status_text, Style::default().fg(Color::Rgb(254, 192, 126)).add_modifier(Modifier::ITALIC)),
-                            Span::styled(" (F3/Ctrl+G to expand processes)", Style::default().fg(Color::DarkGray)),
+                            Span::styled(" (F3/Ctrl+G to expand processes)", Style::default().fg(Color::Gray)),
                         ]));
                         lines.push(Line::from("")); // Spacer bawah
 
@@ -401,7 +401,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
             Span::styled(&req.tool_name, Style::default().fg(Color::White).add_modifier(Modifier::ITALIC)),
         ]));
         chat_input_lines.push(Line::from(vec![
-            Span::styled("     $ ", Style::default().fg(Color::DarkGray)),
+            Span::styled("     $ ", Style::default().fg(Color::Gray)),
             Span::styled(&req.command, Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
         ]));
         chat_input_lines.push(Line::from(""));
@@ -418,7 +418,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
         if app.input_buffer.starts_with('/') {
             if !app.input_buffer.starts_with("/model") {
                 if !app.active_suggestions.is_empty() {
-                    chat_input_lines.push(Line::from(Span::styled("   [Commands] ---------------------------------------------", Style::default().fg(Color::DarkGray))));
+                    chat_input_lines.push(Line::from(Span::styled("   [Commands] ---------------------------------------------", Style::default().fg(Color::Gray))));
                     
                     let all_descs = vec![
                         ("/model <id>", "   - Ganti model aktif secara cepat"),
@@ -449,7 +449,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                         ]));
                     }
                     
-                    chat_input_lines.push(Line::from(Span::styled("   --------------------------------------------------------", Style::default().fg(Color::DarkGray))));
+                    chat_input_lines.push(Line::from(Span::styled("   --------------------------------------------------------", Style::default().fg(Color::Gray))));
                     chat_input_lines.push(Line::from(""));
                 }
             } else if app.input_buffer.starts_with("/model") {
@@ -481,7 +481,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
 
                 chat_input_lines.push(Line::from(Span::styled(
                     format!("   [Select Model]{}---------------------------------", pagination),
-                    Style::default().fg(Color::DarkGray),
+                    Style::default().fg(Color::Gray),
                 )));
 
                 if total_items == 0 {
@@ -490,7 +490,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                     if start_idx > 0 {
                         chat_input_lines.push(Line::from(Span::styled(
                             format!("     ▲ (Ada {} model sebelumnya...)", start_idx),
-                            Style::default().fg(Color::DarkGray).add_modifier(Modifier::ITALIC),
+                            Style::default().fg(Color::Gray).add_modifier(Modifier::ITALIC),
                         )));
                     }
 
@@ -518,7 +518,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                         
                         chat_input_lines.push(Line::from(vec![
                             Span::styled(format!("{}{:<25}", prefix, model_id), style),
-                            Span::styled(format!(" ({})", provider), Style::default().fg(Color::DarkGray)),
+                            Span::styled(format!(" ({})", provider), Style::default().fg(Color::Gray)),
                         ]));
                     }
 
@@ -526,17 +526,17 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                     if remaining > 0 {
                         chat_input_lines.push(Line::from(Span::styled(
                             format!("     ▼ (Ada {} model lainnya...)", remaining),
-                            Style::default().fg(Color::DarkGray).add_modifier(Modifier::ITALIC),
+                            Style::default().fg(Color::Gray).add_modifier(Modifier::ITALIC),
                         )));
                     }
                 }
-                chat_input_lines.push(Line::from(Span::styled("   --------------------------------------------------------", Style::default().fg(Color::DarkGray))));
+                chat_input_lines.push(Line::from(Span::styled("   --------------------------------------------------------", Style::default().fg(Color::Gray))));
                 chat_input_lines.push(Line::from(""));
             }
         }
 
         let text_style = if app.input_buffer.is_empty() {
-            Style::default().fg(Color::DarkGray)
+            Style::default().fg(Color::Gray)
         } else {
             Style::default()
         };
@@ -563,18 +563,18 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                 .add_modifier(Modifier::BOLD),
         ),
         Span::styled(format!(" · {} ", active_model_name), Style::default()),
-        Span::styled(provider_name, Style::default().fg(Color::DarkGray)),
+        Span::styled(provider_name, Style::default().fg(Color::Gray)),
         Span::raw(middle_spacer),
         Span::styled("esc", Style::default()),
-        Span::styled(" workspace  ", Style::default().fg(Color::DarkGray)),
+        Span::styled(" workspace  ", Style::default().fg(Color::Gray)),
         Span::styled("/", Style::default()),
-        Span::styled(" commands  ", Style::default().fg(Color::DarkGray)),
+        Span::styled(" commands  ", Style::default().fg(Color::Gray)),
         Span::styled(":", Style::default()),
-        Span::styled(" terminal  ", Style::default().fg(Color::DarkGray)),
+        Span::styled(" terminal  ", Style::default().fg(Color::Gray)),
         Span::styled("ctrl+p", Style::default()),
-        Span::styled(" palette  ", Style::default().fg(Color::DarkGray)),
+        Span::styled(" palette  ", Style::default().fg(Color::Gray)),
         Span::styled("F3", Style::default()),
-        Span::styled(f3_hint_label, Style::default().fg(Color::DarkGray)),
+        Span::styled(f3_hint_label, Style::default().fg(Color::Gray)),
     ]));
 
     let input_widget = Paragraph::new(chat_input_lines)
@@ -602,7 +602,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
         // Sidebar block dengan background hitam pekat solid untuk membedakannya dari chat area
         let sidebar_block = Block::default()
             .borders(Borders::LEFT)
-            .border_style(Style::default().fg(Color::DarkGray))
+            .border_style(Style::default().fg(Color::Gray))
             .style(Style::default().bg(Color::Rgb(0, 0, 0)));
         let sidebar_inner = sidebar_block.inner(main_chunks[1]);
         frame.render_widget(sidebar_block, main_chunks[1]);
