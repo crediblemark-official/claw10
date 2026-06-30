@@ -140,12 +140,13 @@ impl SetupWizard {
 
         let provider = self.current_provider();
         let base_url = if provider.base_url.is_empty() {
-            &self.custom_url
+            self.custom_url.clone()
         } else {
-            provider.base_url
+            provider.base_url.to_string()
         };
+        let api_key = self.api_key.clone();
 
-        if base_url.is_empty() || self.api_key.is_empty() {
+        if base_url.is_empty() || api_key.is_empty() {
             if !self.static_models.is_empty() {
                 self.fetched_models = self.static_models.clone();
                 self.error_msg = "Gunakan daftar model statis (API key tidak tersedia).".to_string();
@@ -156,57 +157,55 @@ impl SetupWizard {
             return;
         }
 
-        let client = reqwest::blocking::Client::new();
-        let url = format!("{}/models", base_url.trim_end_matches('/'));
+        // Jalankan fetch di thread OS terpisah untuk menghindari error drop tokio runtime
+        let handle = std::thread::spawn(move || {
+            let client = reqwest::blocking::Client::new();
+            let url = format!("{}/models", base_url.trim_end_matches('/'));
+            client
+                .get(&url)
+                .header("Authorization", format!("Bearer {}", api_key))
+                .header("Content-Type", "application/json")
+                .timeout(std::time::Duration::from_secs(10))
+                .send()
+                .map_err(|e| e.to_string())
+                .and_then(|resp| {
+                    if !resp.status().is_success() {
+                        return Err(format!("HTTP {}", resp.status().as_u16()));
+                    }
+                    resp.json::<serde_json::Value>()
+                        .map_err(|e| e.to_string())
+                })
+        });
 
-        let resp = match client
-            .get(&url)
-            .header("Authorization", format!("Bearer {}", self.api_key))
-            .header("Content-Type", "application/json")
-            .timeout(std::time::Duration::from_secs(10))
-            .send()
-        {
-            Ok(r) => r,
-            Err(e) => {
+        match handle.join() {
+            Ok(Ok(body)) => {
+                let models = body["data"]
+                    .as_array()
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v["id"].as_str().map(String::from))
+                            .collect::<Vec<_>>()
+                    })
+                    .unwrap_or_default();
+
+                if models.is_empty() {
+                    self.error_msg = "Tidak ada model dari API.".to_string();
+                    self.fallback_to_static();
+                } else {
+                    self.fetched_models = models;
+                    self.model_search.clear();
+                    self.model_list_selected = 0;
+                }
+            }
+            Ok(Err(e)) => {
                 self.error_msg = format!("Gagal fetch API: {e}.");
                 self.fallback_to_static();
-                return;
             }
-        };
-
-        if !resp.status().is_success() {
-            self.error_msg = format!("Gagal fetch API (HTTP {}).", resp.status().as_u16());
-            self.fallback_to_static();
-            return;
-        }
-
-        let body: serde_json::Value = match resp.json() {
-            Ok(v) => v,
-            Err(e) => {
-                self.error_msg = format!("Gagal parse response: {e}.");
+            Err(_) => {
+                self.error_msg = "Thread fetch panic.".to_string();
                 self.fallback_to_static();
-                return;
             }
-        };
-
-        let models = body["data"]
-            .as_array()
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|v| v["id"].as_str().map(String::from))
-                    .collect::<Vec<_>>()
-            })
-            .unwrap_or_default();
-
-        if models.is_empty() {
-            self.error_msg = "Tidak ada model dari API.".to_string();
-            self.fallback_to_static();
-            return;
         }
-
-        self.fetched_models = models;
-        self.model_search.clear();
-        self.model_list_selected = 0;
     }
 
     fn fallback_to_static(&mut self) {
