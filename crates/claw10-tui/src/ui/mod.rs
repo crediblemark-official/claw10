@@ -43,30 +43,25 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &TuiApp) {
         return;
     }
 
-    // Bagi area menjadi Spacer Atas, Top Bar, Pembatas Bawah, dan Content Area secara padat dan efisien
+    // Bagi area menjadi Top Bar (2 baris: 1 baris invisible border + 1 baris teks), Pembatas Bawah, dan Content Area
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(1), // Spacer Atas
-            Constraint::Length(1), // Top Bar
+            Constraint::Length(2), // Top Bar dengan invisible top border
             Constraint::Length(1), // Pembatas Bawah
             Constraint::Min(0),    // Content Area
         ])
         .split(area);
 
-    // Render spacer atas hitam pekat absolute (#000000) tanpa garis/border pembatas
-    let top_spacer = Block::default().style(Style::default().bg(Color::Rgb(0, 0, 0)));
-    frame.render_widget(top_spacer, chunks[0]);
-
-    draw_top_bar(frame, chunks[1], app);
+    draw_top_bar(frame, chunks[0], app);
 
     // Garis horizontal pembatas bawah yang sleek & minimalis
     let bottom_border = Block::default()
         .borders(Borders::BOTTOM)
         .border_style(Style::default().fg(Color::Rgb(40, 40, 40)).bg(Color::Rgb(0, 0, 0)));
-    frame.render_widget(bottom_border, chunks[2]);
+    frame.render_widget(bottom_border, chunks[1]);
 
-    let content_area = chunks[3];
+    let content_area = chunks[2];
 
     match app.active_screen {
         Screen::Home | Screen::WorkspaceSelect => unreachable!(),
@@ -126,7 +121,12 @@ fn draw_top_bar(frame: &mut Frame, area: Rect, app: &TuiApp) {
 
     let tabs = ratatui::widgets::Tabs::new(titles)
         .select(active_idx)
-        .block(Block::default().style(Style::default().bg(Color::Rgb(0, 0, 0))))
+        .block(
+            Block::default()
+                .borders(Borders::TOP)
+                .border_style(Style::default().fg(Color::Rgb(0, 0, 0)).bg(Color::Rgb(0, 0, 0)))
+                .style(Style::default().bg(Color::Rgb(0, 0, 0)))
+        )
         .style(Style::default().fg(Color::Gray).bg(Color::Rgb(0, 0, 0)))
         .highlight_style(
             Style::default()
