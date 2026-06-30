@@ -1,6 +1,6 @@
 # ClawHive OS — Windows installer (PowerShell)
 # Usage:
-#   irm https://raw.githubusercontent.com/crediblemark-official/clawhive/main/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/crediblemark-official/clawhive/master/install.ps1 | iex
 #
 # To use your own domain, replace the raw GitHub URL above and host this script there.
 

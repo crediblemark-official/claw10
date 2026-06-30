@@ -44,13 +44,13 @@ ClawHive OS adalah sistem operasi untuk kawanan agen AI yang dapat merekrut agen
 **Linux / macOS / WSL / VPS:**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/crediblemark-official/clawhive/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/crediblemark-official/clawhive/master/install.sh | sh
 ```
 
 **Windows PowerShell:**
 
 ```powershell
-irm https://raw.githubusercontent.com/crediblemark-official/clawhive/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/crediblemark-official/clawhive/master/install.ps1 | iex
 ```
 
 **Build dari source:**
