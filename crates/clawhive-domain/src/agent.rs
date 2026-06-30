@@ -9,7 +9,7 @@ use crate::lifecycle::{
 };
 use crate::lineage::LineageId;
 use crate::mission::MissionId;
-use crate::organization::{OrganizationId, Permission};
+use crate::permissions::Permission;
 use crate::policy::PolicyBundle;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -19,7 +19,6 @@ pub struct AgentId(pub Uuid);
 pub struct Agent {
     pub id: AgentId,
     pub identity_id: IdentityId,
-    pub organization_id: OrganizationId,
     pub mission_id: MissionId,
     pub parent_agent_id: Option<AgentId>,
     pub lineage_id: LineageId,

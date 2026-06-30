@@ -13,7 +13,7 @@ pub enum BudgetError {
 pub struct BudgetService;
 
 impl BudgetService {
-    pub fn reserve(budget: &mut Budget, amount: f64) -> Result<(), BudgetError> {
+    pub fn reserve(&self, budget: &mut Budget, amount: f64) -> Result<(), BudgetError> {
         let remaining = budget.allocated_usd - budget.spent_usd;
         if remaining < amount {
             return Err(BudgetError::Exhausted {

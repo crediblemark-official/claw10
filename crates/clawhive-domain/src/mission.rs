@@ -6,7 +6,7 @@ use crate::budget::Budget;
 use crate::identity::IdentityId;
 use crate::lifecycle::LifecycleMode;
 use crate::model::RiskLevel;
-use crate::organization::OrganizationId;
+
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MissionId(pub Uuid);
@@ -14,7 +14,6 @@ pub struct MissionId(pub Uuid);
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Mission {
     pub id: MissionId,
-    pub organization_id: OrganizationId,
     pub owner_id: IdentityId,
     pub objective: String,
     pub scope: Option<String>,

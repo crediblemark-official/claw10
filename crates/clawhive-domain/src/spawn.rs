@@ -5,7 +5,7 @@ use uuid::Uuid;
 use crate::agent::AgentId;
 use crate::lifecycle::LifecycleMode;
 use crate::mission::MissionId;
-use crate::organization::Permission;
+use crate::permissions::Permission;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SpawnRequestId(pub Uuid);

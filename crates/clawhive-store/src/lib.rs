@@ -63,6 +63,17 @@ pub trait StoreExt: Store {
         &self,
         prefix: &str,
     ) -> Result<Vec<(String, T)>, StoreError> {
+        let mut results = self.scan_prefix_unsorted(prefix).await?;
+        results.sort_by(|a, b| a.0.cmp(&b.0));
+        Ok(results)
+    }
+
+    /// Sama seperti `scan_prefix` tapi tidak melakukan sorting.
+    /// Cocok untuk path yang tidak membutuhkan urutan key.
+    async fn scan_prefix_unsorted<T: DeserializeOwned + Send>(
+        &self,
+        prefix: &str,
+    ) -> Result<Vec<(String, T)>, StoreError> {
         let raw = self.scan_prefix_raw(prefix).await?;
         let mut results = Vec::new();
         for (key, bytes) in raw {
@@ -70,7 +81,6 @@ pub trait StoreExt: Store {
                 .map_err(|e| StoreError::Serialization(e.to_string()))?;
             results.push((key, value));
         }
-        results.sort_by(|a, b| a.0.cmp(&b.0));
         Ok(results)
     }
 }

@@ -13,22 +13,30 @@ use crate::{Store, StoreError};
 pub struct NamespacedStore {
     inner: Arc<dyn Store>,
     namespace: String,
+    namespace_len: usize,
 }
 
 impl NamespacedStore {
     pub fn new(inner: Arc<dyn Store>, namespace: impl Into<String>) -> Self {
+        let namespace = namespace.into();
+        let namespace_len = namespace.len();
         Self {
             inner,
-            namespace: namespace.into(),
+            namespace,
+            namespace_len,
         }
     }
 
     fn ns_key(&self, key: &str) -> String {
-        format!("{}{}", self.namespace, key)
+        let mut out = String::with_capacity(self.namespace_len + key.len());
+        out.push_str(&self.namespace);
+        out.push_str(key);
+        out
     }
 
     fn strip_ns<'a>(&self, key: &'a str) -> &'a str {
-        key.strip_prefix(&self.namespace).unwrap_or(key)
+        // Aman karena key yang di-scan pasti diawali namespace
+        &key[self.namespace_len..]
     }
 }
 

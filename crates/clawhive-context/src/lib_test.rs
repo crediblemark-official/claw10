@@ -2,7 +2,7 @@ use super::*;
 use clawhive_domain::{
     AgentId, Budget, IdentityId, LifecycleMode, Memory,
     MemoryId, MemorySource, MemoryStatus, MemoryType, Mission, MissionId,
-    MissionState, OrganizationId, PolicyBundle, PolicyBundleId,
+    MissionState, PolicyBundle, PolicyBundleId,
     PolicyEffect, PolicyRule, PolicyRuleId, PolicySubject, RetryPolicy, RiskLevel,
     Skill, SkillCostProfile, SkillId, SkillState, Task, TaskId, TaskState,
 };
@@ -38,7 +38,6 @@ fn dummy_task() -> Task {
 fn dummy_mission() -> Mission {
     Mission {
         id: MissionId(uuid::Uuid::now_v7()),
-        organization_id: OrganizationId(uuid::Uuid::now_v7()),
         owner_id: IdentityId(uuid::Uuid::now_v7()),
         objective: "an objective".into(),
         scope: None,

@@ -11,6 +11,8 @@ use clawhive_domain::{
 };
 use clawhive_store::{Store, StoreError, StoreExt};
 
+pub use admission::{AdmissionConfig, AdmissionPipeline, AdmissionResult};
+
 #[derive(Debug, thiserror::Error)]
 pub enum MemoryError {
     #[error("memory not found: {0}")]
@@ -47,18 +49,31 @@ const KEY_PREFIX: &str = "memory:";
 
 pub struct MemoryService {
     store: Arc<dyn Store>,
+    admission: AdmissionPipeline,
 }
 
 impl MemoryService {
     #[must_use]
     pub fn new(store: Arc<dyn Store>) -> Self {
-        Self { store }
+        Self::with_config(store, AdmissionConfig::default())
+    }
+
+    #[must_use]
+    pub fn with_config(store: Arc<dyn Store>, config: AdmissionConfig) -> Self {
+        Self {
+            store,
+            admission: AdmissionPipeline::new(config),
+        }
     }
 
     /// Store a new memory.
+    ///
+    /// Runs the admission pipeline before persisting:
+    /// - memories that pass all checks are stored as `Active`
+    /// - memories that fail are stored as `Rejected`
     pub async fn store(&self, input: StoreMemoryInput) -> Memory {
         let now = Utc::now();
-        let memory = Memory {
+        let mut memory = Memory {
             id: MemoryId(uuid::Uuid::now_v7()),
             tenant_id: input.tenant_id,
             scope: input.scope,
@@ -76,6 +91,25 @@ impl MemoryService {
             created_at: now,
             updated_at: now,
         };
+
+        // Run admission pipeline against existing active memories for deduplication.
+        let existing = self
+            .query(MemoryQuery {
+                status: Some(MemoryStatus::Active),
+                ..Default::default()
+            })
+            .await
+            .unwrap_or_default();
+
+        memory.status = match self.admission.evaluate(&memory, &existing) {
+            AdmissionResult::Activated => MemoryStatus::Active,
+            AdmissionResult::Rejected { reason } => {
+                tracing::debug!("memory {} rejected: {}", memory.id.0, reason);
+                MemoryStatus::Rejected
+            }
+        };
+        memory.updated_at = Utc::now();
+
         let key = format!("{KEY_PREFIX}{}", memory.id.0);
         self.store
             .set(&key, &memory)

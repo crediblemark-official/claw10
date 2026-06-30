@@ -3,9 +3,6 @@ use serde::{Deserialize, Serialize};
 use crate::agent::AgentId;
 use crate::identity::IdentityId;
 use crate::mission::MissionId;
-use crate::task::TaskId;
-use crate::tenant::TenantId;
-use crate::worker::WorkerId;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelProfile {
@@ -82,7 +79,6 @@ pub enum ChannelType {
     Terminal,
     Rest,
     Webhook,
-    Email,
     Telegram,
     WhatsApp,
     Slack,
@@ -134,12 +130,3 @@ impl Default for SwarmLimitsConfig {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Ids {
-    pub tenant_id: TenantId,
-    pub organization_id: super::organization::OrganizationId,
-    pub mission_id: MissionId,
-    pub task_id: Option<TaskId>,
-    pub agent_id: Option<AgentId>,
-    pub worker_id: Option<WorkerId>,
-}

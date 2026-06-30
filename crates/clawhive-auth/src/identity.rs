@@ -1,9 +1,7 @@
 use chrono::Utc;
 use uuid::Uuid;
 
-use clawhive_domain::{
-    AgentId, Identity, IdentityId, IdentityKind, OrganizationId, Permission, RoleId,
-};
+use clawhive_domain::{AgentId, Identity, IdentityId, IdentityKind, Permission};
 
 use crate::error::AuthError;
 
@@ -11,18 +9,11 @@ pub struct IdentityService;
 
 impl IdentityService {
     #[must_use]
-    pub fn create_agent_identity(
-        organization_id: &OrganizationId,
-        agent_id: &AgentId,
-        roles: Vec<RoleId>,
-        _permissions: Vec<Permission>,
-    ) -> Identity {
+    pub fn create_agent_identity(agent_id: &AgentId) -> Identity {
         Identity {
             id: IdentityId(Uuid::now_v7()),
             kind: IdentityKind::Agent,
             name: format!("agent-{}", agent_id.0),
-            organization_id: organization_id.clone(),
-            roles,
             is_active: true,
             created_at: Utc::now(),
             updated_at: Utc::now(),

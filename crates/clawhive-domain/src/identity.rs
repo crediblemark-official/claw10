@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::organization::{OrganizationId, RoleId};
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum IdentityKind {
@@ -18,8 +18,6 @@ pub struct Identity {
     pub id: IdentityId,
     pub kind: IdentityKind,
     pub name: String,
-    pub organization_id: OrganizationId,
-    pub roles: Vec<RoleId>,
     pub is_active: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
