@@ -494,14 +494,27 @@ impl SetupWizard {
 
     fn draw(&self, frame: &mut Frame) {
         let area = frame.area();
+
+        // Membuat frame utama pembungkus Setup Wizard
+        let wizard_block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Rgb(218, 165, 32)).add_modifier(Modifier::BOLD))
+            .title(" CLAW10 OS - Setup Wizard ")
+            .title_style(Style::default().fg(Color::Rgb(254, 192, 126)).add_modifier(Modifier::BOLD))
+            .style(Style::default().bg(Color::Rgb(15, 15, 15)));
+
+        let inner_area = wizard_block.inner(area);
+        frame.render_widget(wizard_block, area);
+
+        // Membagi area dalam menjadi: Logo (tinggi 8), Content (min 0), Footer (tinggi 3)
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(9),
-                Constraint::Min(1),
-                Constraint::Length(7),
+                Constraint::Length(8),
+                Constraint::Min(0),
+                Constraint::Length(3),
             ])
-            .split(area);
+            .split(inner_area);
 
         self.draw_logo(frame, chunks[0]);
         self.draw_content(frame, chunks[1]);
@@ -509,35 +522,31 @@ impl SetupWizard {
     }
 
     fn draw_logo(&self, frame: &mut Frame, area: Rect) {
-        let logo = Block::default()
-            .style(Style::default().bg(Color::Rgb(15, 15, 15)));
-        let inner = logo.inner(area);
-        frame.render_widget(logo, area);
-
         let banner_content = include_str!("../../../assets/claw10.txt");
         let mut lines: Vec<Line> = banner_content
             .lines()
             .map(|line| {
                 Line::from(vec![
-                    Span::styled(format!("  {}", line), Style::default().fg(Color::Rgb(254, 192, 126)).add_modifier(Modifier::BOLD)),
+                    Span::styled(line.to_string(), Style::default().fg(Color::Rgb(254, 192, 126)).add_modifier(Modifier::BOLD)),
                 ])
             })
             .collect();
 
         lines.push(Line::from(""));
         lines.push(Line::from(vec![
-            Span::styled("  Recursive Agent Swarm Operating System", Style::default().fg(Color::Rgb(150, 150, 150))),
+            Span::styled("Recursive Agent Swarm Operating System", Style::default().fg(Color::Rgb(150, 150, 150))),
         ]));
 
         let para = Paragraph::new(lines)
+            .alignment(ratatui::layout::Alignment::Center)
             .style(Style::default().bg(Color::Rgb(15, 15, 15)));
-        frame.render_widget(para, inner);
+        frame.render_widget(para, area);
     }
 
     fn draw_content(&self, frame: &mut Frame, area: Rect) {
         let block = Block::default()
             .borders(Borders::TOP)
-            .border_style(Style::default().fg(Color::Rgb(60, 60, 60)))
+            .border_style(Style::default().fg(Color::Rgb(50, 50, 50)))
             .style(Style::default().bg(Color::Rgb(15, 15, 15)));
         let inner = block.inner(area);
         frame.render_widget(block, area);
@@ -559,28 +568,30 @@ impl SetupWizard {
         let lines = vec![
             Line::from(""),
             Line::from(vec![
-                Span::styled("  Selamat datang di Claw10 OS!", Style::default().fg(Color::Rgb(254, 192, 126)).add_modifier(Modifier::BOLD)),
+                Span::styled("Selamat datang di Claw10 OS!", Style::default().fg(Color::Rgb(254, 192, 126)).add_modifier(Modifier::BOLD)),
             ]),
             Line::from(""),
             Line::from(vec![
-                Span::styled("  Wizard ini akan membantu Anda mengatur:", Style::default().fg(Color::Rgb(200, 200, 200))),
+                Span::styled("Wizard ini akan membantu Anda mengatur:", Style::default().fg(Color::Rgb(200, 200, 200))),
             ]),
             Line::from(""),
             Line::from(vec![
-                Span::styled("    \u{2022} Provider model LLM", Style::default().fg(Color::Rgb(180, 180, 180))),
+                Span::styled("• Provider model LLM", Style::default().fg(Color::Rgb(180, 180, 180))),
             ]),
             Line::from(vec![
-                Span::styled("    \u{2022} API key", Style::default().fg(Color::Rgb(180, 180, 180))),
+                Span::styled("• API key", Style::default().fg(Color::Rgb(180, 180, 180))),
             ]),
             Line::from(vec![
-                Span::styled("    \u{2022} Model default (auto-fetch dari API)", Style::default().fg(Color::Rgb(180, 180, 180))),
+                Span::styled("• Model default (auto-fetch dari API)", Style::default().fg(Color::Rgb(180, 180, 180))),
             ]),
             Line::from(""),
             Line::from(vec![
-                Span::styled("  Tekan Enter untuk memulai...", Style::default().fg(Color::Rgb(120, 120, 120))),
+                Span::styled("Tekan Enter untuk memulai...", Style::default().fg(Color::Rgb(120, 120, 120))),
             ]),
         ];
-        let para = Paragraph::new(lines).style(Style::default().bg(Color::Rgb(15, 15, 15)));
+        let para = Paragraph::new(lines)
+            .alignment(ratatui::layout::Alignment::Center)
+            .style(Style::default().bg(Color::Rgb(15, 15, 15)));
         frame.render_widget(para, area);
     }
 
@@ -1010,18 +1021,30 @@ impl SetupWizard {
             ),
         };
 
-        let lines = vec![
-            Line::from(""),
-            Line::from(vec![
-                Span::styled("  \u{2501}".repeat(area.width.saturating_sub(4) as usize), Style::default().fg(Color::Rgb(40, 40, 40))),
-            ]),
-            Line::from(vec![
-                Span::styled(format!("  {}", hint), Style::default().fg(color)),
-            ]),
-        ];
-
-        let para = Paragraph::new(lines)
+        // Membuat block dengan border top tipis sebagai pembatas di atas footer
+        let block = Block::default()
+            .borders(Borders::TOP)
+            .border_style(Style::default().fg(Color::Rgb(50, 50, 50)))
             .style(Style::default().bg(Color::Rgb(15, 15, 15)));
-        frame.render_widget(para, area);
+
+        let inner = block.inner(area);
+        frame.render_widget(block, area);
+
+        // Render teks bantuan di tengah-tengah footer
+        let para = Paragraph::new(Line::from(vec![
+            Span::styled(hint, Style::default().fg(color)),
+        ]))
+        .alignment(ratatui::layout::Alignment::Center);
+
+        // Membagi layout agar hint berada di baris tengah footer area secara vertikal
+        let layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(1), // Spacer
+                Constraint::Length(1), // Hint text
+            ])
+            .split(inner);
+
+        frame.render_widget(para, layout[1]);
     }
 }
