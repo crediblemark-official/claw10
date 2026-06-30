@@ -20,6 +20,10 @@ use crate::ui::screens::{
 };
 
 pub fn draw(frame: &mut Frame, area: Rect, app: &TuiApp) {
+    // Warnai background seluruh area terminal dengan hitam murni solid
+    let root_bg = Block::default().style(Style::default().bg(Color::Black));
+    frame.render_widget(root_bg, area);
+
     if app.active_screen == Screen::Home || app.active_screen == Screen::WorkspaceSelect {
         draw_home(frame, area, app);
 
@@ -51,10 +55,10 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &TuiApp) {
 
     draw_top_bar(frame, chunks[0], app);
 
-    // Garis horizontal pembatas top bar yang sleek & minimalis
+    // Garis horizontal pembatas top bar yang sleek & minimalis dengan background hitam pekat
     let border = Block::default()
         .borders(Borders::BOTTOM)
-        .border_style(Style::default().fg(Color::Rgb(50, 50, 50)));
+        .border_style(Style::default().fg(Color::Rgb(40, 40, 40)).bg(Color::Black));
     frame.render_widget(border, chunks[1]);
 
     let content_area = chunks[2];
@@ -117,12 +121,12 @@ fn draw_top_bar(frame: &mut Frame, area: Rect, app: &TuiApp) {
 
     let tabs = ratatui::widgets::Tabs::new(titles)
         .select(active_idx)
-        .block(Block::default().style(Style::default().bg(Color::Rgb(15, 15, 15))))
-        .style(Style::default().fg(Color::Gray).bg(Color::Rgb(15, 15, 15)))
+        .block(Block::default().style(Style::default().bg(Color::Black)))
+        .style(Style::default().fg(Color::Gray).bg(Color::Black))
         .highlight_style(
             Style::default()
                 .fg(Color::Rgb(254, 192, 126))
-                .bg(Color::Rgb(15, 15, 15))
+                .bg(Color::Black)
                 .add_modifier(Modifier::BOLD),
         )
         .divider("│");
