@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use axum::{
     Json,
     extract::{Path, State},
@@ -11,7 +13,10 @@ use clawhive_lineage::LineageService;
 use clawhive_spawn::broker::SpawnBroker;
 use clawhive_store::StoreExt;
 
+use clawhive_event::ClawHiveEvent;
+
 use crate::error::ApiError;
+use crate::handlers::audit::{self, build_audit_event};
 use crate::state::AppState;
 use crate::store::{AGENT_PREFIX, LINEAGE_PREFIX, MISSION_PREFIX, SPAWNREQ_PREFIX};
 
@@ -144,7 +149,7 @@ pub async fn approve_spawn(
     // Load all agents for depth/validation
     let all_agents: Vec<Agent> = state
         .kv_store
-        .scan_prefix::<Agent>(AGENT_PREFIX)
+        .scan_prefix_unsorted::<Agent>(AGENT_PREFIX)
         .await?
         .into_iter()
         .map(|(_, a)| a)
@@ -228,17 +233,45 @@ pub async fn approve_spawn(
 
     // Update lineage
     let lineage_key = format!("{LINEAGE_PREFIX}{}", parent.lineage_id.0);
-    if let Some(mut lineage) = state.kv_store.get::<Lineage>(&lineage_key).await? {
-        for child in &children {
-            LineageService::add_entry(
-                &mut lineage,
-                child.id.clone(),
-                Some(requested_by.clone()),
-                child.role.clone(),
+    let mut lineage = match state.kv_store.get::<Lineage>(&lineage_key).await? {
+        Some(l) => l,
+        None => {
+            let mut l = LineageService::create_lineage(
+                parent.mission_id.clone(),
+                parent.id.clone(),
             );
+            l.id = parent.lineage_id.clone();
+            l
         }
-        state.kv_store.set(&lineage_key, &lineage).await?;
+    };
+
+    for child in &children {
+        LineageService::add_entry(
+            &mut lineage,
+            child.id.clone(),
+            Some(requested_by.clone()),
+            child.role.clone(),
+        );
     }
+    state.kv_store.set(&lineage_key, &lineage).await?;
+
+    let _ = state.event_bus.publish(ClawHiveEvent::SpawnRequestApproved {
+        spawn_request_id: request.id.0,
+        parent_agent_id: requested_by.0,
+        child_count: children.len(),
+        timestamp: chrono::Utc::now(),
+    }).await;
+
+    audit::emit_event(
+        Arc::clone(&state.audit_service),
+        build_audit_event(
+            "spawn_approved",
+            Some(requested_by.0.to_string()),
+            Some(request.mission_id.0.to_string()),
+            None,
+            serde_json::json!({"spawn_request_id": request.id.0.to_string(), "child_count": children.len()}),
+        ),
+    );
 
     Ok(Json(ApproveSpawnResponse {
         request_id: request.id.0.to_string(),
@@ -271,6 +304,24 @@ pub async fn deny_spawn(
     let _ = state.telemetry.record("spawn.denied", "success", |e| {
         e.with_mission_id(request.mission_id.0.to_string())
     });
+
+    let _ = state.event_bus.publish(ClawHiveEvent::SpawnRequestDenied {
+        spawn_request_id: request.id.0,
+        parent_agent_id: request.requested_by.0,
+        reason: "denied by user".into(),
+        timestamp: chrono::Utc::now(),
+    }).await;
+
+    audit::emit_event(
+        Arc::clone(&state.audit_service),
+        build_audit_event(
+            "spawn_denied",
+            Some(request.requested_by.0.to_string()),
+            Some(request.mission_id.0.to_string()),
+            None,
+            serde_json::json!({"spawn_request_id": request.id.0.to_string(), "reason": "denied by user"}),
+        ),
+    );
 
     Ok(Json(SpawnResponse {
         id: request.id.0.to_string(),

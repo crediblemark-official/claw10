@@ -5,7 +5,8 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 
-use clawhive_domain::{AgentId, EvidenceId, MemoryId, MemoryType, TaskId};
+use clawhive_domain::{AgentId, EvidenceId, MemoryId, MemoryType, MemoryStatus, TaskId};
+use clawhive_event::ClawHiveEvent;
 
 use crate::error::ApiError;
 use crate::state::AppState;
@@ -94,6 +95,13 @@ pub async fn store_memory(
             .with_additional("memory_id".into(), memory.id.0.to_string())
             .with_additional("memory_type".into(), format!("{:?}", memory.memory_type))
     });
+
+    let _ = state.event_bus.publish(ClawHiveEvent::MemoryCandidateSubmitted {
+        memory_id: memory.id.0,
+        agent_id: memory.source.agent_id.0,
+        scope: memory.scope.clone(),
+        timestamp: chrono::Utc::now(),
+    }).await;
 
     Ok((
         StatusCode::CREATED,
@@ -205,9 +213,31 @@ pub async fn transition_memory(
 
     state
         .memory_service
-        .transition_status(&MemoryId(id), status)
+        .transition_status(&MemoryId(id), status.clone())
         .await
         .map_err(|e| ApiError::Validation(e.to_string()))?;
+
+    let memory = state
+        .memory_service
+        .get(&MemoryId(id))
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?
+        .ok_or_else(|| ApiError::NotFound(format!("memory {id}")))?;
+
+    let _ = match status {
+        MemoryStatus::Active => state.event_bus.publish(ClawHiveEvent::MemoryActivated {
+            memory_id: memory.id.0,
+            scope: memory.scope.clone(),
+            confidence: memory.confidence,
+            timestamp: chrono::Utc::now(),
+        }).await,
+        MemoryStatus::Rejected => state.event_bus.publish(ClawHiveEvent::MemoryRejected {
+            memory_id: memory.id.0,
+            reason: "transitioned to rejected".into(),
+            timestamp: chrono::Utc::now(),
+        }).await,
+        _ => Ok(()),
+    };
 
     let _ = state.telemetry.record("memory.transitioned", "success", |e| {
         e.with_additional("memory_id".into(), id.to_string())

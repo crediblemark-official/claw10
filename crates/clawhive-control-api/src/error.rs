@@ -64,21 +64,36 @@ impl From<StoreError> for ApiError {
     }
 }
 
-impl From<clawhive_auth::AuthError> for ApiError {
-    fn from(e: clawhive_auth::AuthError) -> Self {
+impl From<clawhive_skill::SkillError> for ApiError {
+    fn from(e: clawhive_skill::SkillError) -> Self {
         match e {
-            clawhive_auth::AuthError::IdentityNotFound(m) => ApiError::NotFound(m),
-            clawhive_auth::AuthError::Unauthorized(m) => ApiError::Unauthorized(m),
-            clawhive_auth::AuthError::CredentialExpired => {
-                ApiError::Unauthorized("credential expired".into())
+            clawhive_skill::SkillError::NotFound(m) => ApiError::NotFound(m),
+            clawhive_skill::SkillError::InvalidTransition { from, to } => {
+                ApiError::Validation(format!("invalid transition: {from:?} -> {to:?}"))
             }
-            clawhive_auth::AuthError::CredentialRevoked => {
-                ApiError::Unauthorized("credential revoked".into())
+            clawhive_skill::SkillError::Unsigned => {
+                ApiError::Validation("skill must be signed before activation".into())
             }
-            clawhive_auth::AuthError::InsufficientPermissions { .. } => {
-                ApiError::Unauthorized("insufficient permissions".into())
-            }
-            _ => ApiError::Internal(e.to_string()),
+            clawhive_skill::SkillError::Store(se) => se.into(),
         }
     }
 }
+
+impl From<clawhive_artifact::ArtifactError> for ApiError {
+    fn from(e: clawhive_artifact::ArtifactError) -> Self {
+        match e {
+            clawhive_artifact::ArtifactError::NotFound(m) => ApiError::NotFound(m),
+            clawhive_artifact::ArtifactError::ContentHashMismatch(m) => {
+                ApiError::Validation(format!("content hash mismatch: {m}"))
+            }
+            clawhive_artifact::ArtifactError::Store(se) => se.into(),
+        }
+    }
+}
+
+impl From<clawhive_audit::AuditError> for ApiError {
+    fn from(e: clawhive_audit::AuditError) -> Self {
+        ApiError::Internal(e.to_string())
+    }
+}
+

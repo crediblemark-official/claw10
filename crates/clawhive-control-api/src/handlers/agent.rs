@@ -10,10 +10,13 @@ use uuid::Uuid;
 
 use clawhive_agent::{AgentRuntime, AgentStore, error::AgentError};
 use clawhive_domain::{Agent, AgentState, WorkerId};
+use clawhive_event::ClawHiveEvent;
+use clawhive_event::events::TerminationReason;
 use clawhive_lifecycle::LifecycleService;
 use clawhive_store::StoreExt;
 
 use crate::error::ApiError;
+use crate::handlers::audit::{self, build_audit_event};
 use crate::state::AppState;
 use crate::store::AGENT_PREFIX;
 
@@ -40,7 +43,7 @@ pub async fn list_agents(
 ) -> Result<Json<Vec<AgentResponse>>, ApiError> {
     let agents = state
         .kv_store
-        .scan_prefix::<Agent>(AGENT_PREFIX)
+        .scan_prefix_unsorted::<Agent>(AGENT_PREFIX)
         .await?
         .into_iter()
         .map(|(_, a)| a)
@@ -207,6 +210,17 @@ pub async fn execute_agent(
             .with_mission_id(format!("{}", uuid::Uuid::nil()))
     });
 
+    audit::emit_event(
+        Arc::clone(&state.audit_service),
+        build_audit_event(
+            "agent_executed",
+            Some(id.to_string()),
+            None,
+            None,
+            serde_json::json!({"session_id": session.id.0.to_string()}),
+        ),
+    );
+
     Ok(Json(ExecuteResponse {
         session_id: session.id.0.to_string(),
         turn_count: session.turn_count,
@@ -232,7 +246,7 @@ pub async fn terminate_agent(
 
     let all_agents: Vec<Agent> = state
         .kv_store
-        .scan_prefix::<Agent>(AGENT_PREFIX)
+        .scan_prefix_unsorted::<Agent>(AGENT_PREFIX)
         .await?
         .into_iter()
         .map(|(_, a)| a)
@@ -264,6 +278,23 @@ pub async fn terminate_agent(
         e.with_agent_id(agent.id.0.to_string())
             .with_mission_id(agent.mission_id.0.to_string())
     });
+
+    let _ = state.event_bus.publish(ClawHiveEvent::AgentTerminated {
+        agent_id: agent.id.0,
+        reason: TerminationReason::OperatorKill,
+        timestamp: chrono::Utc::now(),
+    }).await;
+
+    audit::emit_event(
+        Arc::clone(&state.audit_service),
+        build_audit_event(
+            "agent_terminated",
+            Some(agent.id.0.to_string()),
+            Some(agent.mission_id.0.to_string()),
+            None,
+            serde_json::Value::Null,
+        ),
+    );
 
     Ok(Json(AgentResponse {
         id: agent.id.0.to_string(),

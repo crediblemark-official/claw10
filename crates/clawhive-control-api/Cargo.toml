@@ -5,8 +5,6 @@ edition = "2024"
 
 [dependencies]
 clawhive-domain = { path = "../clawhive-domain" }
-clawhive-auth = { path = "../clawhive-auth" }
-clawhive-organization = { path = "../clawhive-organization" }
 clawhive-mission = { path = "../clawhive-mission" }
 clawhive-task = { path = "../clawhive-task" }
 clawhive-lineage = { path = "../clawhive-lineage" }
@@ -16,8 +14,12 @@ clawhive-lifecycle = { path = "../clawhive-lifecycle" }
 clawhive-scheduler = { path = "../clawhive-scheduler" }
 clawhive-worker = { path = "../clawhive-worker" }
 clawhive-policy = { path = "../clawhive-policy" }
+clawhive-icvs = { path = "../clawhive-icvs" }
 clawhive-memory = { path = "../clawhive-memory" }
 clawhive-gateway = { path = "../clawhive-gateway" }
+clawhive-skill = { path = "../clawhive-skill" }
+clawhive-artifact = { path = "../clawhive-artifact" }
+clawhive-audit = { path = "../clawhive-audit" }
 clawhive-store = { path = "../clawhive-store" }
 clawhive-agent = { path = "../clawhive-agent" }
 clawhive-event = { path = "../clawhive-event" }
@@ -30,7 +32,14 @@ uuid = { workspace = true }
 chrono = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
+base64 = "0.22"
 axum = { workspace = true }
 tower = { workspace = true }
 tower-http = { workspace = true }
 tracing = { workspace = true }
+
+nats = { workspace = true, optional = true }
+
+[features]
+default = []
+nats = ["clawhive-event/nats", "dep:nats"]

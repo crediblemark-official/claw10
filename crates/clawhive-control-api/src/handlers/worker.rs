@@ -6,6 +6,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 
 use clawhive_domain::{WorkerHeartbeat, WorkerId, WorkerState, WorkerType};
+use clawhive_event::ClawHiveEvent;
 
 use crate::error::ApiError;
 use crate::state::AppState;
@@ -161,6 +162,11 @@ pub async fn worker_heartbeat(
         e.with_worker_id(id.to_string())
     });
 
+    let _ = state.event_bus.publish(ClawHiveEvent::WorkerHeartbeat {
+        worker_id: id,
+        timestamp: chrono::Utc::now(),
+    }).await;
+
     Ok(Json(serde_json::json!({ "status": "heartbeat received" })))
 }
 
@@ -246,6 +252,14 @@ pub async fn stale_workers(
         .detect_stale(30)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    for w in &stale {
+        let _ = state.event_bus.publish(ClawHiveEvent::WorkerStale {
+            worker_id: w.id.0,
+            last_seen: chrono::Utc::now(),
+            timestamp: chrono::Utc::now(),
+        }).await;
+    }
 
     Ok(Json(
         stale

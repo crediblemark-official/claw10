@@ -7,6 +7,8 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use clawhive_domain::{Agent, CheckpointReason, RuntimeLease};
+use clawhive_event::ClawHiveEvent;
+use clawhive_event::events::{WakeTrigger};
 use clawhive_lifecycle::LifecycleService;
 use clawhive_store::StoreExt;
 
@@ -141,6 +143,12 @@ pub async fn hibernate_agent(
             .with_mission_id(agent.mission_id.0.to_string())
     });
 
+    let _ = state.event_bus.publish(ClawHiveEvent::AgentHibernated {
+        agent_id: agent.id.0,
+        checkpoint_id: agent.checkpoints.last().map(|c| c.id.0).unwrap_or_default(),
+        timestamp: chrono::Utc::now(),
+    }).await;
+
     let cp = agent.checkpoints.last().ok_or_else(|| {
         ApiError::Internal("hibernate succeeded but no checkpoint created".into())
     })?;
@@ -180,6 +188,12 @@ pub async fn wake_agent(
             .with_mission_id(agent.mission_id.0.to_string())
     });
 
+    let _ = state.event_bus.publish(ClawHiveEvent::AgentWoken {
+        agent_id: agent.id.0,
+        trigger: WakeTrigger::ManualWake,
+        timestamp: chrono::Utc::now(),
+    }).await;
+
     Ok(Json(serde_json::json!({ "status": "woken" })))
 }
 
@@ -215,7 +229,7 @@ pub async fn list_stale_agents(
 ) -> Result<Json<Vec<StaleAgentResponse>>, ApiError> {
     let all_agents: Vec<Agent> = state
         .kv_store
-        .scan_prefix::<Agent>(AGENT_PREFIX)
+        .scan_prefix_unsorted::<Agent>(AGENT_PREFIX)
         .await?
         .into_iter()
         .map(|(_, a)| a)
@@ -262,6 +276,15 @@ pub async fn migrate_agent(
         e.with_agent_id(agent.id.0.to_string())
             .with_worker_id(body.target_worker_id.clone())
     });
+
+    let from_worker = agent.current_runtime.as_ref().map(|l| l.worker_id.clone()).unwrap_or_default();
+    let _ = state.event_bus.publish(ClawHiveEvent::AgentMigrated {
+        agent_id: agent.id.0,
+        from_worker,
+        to_worker: body.target_worker_id.clone(),
+        checkpoint_id: agent.checkpoints.last().map(|c| c.id.0).unwrap_or_default(),
+        timestamp: chrono::Utc::now(),
+    }).await;
 
     let cp = agent.checkpoints.last().ok_or_else(|| {
         ApiError::Internal("migrate succeeded but no checkpoint created".into())

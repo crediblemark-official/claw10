@@ -53,12 +53,21 @@ const SESSION_PREFIX: &str = "gateway:session:";
 
 pub struct GatewayService {
     store: Arc<dyn Store>,
+    http: reqwest::Client,
 }
 
 impl GatewayService {
     #[must_use]
     pub fn new(store: Arc<dyn Store>) -> Self {
-        Self { store }
+        Self {
+            store,
+            http: reqwest::Client::new(),
+        }
+    }
+
+    #[must_use]
+    pub fn with_client(store: Arc<dyn Store>, http: reqwest::Client) -> Self {
+        Self { store, http }
     }
 
     // ── Channel Management ──────────────────────────────────────
@@ -224,7 +233,12 @@ impl GatewayService {
 
     /// Dispatch a message through a channel.
     ///
-    /// This is a simulation — actual transport is not implemented.
+    /// Supported transports:
+    /// - `Webhook`: POST JSON payload to `config.url`
+    /// - `Telegram`: call `sendMessage` using `config.bot_token` and `config.chat_id`
+    /// - `Discord`: POST to `config.webhook_url`
+    /// - `WhatsApp`: POST JSON to `config.bridge_url` (user-provided bridge, e.g. WhatsApp Business API or Baileys)
+    /// - `InternalBus`: no-op / local echo
     ///
     /// # Errors
     /// Returns `GatewayError::ChannelNotFound` if the channel does not exist.
@@ -233,7 +247,7 @@ impl GatewayService {
     pub async fn dispatch(
         &self,
         channel_id: &str,
-        _message: &Message,
+        message: &Message,
     ) -> Result<DispatchResult, GatewayError> {
         let key = format!("{CHANNEL_PREFIX}{channel_id}");
         let channel = self
@@ -246,22 +260,124 @@ impl GatewayService {
             return Err(GatewayError::ChannelInactive(channel_id.into()));
         }
 
-        match channel.channel_type {
-            ChannelType::Webhook
-            | ChannelType::Email
-            | ChannelType::Slack
-            | ChannelType::Telegram
-            | ChannelType::WhatsApp
-            | ChannelType::Discord
-            | ChannelType::InternalBus => Ok(DispatchResult {
-                channel_id: channel_id.into(),
-                success: true,
-                response: Some(format!("dispatched via {:?}", channel.channel_type)),
-                dispatched_at: Utc::now(),
-            }),
-            ChannelType::Mobile | ChannelType::Rest | ChannelType::Terminal => {
-                Err(GatewayError::UnsupportedDispatch(channel.channel_type))
+        let payload = serde_json::json!({
+            "recipient": message.recipient,
+            "subject": message.subject,
+            "body": message.body,
+            "metadata": message.metadata,
+            "channel_type": format!("{:?}", channel.channel_type),
+            "dispatched_at": Utc::now().to_rfc3339(),
+        });
+
+        let response = match channel.channel_type {
+            ChannelType::Webhook | ChannelType::Slack | ChannelType::WhatsApp => {
+                let url = channel
+                    .config
+                    .get("url")
+                    .or_else(|| channel.config.get("bridge_url"))
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        GatewayError::Other(format!(
+                            "channel {} missing url/bridge_url config",
+                            channel_id
+                        ))
+                    })?;
+
+                self.http
+                    .post(url)
+                    .json(&payload)
+                    .send()
+                    .await
+                    .map_err(|e| GatewayError::Other(format!("webhook request failed: {e}")))?
+                    .text()
+                    .await
+                    .map_err(|e| GatewayError::Other(format!("webhook read body failed: {e}")))?
             }
-        }
+            ChannelType::Telegram => {
+                let bot_token = channel
+                    .config
+                    .get("bot_token")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        GatewayError::Other(format!("channel {} missing bot_token", channel_id))
+                    })?;
+                let chat_id = channel
+                    .config
+                    .get("chat_id")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        GatewayError::Other(format!("channel {} missing chat_id", channel_id))
+                    })?;
+
+                let tg_payload = serde_json::json!({
+                    "chat_id": chat_id,
+                    "text": format!(
+                        "{}{}",
+                        message
+                            .subject
+                            .as_ref()
+                            .map(|s| format!("*{s}*\n\n"))
+                            .unwrap_or_default(),
+                        message.body
+                    ),
+                    "parse_mode": "MarkdownV2",
+                });
+
+                let url = format!("https://api.telegram.org/bot{bot_token}/sendMessage");
+                self.http
+                    .post(&url)
+                    .json(&tg_payload)
+                    .send()
+                    .await
+                    .map_err(|e| GatewayError::Other(format!("telegram request failed: {e}")))?
+                    .text()
+                    .await
+                    .map_err(|e| GatewayError::Other(format!("telegram read body failed: {e}")))?
+            }
+            ChannelType::Discord => {
+                let webhook_url = channel
+                    .config
+                    .get("webhook_url")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        GatewayError::Other(format!("channel {} missing webhook_url", channel_id))
+                    })?;
+
+                let discord_payload = serde_json::json!({
+                    "content": message.body,
+                    "username": message.recipient,
+                    "embeds": message.subject.as_ref().map(|s| {
+                        vec![serde_json::json!({
+                            "title": s,
+                            "description": message.body,
+                        })]
+                    }),
+                });
+
+                self.http
+                    .post(webhook_url)
+                    .json(&discord_payload)
+                    .send()
+                    .await
+                    .map_err(|e| GatewayError::Other(format!("discord request failed: {e}")))?
+                    .text()
+                    .await
+                    .map_err(|e| GatewayError::Other(format!("discord read body failed: {e}")))?
+            }
+            ChannelType::InternalBus => {
+                tracing::debug!("internal bus dispatch: {payload}");
+                "internal bus echo".into()
+            }
+            ChannelType::Mobile | ChannelType::Rest | ChannelType::Terminal => {
+                return Err(GatewayError::UnsupportedDispatch(channel.channel_type));
+            }
+        };
+
+        Ok(DispatchResult {
+            channel_id: channel_id.into(),
+            success: true,
+            response: Some(response),
+            dispatched_at: Utc::now(),
+        })
     }
 }

@@ -6,8 +6,8 @@ use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 
 use crate::handlers::{
-    agent, approval, gateway, health, lifecycle, lineage, memory, mission, policy, scheduler,
-    spawn, task, worker,
+    agent, approval, artifact, audit, gateway, health, lifecycle, lineage, memory, mission, policy,
+    scheduler, skill, spawn, task, worker,
 };
 use crate::state::AppState;
 
@@ -21,8 +21,12 @@ pub fn build_router(state: AppState) -> Router {
             get(mission::list_missions).post(mission::create_mission),
         )
         .route("/v1/missions/{id}", get(mission::get_mission))
+        .route("/v1/missions/{id}/pause", post(mission::pause_mission))
+        .route("/v1/missions/{id}/complete", post(mission::complete_mission))
+        .route("/v1/missions/{id}/cancel", post(mission::cancel_mission))
         .route("/v1/tasks", get(task::list_tasks).post(task::create_task))
         .route("/v1/tasks/{id}", get(task::get_task))
+        .route("/v1/tasks/{id}/transition", post(task::transition_task))
         .route("/v1/agents", get(agent::list_agents))
         .route("/v1/agents/{id}", get(agent::get_agent))
         .route("/v1/agents/{id}/pause", post(agent::pause_agent))
@@ -136,5 +140,22 @@ pub fn build_router(state: AppState) -> Router {
             "/v1/identities/{identity_id}/sessions",
             get(gateway::list_identity_sessions),
         )
+        // Skill endpoints
+        .route("/v1/skills", get(skill::list_skills).post(skill::create_skill))
+        .route("/v1/skills/{id}", get(skill::get_skill))
+        .route("/v1/skills/{id}/transition", post(skill::transition_skill))
+        .route("/v1/skills/{id}/sign", post(skill::sign_skill))
+        // Artifact endpoints
+        .route(
+            "/v1/artifacts",
+            get(artifact::list_artifacts).post(artifact::store_artifact),
+        )
+        .route(
+            "/v1/artifacts/{id}",
+            get(artifact::get_artifact).delete(artifact::delete_artifact),
+        )
+        .route("/v1/artifacts/{id}/content", get(artifact::get_artifact_content))
+        // Audit endpoints
+        .route("/v1/audit", get(audit::list_audit_events))
         .with_state(state)
 }

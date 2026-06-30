@@ -1,5 +1,7 @@
 pub mod agent;
 pub mod approval;
+pub mod artifact;
+pub mod audit;
 pub mod gateway;
 pub mod health;
 pub mod lifecycle;
@@ -8,6 +10,7 @@ pub mod memory;
 pub mod mission;
 pub mod policy;
 pub mod scheduler;
+pub mod skill;
 pub mod spawn;
 pub mod task;
 pub mod worker;
