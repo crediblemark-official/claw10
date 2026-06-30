@@ -43,28 +43,30 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &TuiApp) {
         return;
     }
 
-    // Bagi area menjadi Spacer Atas, Top Bar, Pembatas, dan Content Area secara padat dan efisien
+    // Bagi area menjadi Pembatas Atas, Top Bar, Pembatas Bawah, dan Content Area secara padat dan efisien
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(1), // Spacer Atas
+            Constraint::Length(1), // Pembatas Atas
             Constraint::Length(1), // Top Bar
-            Constraint::Length(1), // Border pembatas
+            Constraint::Length(1), // Pembatas Bawah
             Constraint::Min(0),    // Content Area
         ])
         .split(area);
 
-    // Render spacer atas hitam pekat absolute (#000000)
-    let black_spacer = Block::default().style(Style::default().bg(Color::Rgb(0, 0, 0)));
-    frame.render_widget(black_spacer, chunks[0]);
+    // Garis horizontal pembatas atas yang sleek & minimalis
+    let top_border = Block::default()
+        .borders(Borders::BOTTOM)
+        .border_style(Style::default().fg(Color::Rgb(40, 40, 40)).bg(Color::Rgb(0, 0, 0)));
+    frame.render_widget(top_border, chunks[0]);
 
     draw_top_bar(frame, chunks[1], app);
 
-    // Garis horizontal pembatas top bar yang sleek & minimalis dengan background hitam pekat absolute (#000000)
-    let border = Block::default()
+    // Garis horizontal pembatas bawah yang sleek & minimalis
+    let bottom_border = Block::default()
         .borders(Borders::BOTTOM)
         .border_style(Style::default().fg(Color::Rgb(40, 40, 40)).bg(Color::Rgb(0, 0, 0)));
-    frame.render_widget(border, chunks[2]);
+    frame.render_widget(bottom_border, chunks[2]);
 
     let content_area = chunks[3];
 
