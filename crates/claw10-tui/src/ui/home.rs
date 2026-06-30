@@ -207,24 +207,11 @@ pub fn draw_home(frame: &mut Frame, area: Rect, app: &TuiApp) {
     frame.render_widget(tip, inner_chunks[6]);
 
     // ── Footer ────────────────────────────────────────────────────────────────
-    let footer_chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-        .split(footer_area);
-
-    let current_dir = std::env::current_dir()
-        .map(|p| p.to_string_lossy().to_string())
-        .unwrap_or_else(|_| "~".to_string());
-    frame.render_widget(
-        Paragraph::new(current_dir).style(Style::default().fg(Color::Rgb(140, 140, 140))),
-        footer_chunks[0],
-    );
-
     let version = format!("v{}", env!("CARGO_PKG_VERSION"));
     frame.render_widget(
         Paragraph::new(version)
             .style(Style::default().fg(Color::Rgb(140, 140, 140)))
-            .alignment(ratatui::layout::Alignment::Right),
-        footer_chunks[1],
+            .alignment(ratatui::layout::Alignment::Center),
+        footer_area,
     );
 }
