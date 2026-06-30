@@ -497,7 +497,7 @@ impl SetupWizard {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(6),
+                Constraint::Length(9),
                 Constraint::Min(1),
                 Constraint::Length(7),
             ])
@@ -514,21 +514,20 @@ impl SetupWizard {
         let inner = logo.inner(area);
         frame.render_widget(logo, area);
 
-        let lines = vec![
-            Line::from(vec![
-                Span::styled("  ╔═╗╦  ╔═╗╦ ╦╔╦╗╔═╗  ╔═╗╔═╗", Style::default().fg(Color::Rgb(254, 192, 126)).add_modifier(Modifier::BOLD)),
-            ]),
-            Line::from(vec![
-                Span::styled("  ║  ║  ╠═╣║║║ ║ ║ ║  ║ ║╚═╗", Style::default().fg(Color::Rgb(254, 192, 126)).add_modifier(Modifier::BOLD)),
-            ]),
-            Line::from(vec![
-                Span::styled("  ╚═╝╩  ╩ ╩╚╩╝╚╩╝╚═╝  ╚═╝╚═╝", Style::default().fg(Color::Rgb(254, 192, 126)).add_modifier(Modifier::BOLD)),
-            ]),
-            Line::from(""),
-            Line::from(vec![
-                Span::styled("  Recursive Agent Swarm Operating System", Style::default().fg(Color::Rgb(150, 150, 150))),
-            ]),
-        ];
+        let banner_content = include_str!("../../../assets/claw10.txt");
+        let mut lines: Vec<Line> = banner_content
+            .lines()
+            .map(|line| {
+                Line::from(vec![
+                    Span::styled(format!("  {}", line), Style::default().fg(Color::Rgb(254, 192, 126)).add_modifier(Modifier::BOLD)),
+                ])
+            })
+            .collect();
+
+        lines.push(Line::from(""));
+        lines.push(Line::from(vec![
+            Span::styled("  Recursive Agent Swarm Operating System", Style::default().fg(Color::Rgb(150, 150, 150))),
+        ]));
 
         let para = Paragraph::new(lines)
             .style(Style::default().bg(Color::Rgb(15, 15, 15)));
