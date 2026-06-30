@@ -949,27 +949,26 @@ impl SetupWizard {
             .split(area);
 
         let title = Paragraph::new(Line::from(vec![
-            Span::styled(" Konfirmasi Konfigurasi", Style::default().fg(Color::Rgb(254, 192, 126)).add_modifier(Modifier::BOLD)),
+            Span::styled("    Konfirmasi Konfigurasi", Style::default().fg(Color::Rgb(254, 192, 126)).add_modifier(Modifier::BOLD)),
         ]))
         .style(Style::default().bg(Color::Rgb(15, 15, 15)));
         frame.render_widget(title, chunks[0]);
 
         let lines = vec![
-            Line::from(""),
             Line::from(vec![
-                Span::styled("  Provider:  ", Style::default().fg(Color::Rgb(150, 150, 150))),
+                Span::styled("  Provider:    ", Style::default().fg(Color::Rgb(150, 150, 150))),
                 Span::styled(provider.name, Style::default().fg(Color::Rgb(254, 192, 126)).add_modifier(Modifier::BOLD)),
             ]),
             Line::from(vec![
-                Span::styled("  Model:     ", Style::default().fg(Color::Rgb(150, 150, 150))),
+                Span::styled("  Model:       ", Style::default().fg(Color::Rgb(150, 150, 150))),
                 Span::styled(model, Style::default().fg(Color::Rgb(200, 200, 200))),
             ]),
             Line::from(vec![
-                Span::styled("  API Key:   ", Style::default().fg(Color::Rgb(150, 150, 150))),
+                Span::styled("  API Key:     ", Style::default().fg(Color::Rgb(150, 150, 150))),
                 Span::styled(if self.api_key.is_empty() { "(env var)" } else { "********" }, Style::default().fg(Color::Rgb(200, 200, 200))),
             ]),
             Line::from(vec![
-                Span::styled("  Base URL:  ", Style::default().fg(Color::Rgb(150, 150, 150))),
+                Span::styled("  Base URL:    ", Style::default().fg(Color::Rgb(150, 150, 150))),
                 Span::styled(if provider.base_url.is_empty() { &self.custom_url } else { provider.base_url }, Style::default().fg(Color::Rgb(200, 200, 200))),
             ]),
             Line::from(""),
@@ -983,36 +982,86 @@ impl SetupWizard {
             ]),
         ];
 
+        let review_height = lines.len() as u16;
+
+        // Menengahkan secara vertikal
+        let vertical_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Min(0),
+                Constraint::Length(review_height),
+                Constraint::Min(0),
+            ])
+            .split(chunks[1]);
+
+        // Menengahkan secara horizontal dengan card lebar tetap 56
+        let card_width = 56u16;
+        let left_padding = area.width.saturating_sub(card_width) / 2;
+
+        let horizontal_chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Length(left_padding),
+                Constraint::Length(card_width),
+                Constraint::Min(0),
+            ])
+            .split(vertical_chunks[1]);
+
         let para = Paragraph::new(lines)
             .style(Style::default().bg(Color::Rgb(15, 15, 15)));
-        frame.render_widget(para, chunks[1]);
+        frame.render_widget(para, horizontal_chunks[1]);
     }
 
     fn draw_complete(&self, frame: &mut Frame, area: Rect) {
         let lines = vec![
-            Line::from(""),
             Line::from(vec![
-                Span::styled("  \u{2713} Konfigurasi berhasil disimpan!", Style::default().fg(Color::Rgb(0, 200, 100)).add_modifier(Modifier::BOLD)),
+                Span::styled("\u{2713} Konfigurasi berhasil disimpan!", Style::default().fg(Color::Rgb(0, 200, 100)).add_modifier(Modifier::BOLD)),
             ]),
             Line::from(""),
             Line::from(vec![
-                Span::styled("  Anda bisa menjalankan:", Style::default().fg(Color::Rgb(200, 200, 200))),
+                Span::styled("Anda bisa menjalankan:", Style::default().fg(Color::Rgb(200, 200, 200))),
             ]),
             Line::from(""),
             Line::from(vec![
-                Span::styled("    claw10 tui", Style::default().fg(Color::Rgb(254, 192, 126)).add_modifier(Modifier::BOLD)),
+                Span::styled("  \u{2022} claw10 tui", Style::default().fg(Color::Rgb(254, 192, 126)).add_modifier(Modifier::BOLD)),
             ]),
             Line::from(vec![
-                Span::styled("    claw10 serve", Style::default().fg(Color::Rgb(254, 192, 126)).add_modifier(Modifier::BOLD)),
+                Span::styled("  \u{2022} claw10 serve", Style::default().fg(Color::Rgb(254, 192, 126)).add_modifier(Modifier::BOLD)),
             ]),
             Line::from(""),
             Line::from(vec![
-                Span::styled("  Tekan tombol apa pun untuk keluar.", Style::default().fg(Color::Rgb(120, 120, 120))),
+                Span::styled("Tekan tombol apa pun untuk keluar.", Style::default().fg(Color::Rgb(120, 120, 120))),
             ]),
         ];
+
+        let complete_height = lines.len() as u16;
+
+        // Menengahkan secara vertikal
+        let vertical_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Min(0),
+                Constraint::Length(complete_height),
+                Constraint::Min(0),
+            ])
+            .split(area);
+
+        // Menengahkan secara horizontal dengan card lebar tetap 42
+        let card_width = 42u16;
+        let left_padding = area.width.saturating_sub(card_width) / 2;
+
+        let horizontal_chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Length(left_padding),
+                Constraint::Length(card_width),
+                Constraint::Min(0),
+            ])
+            .split(vertical_chunks[1]);
+
         let para = Paragraph::new(lines)
             .style(Style::default().bg(Color::Rgb(15, 15, 15)));
-        frame.render_widget(para, area);
+        frame.render_widget(para, horizontal_chunks[1]);
     }
 
     fn draw_footer(&self, frame: &mut Frame, area: Rect) {
