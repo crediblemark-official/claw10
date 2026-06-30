@@ -1,5 +1,5 @@
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Wrap},
@@ -27,7 +27,8 @@ pub fn draw_apikey_input(frame: &mut Frame, area: Rect, app: &TuiApp) {
             .borders(Borders::ALL)
             .border_style(Style::default().fg(Color::Rgb(218, 165, 32)))
             .style(Style::default().bg(Color::Rgb(15, 15, 15)))
-            .title(" Set API Key ");
+            .title(" Set API Key ")
+            .title_alignment(Alignment::Center);
 
         let inner = block.inner(modal_area);
         frame.render_widget(ratatui::widgets::Clear, modal_area);
@@ -290,7 +291,8 @@ pub fn draw_model_selection(frame: &mut Frame, area: Rect, app: &TuiApp) {
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::Rgb(120, 120, 120)))
         .style(Style::default().bg(Color::Rgb(15, 15, 15)))
-        .title(format!(" {} ", title));
+        .title(format!(" {} ", title))
+        .title_alignment(Alignment::Center);
 
     let inner_area = block.inner(modal_area);
     frame.render_widget(ratatui::widgets::Clear, modal_area);
@@ -373,7 +375,8 @@ pub fn draw_manual_model_input(frame: &mut Frame, area: Rect, app: &TuiApp) {
             .borders(Borders::ALL)
             .border_style(Style::default().fg(Color::Rgb(218, 165, 32)))
             .style(Style::default().bg(Color::Rgb(15, 15, 15)))
-            .title(" Add Model Manually ");
+            .title(" Add Model Manually ")
+            .title_alignment(Alignment::Center);
 
         let inner = block.inner(modal_area);
         frame.render_widget(ratatui::widgets::Clear, modal_area);

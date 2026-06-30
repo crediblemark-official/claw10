@@ -1,5 +1,5 @@
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, Paragraph},
@@ -95,6 +95,7 @@ pub fn draw_home(frame: &mut Frame, area: Rect, app: &TuiApp) {
     let form_block = Block::default()
         .title(" Create New Workspace ")
         .title_style(Style::default().fg(Color::Rgb(218, 165, 32)).add_modifier(Modifier::BOLD))
+        .title_alignment(Alignment::Center)
         .borders(Borders::ALL)
         .border_style(form_border_style);
 
@@ -132,6 +133,7 @@ pub fn draw_home(frame: &mut Frame, area: Rect, app: &TuiApp) {
         .block(Block::default()
             .title(" Workspaces ")
             .title_style(Style::default().fg(Color::Rgb(100, 100, 100)))
+            .title_alignment(Alignment::Center)
             .borders(Borders::ALL)
             .border_style(Style::default().fg(Color::Rgb(100, 100, 100))));
         frame.render_widget(empty_msg, list_area);
@@ -186,6 +188,7 @@ pub fn draw_home(frame: &mut Frame, area: Rect, app: &TuiApp) {
             .block(Block::default()
                 .title(format!(" Workspaces ({}) ", app.workspaces.len()))
                 .title_style(Style::default().fg(Color::Rgb(218, 165, 32)))
+                .title_alignment(Alignment::Center)
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(Color::Rgb(150, 120, 50))));
         frame.render_widget(ws_list, list_area);
