@@ -2,7 +2,7 @@
 name = "claw10-toon"
 version.workspace = true
 edition = "2024"
-description = "Tiny object notation utilities for Claw10 OS"
+description = "Token-Oriented Object Notation utilities for Claw10 OS"
 license.workspace = true
 authors.workspace = true
 repository = "https://github.com/crediblemark-official/claw10"

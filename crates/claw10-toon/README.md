@@ -1,6 +1,6 @@
 # claw10-toon
 
-Utilitas enkoding **Tiny Object Notation (TOON)** untuk **Claw10 OS**.
+Utilitas enkoding **Token-Oriented Object Notation (TOON)** untuk **Claw10 OS**.
 
 Crate ini menyediakan fungsi pembantu (helper) untuk mengompresi struktur data kompleks menjadi format ringkas guna meminimalkan penggunaan token saat dikirim ke LLM (*Large Language Model*).
 
