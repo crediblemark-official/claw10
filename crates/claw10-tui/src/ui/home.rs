@@ -133,7 +133,7 @@ pub fn draw_home(frame: &mut Frame, area: Rect, app: &TuiApp) {
             .title(" Workspaces ")
             .title_style(Style::default().fg(Color::Rgb(100, 100, 100)))
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Rgb(50, 50, 50))));
+            .border_style(Style::default().fg(Color::Rgb(100, 100, 100))));
         frame.render_widget(empty_msg, list_area);
     } else {
         let items: Vec<ListItem> = app
@@ -187,7 +187,7 @@ pub fn draw_home(frame: &mut Frame, area: Rect, app: &TuiApp) {
                 .title(format!(" Workspaces ({}) ", app.workspaces.len()))
                 .title_style(Style::default().fg(Color::Rgb(218, 165, 32)))
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::Rgb(80, 70, 30))));
+                .border_style(Style::default().fg(Color::Rgb(150, 120, 50))));
         frame.render_widget(ws_list, list_area);
     }
 

@@ -92,7 +92,7 @@ pub fn draw_missions(frame: &mut Frame, area: Rect, app: &TuiApp) {
             .title(" Missions ")
             .title_style(Style::default().fg(Color::Rgb(218, 165, 32)))
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Rgb(80, 70, 30))),
+            .border_style(Style::default().fg(Color::Rgb(150, 120, 50))),
     );
     frame.render_widget(table, chunks[1]);
     draw_footer(frame, chunks[2], app, "Missions");
@@ -147,7 +147,7 @@ pub fn draw_tasks(frame: &mut Frame, area: Rect, app: &TuiApp) {
             .title(" Tasks ")
             .title_style(Style::default().fg(Color::Rgb(218, 165, 32)))
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Rgb(80, 70, 30))),
+            .border_style(Style::default().fg(Color::Rgb(150, 120, 50))),
     );
     frame.render_widget(table, chunks[1]);
     draw_footer(frame, chunks[2], app, "Tasks");
@@ -201,7 +201,7 @@ pub fn draw_memory(frame: &mut Frame, area: Rect, app: &TuiApp) {
             .title(" Memory ")
             .title_style(Style::default().fg(Color::Rgb(218, 165, 32)))
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Rgb(80, 70, 30))),
+            .border_style(Style::default().fg(Color::Rgb(150, 120, 50))),
     );
     frame.render_widget(table, chunks[1]);
     draw_footer(frame, chunks[2], app, "Memory");
@@ -255,7 +255,7 @@ pub fn draw_approvals(frame: &mut Frame, area: Rect, app: &TuiApp) {
             .title(" Tool Approvals ")
             .title_style(Style::default().fg(Color::Rgb(218, 165, 32)))
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Rgb(80, 70, 30))),
+            .border_style(Style::default().fg(Color::Rgb(150, 120, 50))),
     );
     frame.render_widget(table, chunks[1]);
     draw_footer(frame, chunks[2], app, "Approvals");
@@ -282,7 +282,7 @@ pub fn draw_costs(frame: &mut Frame, area: Rect, app: &TuiApp) {
             .title(" Costs Summary ")
             .title_style(Style::default().fg(Color::Rgb(218, 165, 32)))
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Rgb(80, 70, 30))),
+            .border_style(Style::default().fg(Color::Rgb(150, 120, 50))),
     );
 
     let header = Row::new(vec!["Agent Name", "State", "Total Cost (USD)"])
@@ -328,7 +328,7 @@ pub fn draw_costs(frame: &mut Frame, area: Rect, app: &TuiApp) {
             .title(" Agent Costs ")
             .title_style(Style::default().fg(Color::Rgb(218, 165, 32)))
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Rgb(80, 70, 30))),
+            .border_style(Style::default().fg(Color::Rgb(150, 120, 50))),
     );
 
     let content_chunks = Layout::default()
@@ -388,7 +388,7 @@ pub fn draw_policies(frame: &mut Frame, area: Rect, app: &TuiApp) {
             .title(" Policies ")
             .title_style(Style::default().fg(Color::Rgb(218, 165, 32)))
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Rgb(80, 70, 30))),
+            .border_style(Style::default().fg(Color::Rgb(150, 120, 50))),
     );
     frame.render_widget(table, chunks[1]);
     draw_footer(frame, chunks[2], app, "Policies");
@@ -444,7 +444,7 @@ pub fn draw_skills(frame: &mut Frame, area: Rect, app: &TuiApp) {
             .title(" Skills ")
             .title_style(Style::default().fg(Color::Rgb(218, 165, 32)))
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Rgb(80, 70, 30))),
+            .border_style(Style::default().fg(Color::Rgb(150, 120, 50))),
     );
     frame.render_widget(table, chunks[1]);
     draw_footer(frame, chunks[2], app, "Skills");
@@ -505,7 +505,7 @@ pub fn draw_artifacts(frame: &mut Frame, area: Rect, app: &TuiApp) {
             .title(" Artifacts ")
             .title_style(Style::default().fg(Color::Rgb(218, 165, 32)))
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Rgb(80, 70, 30))),
+            .border_style(Style::default().fg(Color::Rgb(150, 120, 50))),
     );
     frame.render_widget(table, chunks[1]);
     draw_footer(frame, chunks[2], app, "Artifacts");
@@ -559,7 +559,7 @@ pub fn draw_incidents(frame: &mut Frame, area: Rect, app: &TuiApp) {
             .title(" Incidents ")
             .title_style(Style::default().fg(Color::Rgb(218, 165, 32)))
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Rgb(80, 70, 30))),
+            .border_style(Style::default().fg(Color::Rgb(150, 120, 50))),
     );
     frame.render_widget(table, chunks[1]);
     draw_footer(frame, chunks[2], app, "Incidents");

@@ -59,7 +59,7 @@ pub fn draw_apikey_input(frame: &mut Frame, area: Rect, app: &TuiApp) {
 
         let input_block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::DarkGray));
+            .border_style(Style::default().fg(Color::Rgb(120, 120, 120)));
         let input_inner = input_block.inner(input_chunks[1]);
         frame.render_widget(input_block, input_chunks[1]);
 
@@ -110,7 +110,7 @@ pub fn draw_command_palette(frame: &mut Frame, area: Rect, app: &TuiApp) {
 
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::DarkGray))
+            .border_style(Style::default().fg(Color::Rgb(120, 120, 120)))
             .style(Style::default().bg(Color::Rgb(15, 15, 15))); // Background hitam pekat modal
 
         let inner_area = block.inner(palette_area);
@@ -288,7 +288,7 @@ pub fn draw_model_selection(frame: &mut Frame, area: Rect, app: &TuiApp) {
 
     let block = Block::default()
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray))
+        .border_style(Style::default().fg(Color::Rgb(120, 120, 120)))
         .style(Style::default().bg(Color::Rgb(15, 15, 15)))
         .title(format!(" {} ", title));
 
@@ -405,7 +405,7 @@ pub fn draw_manual_model_input(frame: &mut Frame, area: Rect, app: &TuiApp) {
 
         let input_block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::DarkGray));
+            .border_style(Style::default().fg(Color::Rgb(120, 120, 120)));
         let input_inner = input_block.inner(input_chunks[1]);
         frame.render_widget(input_block, input_chunks[1]);
 

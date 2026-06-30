@@ -691,7 +691,7 @@ fn draw_sidebar_accordion(frame: &mut Frame, area: Rect, app: &TuiApp) {
         // Render header dengan border bottom jika collapsed
         let header_block = Block::default()
             .borders(Borders::BOTTOM)
-            .border_style(Style::default().fg(Color::Rgb(40, 40, 40)));
+            .border_style(Style::default().fg(Color::Rgb(90, 90, 90)));
 
         let header = Paragraph::new(Line::from(vec![
             Span::styled(indicator, header_style),
@@ -742,7 +742,7 @@ fn draw_sidebar_accordion(frame: &mut Frame, area: Rect, app: &TuiApp) {
                 height: 1,
             };
             let bottom_line = Paragraph::new(Line::from(""))
-                .block(Block::default().borders(Borders::BOTTOM).border_style(Style::default().fg(Color::Rgb(40, 40, 40))));
+                .block(Block::default().borders(Borders::BOTTOM).border_style(Style::default().fg(Color::Rgb(90, 90, 90))));
             frame.render_widget(bottom_line, footer_rect);
         } else {
             // Jika collapsed, render block header (tinggi 2, memuat border bottom) di seluruh section_area

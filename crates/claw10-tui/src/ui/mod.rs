@@ -58,7 +58,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &TuiApp) {
     // Garis horizontal pembatas bawah yang sleek & minimalis
     let bottom_border = Block::default()
         .borders(Borders::BOTTOM)
-        .border_style(Style::default().fg(Color::Rgb(40, 40, 40)).bg(Color::Rgb(0, 0, 0)));
+        .border_style(Style::default().fg(Color::Rgb(90, 90, 90)).bg(Color::Rgb(0, 0, 0)));
     frame.render_widget(bottom_border, chunks[1]);
 
     let content_area = chunks[2];
