@@ -39,7 +39,7 @@ fn draw_footer(frame: &mut Frame, area: Rect, app: &TuiApp, title: &str) {
 }
 
 fn empty_rows(message: &str) -> Vec<Row<'static>> {
-    vec![Row::new(vec![Cell::from(message.to_string()).style(Style::default().fg(Color::Rgb(140, 140, 140)))])]
+    vec![Row::new(vec![Cell::from(format!("  {}", message)).style(Style::default().fg(Color::Rgb(140, 140, 140)))])]
 }
 
 fn draw_table_columns(frame: &mut Frame, area: Rect, percentages: &[u16]) {
