@@ -104,7 +104,7 @@ async fn main() {
     // When no subcommand is provided, start the API server in the background
     // and launch the TUI. This keeps the HTTP API and webhook endpoints
     // reachable while the user interacts with the terminal UI.
-    let mut command = cli.command.unwrap_or(Commands::Serve {
+    let command = cli.command.unwrap_or(Commands::Serve {
         bind: "0.0.0.0:3000".into(),
         db: None,
         tui: true,
@@ -191,12 +191,12 @@ async fn main() {
             eprintln!("Setup gagal: {e}");
             std::process::exit(1);
         }
-        println!("\nSetup sukses! Menjalankan Claw10 server & TUI otomatis...");
-        command = Commands::Serve {
-            bind: "0.0.0.0:3000".into(),
-            db: None,
-            tui: true,
-        };
+        println!("\nSetup sukses! Menginstal dan menjalankan Claw10 server daemon di background...");
+        handle_service_command(ServiceAction::Install);
+        handle_service_command(ServiceAction::Start);
+        println!("\n✓ Claw10 server daemon aktif dan berjalan otomatis sebagai systemd user service!");
+        println!("Gunakan 'claw10 service status' untuk memantau status service.");
+        std::process::exit(0);
     }
 
     match command {
@@ -756,6 +756,10 @@ fn handle_service_command(action: ServiceAction) {
 }
 
 async fn run_setup_wizard(force: bool) -> Result<(), Box<dyn std::error::Error>> {
+    let _ = std::process::Command::new("systemctl")
+        .args(["--user", "stop", "claw10"])
+        .status();
+
     let _ = std::process::Command::new("sh")
         .arg("-c")
         .arg("pkill -f 'claw10 serve' || fuser -k 3000/tcp")
