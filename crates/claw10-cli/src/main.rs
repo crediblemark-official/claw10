@@ -624,6 +624,12 @@ async fn main() {
 }
 
 async fn run_setup_wizard(force: bool) -> Result<(), Box<dyn std::error::Error>> {
+    let _ = std::process::Command::new("sh")
+        .arg("-c")
+        .arg("pkill -f 'claw10 serve' || fuser -k 3000/tcp")
+        .output();
+    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
     let default_path = std::path::PathBuf::from(&home).join(".claw10").join("config.toml");
     let local_path = std::path::PathBuf::from("claw10.toml");
