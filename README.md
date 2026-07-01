@@ -198,6 +198,15 @@ crates/
 └── claw10-telemetry        # Telemetry events
 ```
 
+## Dokumentasi Resmi
+
+Untuk detail arsitektur produk dan panduan teknis yang lebih mendalam, silakan baca dokumentasi berikut:
+*   [Product Requirements Document (PRD)](doc/prd.md) — Visi produk, Use Case utama, dan terminologi dasar.
+*   [Model Swarm & Siklus Hidup Agen](doc/agent_swarm.md) — Model kehidupan agen (Persistent & Ephemeral) dan pembentukan swarm secara rekursif.
+*   [Fitur & Sub-system](doc/features.md) — Detail Mission, Task, Scheduler, TOON, ICVS, human approval, dan memory system.
+*   [Arsitektur Sistem & Data](doc/architecture.md) — High-level architecture, model organisasi, dan struktur data database (Sled).
+*   [Spesifikasi Teknis & Keamanan](doc/technical_specs.md) — Functional/Non-functional requirements, Threat model, dan Observability pipeline.
+
 ---
 
 ## Catatan Hardware / Embedded
