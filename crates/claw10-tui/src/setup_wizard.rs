@@ -592,10 +592,30 @@ impl SetupWizard {
 
     fn save_config(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let provider = self.current_provider();
-        let model = self.custom_model.as_str();
+        
+        let model = if self.custom_model.is_empty() {
+            match provider.slot {
+                "nvidia" => "meta/llama-3.3-70b-instruct",
+                "openai" => "gpt-4o",
+                "anthropic" => "claude-3-5-sonnet-latest",
+                "google-gemini" => "gemini-1.5-flash",
+                "deepseek" => "deepseek-chat",
+                "groq" => "llama-3.3-70b-versatile",
+                "ollama" => "llama3",
+                _ => "meta/llama-3.3-70b-instruct",
+            }
+        } else {
+            self.custom_model.as_str()
+        };
 
         let telegram_token = if self.setup_telegram { self.telegram_token.as_str() } else { "" };
         let telegram_chat_id = if self.setup_telegram { self.telegram_chat_id.as_str() } else { "" };
+
+        unsafe {
+            std::env::set_var("TELEGRAM_BOT_TOKEN", telegram_token);
+            std::env::set_var("TELEGRAM_CHAT_ID", telegram_chat_id);
+            std::env::set_var(provider.env_var, &self.api_key);
+        }
 
         crate::setup_service::save_config_to_disk(
             &self.config_path,

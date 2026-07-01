@@ -283,6 +283,8 @@ async fn main() {
             let tool_registry = Arc::new(tool_registry);
 
 
+            load_claw10_env();
+
             let state = claw10_control_api::AppState::new_with_services(
                 Arc::clone(&kv_store),
                 model_router,
