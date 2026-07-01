@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use std::collections::HashSet;
+use std::collections::HashMap;
 
 use crossterm::event::{read, Event, KeyCode, KeyEventKind};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen};
@@ -36,6 +36,12 @@ const PROVIDERS: &[ProviderOption] = &[
     ProviderOption { name: "Custom Provider", slot: "custom", env_var: "CUSTOM_API_KEY", base_url: "" },
 ];
 
+enum BindingEvent {
+    ChatDetected { username: String, chat_id: String },
+    CodeMatched { chat_id: String },
+    Error(String),
+}
+
 pub struct SetupWizard {
     step: Step,
     providers: Vec<ProviderOption>,
@@ -53,7 +59,11 @@ pub struct SetupWizard {
     fetch_failed: bool,
     setup_telegram: bool,
     telegram_token: String,
-    configured_env_vars: HashSet<String>,
+    telegram_chat_id: String,
+    binding_code: String,
+    binding_status: String,
+    binding_rx: Option<std::sync::mpsc::Receiver<BindingEvent>>,
+    configured_env_vars: HashMap<String, String>,
 }
 
 enum Step {
@@ -66,6 +76,7 @@ enum Step {
     ModelSelect,
     TelegramSetupPrompt,
     TelegramTokenInput,
+    TelegramBindingWait,
     Review,
     Complete,
 }
@@ -74,7 +85,7 @@ impl SetupWizard {
     pub fn new(config_path: PathBuf) -> Self {
         let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
         let env_path = std::path::PathBuf::from(&home).join(".claw10").join(".env");
-        let mut configured_env_vars = HashSet::new();
+        let mut configured_env_vars = HashMap::new();
         if let Ok(content) = std::fs::read_to_string(&env_path) {
             for line in content.lines() {
                 let parts: Vec<&str> = line.splitn(2, '=').collect();
@@ -82,7 +93,7 @@ impl SetupWizard {
                     let key = parts[0].trim();
                     let val = parts[1].trim();
                     if !val.is_empty() {
-                        configured_env_vars.insert(key.to_string());
+                        configured_env_vars.insert(key.to_string(), val.to_string());
                     }
                 }
             }
@@ -105,6 +116,10 @@ impl SetupWizard {
             fetch_failed: false,
             setup_telegram: false,
             telegram_token: String::new(),
+            telegram_chat_id: String::new(),
+            binding_code: String::new(),
+            binding_status: String::new(),
+            binding_rx: None,
             configured_env_vars,
         }
     }
@@ -141,21 +156,57 @@ impl SetupWizard {
                 continue;
             }
 
-            let event = read()?;
-            if let Event::Key(key) = event {
-                if key.kind == KeyEventKind::Press {
-                    match self.step {
-                        Step::Welcome => self.handle_welcome(key),
-                        Step::ProviderSelect => self.handle_provider_select(key),
-                        Step::ApiKeyInput => self.handle_api_key_input(key),
-                        Step::BaseUrlInput => self.handle_base_url_input(key),
-                        Step::ModelList => self.handle_model_list(key),
-                        Step::ModelSelect => self.handle_model_select(key),
-                        Step::TelegramSetupPrompt => self.handle_telegram_setup_prompt(key),
-                        Step::TelegramTokenInput => self.handle_telegram_token_input(key),
-                        Step::Review => self.handle_review(key),
-                        Step::Complete => return Ok(()),
-                        Step::ModelFetch => {}
+            // Check async binding events
+            if let Step::TelegramBindingWait = self.step {
+                if let Some(ref rx) = self.binding_rx {
+                    if let Ok(event) = rx.try_recv() {
+                        match event {
+                            BindingEvent::ChatDetected { username, chat_id } => {
+                                self.telegram_chat_id = chat_id;
+                                self.binding_status = format!(
+                                    "Ditemukan chat dari @{username}! Kirim kode verifikasi ke bot: {}",
+                                    self.binding_code
+                                );
+                            }
+                            BindingEvent::CodeMatched { chat_id } => {
+                                self.telegram_chat_id = chat_id;
+                                self.binding_status = "Koneksi bot Telegram sukses terverifikasi!".to_string();
+                                terminal.draw(|f| self.draw(f))?;
+                                std::thread::sleep(std::time::Duration::from_millis(1500));
+                                self.next_step();
+                            }
+                            BindingEvent::Error(err) => {
+                                self.error_msg = err;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Non-blocking keyboard event poll
+            if crossterm::event::poll(std::time::Duration::from_millis(100))? {
+                let event = read()?;
+                if let Event::Key(key) = event {
+                    if key.kind == KeyEventKind::Press {
+                        match self.step {
+                            Step::Welcome => self.handle_welcome(key),
+                            Step::ProviderSelect => self.handle_provider_select(key),
+                            Step::ApiKeyInput => self.handle_api_key_input(key),
+                            Step::BaseUrlInput => self.handle_base_url_input(key),
+                            Step::ModelList => self.handle_model_list(key),
+                            Step::ModelSelect => self.handle_model_select(key),
+                            Step::TelegramSetupPrompt => self.handle_telegram_setup_prompt(key),
+                            Step::TelegramTokenInput => self.handle_telegram_token_input(key),
+                            Step::TelegramBindingWait => {
+                                if key.code == KeyCode::Esc {
+                                    self.binding_rx = None;
+                                    self.prev_step();
+                                }
+                            }
+                            Step::Review => self.handle_review(key),
+                            Step::Complete => return Ok(()),
+                            Step::ModelFetch => {}
+                        }
                     }
                 }
             }
@@ -274,7 +325,11 @@ impl SetupWizard {
                     Step::Review
                 }
             }
-            Step::TelegramTokenInput => Step::Review,
+            Step::TelegramTokenInput => {
+                self.start_telegram_binding_poll();
+                Step::TelegramBindingWait
+            }
+            Step::TelegramBindingWait => Step::Review,
             Step::Review => Step::Complete,
             _ => Step::Complete,
         };
@@ -301,9 +356,10 @@ impl SetupWizard {
                 }
             }
             Step::TelegramTokenInput => Step::TelegramSetupPrompt,
+            Step::TelegramBindingWait => Step::TelegramTokenInput,
             Step::Review => {
                 if self.setup_telegram {
-                    Step::TelegramTokenInput
+                    Step::TelegramBindingWait
                 } else {
                     Step::TelegramSetupPrompt
                 }
@@ -367,7 +423,15 @@ impl SetupWizard {
                     self.selected = next;
                 }
             }
-            KeyCode::Enter => self.next_step(),
+            KeyCode::Enter => {
+                let provider = self.current_provider();
+                if let Some(val) = self.configured_env_vars.get(provider.env_var) {
+                    self.api_key = val.clone();
+                } else {
+                    self.api_key.clear();
+                }
+                self.next_step();
+            }
             KeyCode::Esc => self.prev_step(),
             KeyCode::Tab | KeyCode::Char('s') | KeyCode::Char('S') => {
                 self.step = Step::Review;
@@ -524,6 +588,78 @@ impl SetupWizard {
         }
     }
 
+    fn start_telegram_binding_poll(&mut self) {
+        let (tx, rx) = std::sync::mpsc::channel();
+        self.binding_rx = Some(rx);
+        self.binding_status = "Buka Telegram Anda, cari bot Anda, lalu kirim pesan /start...".to_string();
+
+        let token = self.telegram_token.clone();
+        // Generate pseudo-random 6-digit code menggunakan timestamp nanos
+        let now = chrono::Utc::now().timestamp_nanos_opt().unwrap_or(123456);
+        let code = format!("{:06}", (now % 1_000_000).abs());
+        self.binding_code = code.clone();
+
+        std::thread::spawn(move || {
+            let client = match reqwest::blocking::Client::builder()
+                .timeout(std::time::Duration::from_secs(4))
+                .build()
+            {
+                Ok(c) => c,
+                Err(e) => {
+                    let _ = tx.send(BindingEvent::Error(format!("Gagal inisialisasi HTTP client: {e}")));
+                    return;
+                }
+            };
+            let mut offset = 0i64;
+            let mut detected_chat_id: Option<String> = None;
+
+            loop {
+                let url = format!("https://api.telegram.org/bot{}/getUpdates?offset={}&timeout=3", token, offset);
+                match client.get(&url).send() {
+                    Ok(res) => {
+                        if let Ok(json) = res.json::<serde_json::Value>() {
+                            if let Some(ok) = json.get("ok").and_then(|v| v.as_bool()) {
+                                if ok {
+                                    if let Some(result) = json.get("result").and_then(|v| v.as_array()) {
+                                        for update in result {
+                                            if let Some(update_id) = update.get("update_id").and_then(|v| v.as_i64()) {
+                                                offset = update_id + 1;
+                                            }
+                                            if let Some(message) = update.get("message") {
+                                                if let Some(chat) = message.get("chat") {
+                                                    if let Some(chat_id) = chat.get("id").map(|v| v.to_string()) {
+                                                        let username = chat.get("username")
+                                                            .and_then(|v| v.as_str())
+                                                            .unwrap_or("User")
+                                                            .to_string();
+                                                        
+                                                        let text = message.get("text").and_then(|v| v.as_str()).unwrap_or("").trim();
+
+                                                        if detected_chat_id.is_none() {
+                                                            detected_chat_id = Some(chat_id.clone());
+                                                            let _ = tx.send(BindingEvent::ChatDetected { username, chat_id: chat_id.clone() });
+                                                        } else if Some(&chat_id) == detected_chat_id.as_ref() {
+                                                            if text == code {
+                                                                let _ = tx.send(BindingEvent::CodeMatched { chat_id });
+                                                                return; // Stop thread
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Err(_) => {}
+                }
+                std::thread::sleep(std::time::Duration::from_millis(500));
+            }
+        });
+    }
+
     fn handle_review(&mut self, key: crossterm::event::KeyEvent) {
         match key.code {
             KeyCode::Enter => {
@@ -588,6 +724,9 @@ impl SetupWizard {
         }
         if self.setup_telegram && !self.telegram_token.is_empty() {
             env_content.push_str(&format!("TELEGRAM_BOT_TOKEN={}\n", self.telegram_token));
+            if !self.telegram_chat_id.is_empty() {
+                env_content.push_str(&format!("TELEGRAM_CHAT_ID={}\n", self.telegram_chat_id));
+            }
         }
 
         if !env_content.is_empty() {
@@ -667,6 +806,7 @@ impl SetupWizard {
             Step::ModelSelect => self.draw_model_select(frame, inner),
             Step::TelegramSetupPrompt => self.draw_telegram_setup_prompt(frame, inner),
             Step::TelegramTokenInput => self.draw_telegram_token_input(frame, inner),
+            Step::TelegramBindingWait => self.draw_telegram_binding_wait(frame, inner),
             Step::Review => self.draw_review(frame, inner),
             Step::Complete => self.draw_complete(frame, inner),
         }
@@ -768,7 +908,7 @@ impl SetupWizard {
                 height: 1,
             };
 
-            let is_configured = self.configured_env_vars.contains(provider.env_var);
+            let is_configured = self.configured_env_vars.contains_key(provider.env_var);
             let text = if is_selected {
                 let mut spans = vec![
                     Span::styled("\u{25B6} ", Style::default().fg(Color::Rgb(254, 192, 126)).add_modifier(Modifier::BOLD)),
@@ -1242,6 +1382,87 @@ impl SetupWizard {
         }
     }
 
+    fn draw_telegram_binding_wait(&self, frame: &mut Frame, area: Rect) {
+        let vertical_layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(4),
+                Constraint::Min(0),
+            ])
+            .split(area);
+
+        let title_lines = vec![
+            Line::from(vec![
+                Span::styled("Telegram Bot Pairing / Binding", Style::default().fg(Color::Rgb(254, 192, 126)).add_modifier(Modifier::BOLD)),
+            ]),
+            Line::from(""),
+            Line::from(vec![
+                Span::styled("Langkah 1: Cari bot Anda di Telegram dan kirim pesan ", Style::default().fg(Color::Rgb(180, 180, 180))),
+                Span::styled("/start", Style::default().fg(Color::Rgb(218, 165, 32)).add_modifier(Modifier::BOLD)),
+            ]),
+        ];
+
+        let title = Paragraph::new(title_lines)
+            .alignment(ratatui::layout::Alignment::Center)
+            .style(Style::default().bg(Color::Rgb(15, 15, 15)));
+        frame.render_widget(title, vertical_layout[0]);
+
+        let card_width = 64u16;
+        let left_padding = area.width.saturating_sub(card_width) / 2;
+        let horizontal_chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Length(left_padding),
+                Constraint::Length(card_width),
+                Constraint::Min(0),
+            ])
+            .split(vertical_layout[1]);
+
+        let opt_area = horizontal_chunks[1];
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(4),
+                Constraint::Length(3),
+                Constraint::Min(0),
+            ])
+            .split(opt_area);
+
+        // Render status
+        let status_block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Rgb(100, 100, 100)))
+            .title(" Status Polling ")
+            .title_alignment(ratatui::layout::Alignment::Center);
+        let status_inner = status_block.inner(chunks[0]);
+        let status_para = Paragraph::new(Line::from(vec![
+            Span::styled(&self.binding_status, Style::default().fg(Color::Rgb(200, 200, 200))),
+        ]))
+        .alignment(ratatui::layout::Alignment::Center)
+        .style(Style::default().bg(Color::Rgb(20, 20, 20)));
+
+        frame.render_widget(status_block, chunks[0]);
+        frame.render_widget(status_para, status_inner);
+
+        // Jika chat sudah dideteksi, tunjukkan kode verifikasi 6 digit yang harus diketik user ke bot telegramnya
+        if !self.telegram_chat_id.is_empty() {
+            let code_block = Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Rgb(218, 165, 32)).add_modifier(Modifier::BOLD))
+                .title(" Kirim Kode ini ke Telegram Bot ")
+                .title_alignment(ratatui::layout::Alignment::Center);
+            let code_inner = code_block.inner(chunks[1]);
+            let code_para = Paragraph::new(Line::from(vec![
+                Span::styled(&self.binding_code, Style::default().fg(Color::Rgb(254, 192, 126)).add_modifier(Modifier::BOLD)),
+            ]))
+            .alignment(ratatui::layout::Alignment::Center)
+            .style(Style::default().bg(Color::Rgb(25, 25, 25)));
+
+            frame.render_widget(code_block, chunks[1]);
+            frame.render_widget(code_para, code_inner);
+        }
+    }
+
     fn draw_review(&self, frame: &mut Frame, area: Rect) {
         let provider = self.current_provider();
         let model = &self.custom_model;
@@ -1286,6 +1507,12 @@ impl SetupWizard {
                 Span::styled("  Tele Token:  ", Style::default().fg(Color::Rgb(150, 150, 150))),
                 Span::styled("********", Style::default().fg(Color::Rgb(200, 200, 200))),
             ]));
+            if !self.telegram_chat_id.is_empty() {
+                lines.push(Line::from(vec![
+                    Span::styled("  Chat ID:     ", Style::default().fg(Color::Rgb(150, 150, 150))),
+                    Span::styled(&self.telegram_chat_id, Style::default().fg(Color::Rgb(200, 200, 200))),
+                ]));
+            }
         }
         lines.push(Line::from(""));
         lines.push(Line::from(vec![
@@ -1416,6 +1643,10 @@ impl SetupWizard {
             ),
             Step::TelegramTokenInput => (
                 "Ketik Token Bot Telegram  |  Enter: lanjut  |  Esc: kembali",
+                Color::Rgb(150, 150, 150),
+            ),
+            Step::TelegramBindingWait => (
+                "Kirim /start ke bot lalu ketik kode verifikasi  |  Esc: kembali",
                 Color::Rgb(150, 150, 150),
             ),
             Step::Review => (

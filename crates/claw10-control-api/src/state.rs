@@ -127,12 +127,14 @@ fn auto_register_telegram_if_needed(kv_store: Arc<dyn Store>, gateway_service: A
                         }
                     }
                     if !exists {
+                        let chat_id = std::env::var("TELEGRAM_CHAT_ID").unwrap_or_default();
                         let config = serde_json::json!({
                             "bot_token": token,
+                            "chat_id": chat_id,
                             "agent_id": agent.id.0.to_string(),
                         });
                         let channel = gateway_clone.register_channel(claw10_domain::ChannelType::Telegram, config).await;
-                        tracing::info!("Auto-registered Telegram bot channel ID: {}", channel.id);
+                        tracing::info!("Auto-registered Telegram bot channel ID: {} with Chat ID: {}", channel.id, chat_id);
                     }
                 }
             }
