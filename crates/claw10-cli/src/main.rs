@@ -85,7 +85,7 @@ async fn main() {
     // When no subcommand is provided, start the API server in the background
     // and launch the TUI. This keeps the HTTP API and webhook endpoints
     // reachable while the user interacts with the terminal UI.
-    let command = cli.command.unwrap_or(Commands::Serve {
+    let mut command = cli.command.unwrap_or(Commands::Serve {
         bind: "0.0.0.0:3000".into(),
         db: None,
         tui: true,
@@ -163,6 +163,20 @@ async fn main() {
             eprintln!("Setup gagal: {e}");
             std::process::exit(1);
         }
+    }
+
+    // Jika user secara eksplisit memanggil `setup`, jalankan wizard lalu otomatis alihkan ke `serve` (auto run)
+    if let Commands::Setup { force } = command {
+        if let Err(e) = run_setup_wizard(force).await {
+            eprintln!("Setup gagal: {e}");
+            std::process::exit(1);
+        }
+        println!("\nSetup sukses! Menjalankan Claw10 server & TUI otomatis...");
+        command = Commands::Serve {
+            bind: "0.0.0.0:3000".into(),
+            db: None,
+            tui: true,
+        };
     }
 
     match command {
