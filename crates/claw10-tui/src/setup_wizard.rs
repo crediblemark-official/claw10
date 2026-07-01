@@ -50,6 +50,8 @@ pub struct SetupWizard {
     model_search: String,
     model_list_selected: usize,
     fetch_failed: bool,
+    setup_telegram: bool,
+    telegram_token: String,
 }
 
 enum Step {
@@ -60,6 +62,8 @@ enum Step {
     ModelFetch,
     ModelList,
     ModelSelect,
+    TelegramSetupPrompt,
+    TelegramTokenInput,
     Review,
     Complete,
 }
@@ -81,6 +85,8 @@ impl SetupWizard {
             model_search: String::new(),
             model_list_selected: 0,
             fetch_failed: false,
+            setup_telegram: false,
+            telegram_token: String::new(),
         }
     }
 
@@ -126,6 +132,8 @@ impl SetupWizard {
                         Step::BaseUrlInput => self.handle_base_url_input(key),
                         Step::ModelList => self.handle_model_list(key),
                         Step::ModelSelect => self.handle_model_select(key),
+                        Step::TelegramSetupPrompt => self.handle_telegram_setup_prompt(key),
+                        Step::TelegramTokenInput => self.handle_telegram_token_input(key),
                         Step::Review => self.handle_review(key),
                         Step::Complete => return Ok(()),
                         Step::ModelFetch => {}
@@ -239,7 +247,15 @@ impl SetupWizard {
                 if is_custom { Step::BaseUrlInput } else { Step::ModelFetch }
             }
             Step::BaseUrlInput => Step::ModelFetch,
-            Step::ModelSelect => Step::Review,
+            Step::ModelList | Step::ModelSelect => Step::TelegramSetupPrompt,
+            Step::TelegramSetupPrompt => {
+                if self.setup_telegram {
+                    Step::TelegramTokenInput
+                } else {
+                    Step::Review
+                }
+            }
+            Step::TelegramTokenInput => Step::Review,
             Step::Review => Step::Complete,
             _ => Step::Complete,
         };
@@ -258,11 +274,19 @@ impl SetupWizard {
             | Step::ModelSelect => {
                 if self.current_provider().slot == "custom" { Step::BaseUrlInput } else { Step::ApiKeyInput }
             }
-            Step::Review => {
+            Step::TelegramSetupPrompt => {
                 if !self.fetched_models.is_empty() {
                     Step::ModelList
                 } else {
                     Step::ModelSelect
+                }
+            }
+            Step::TelegramTokenInput => Step::TelegramSetupPrompt,
+            Step::Review => {
+                if self.setup_telegram {
+                    Step::TelegramTokenInput
+                } else {
+                    Step::TelegramSetupPrompt
                 }
             }
             Step::Complete => Step::Complete,
@@ -438,6 +462,46 @@ impl SetupWizard {
         }
     }
 
+    fn handle_telegram_setup_prompt(&mut self, key: crossterm::event::KeyEvent) {
+        match key.code {
+            KeyCode::Char('y') | KeyCode::Char('Y') => {
+                self.setup_telegram = true;
+                self.next_step();
+            }
+            KeyCode::Char('n') | KeyCode::Char('N') => {
+                self.setup_telegram = false;
+                self.next_step();
+            }
+            KeyCode::Enter => {
+                self.next_step();
+            }
+            KeyCode::Esc => self.prev_step(),
+            _ => {}
+        }
+    }
+
+    fn handle_telegram_token_input(&mut self, key: crossterm::event::KeyEvent) {
+        match key.code {
+            KeyCode::Enter => {
+                if self.telegram_token.is_empty() {
+                    self.error_msg = "Masukkan token bot Telegram atau tekan Esc.".to_string();
+                } else {
+                    self.next_step();
+                }
+            }
+            KeyCode::Esc => self.prev_step(),
+            KeyCode::Backspace => {
+                self.telegram_token.pop();
+                self.error_msg.clear();
+            }
+            KeyCode::Char(c) => {
+                self.telegram_token.push(c);
+                self.error_msg.clear();
+            }
+            _ => {}
+        }
+    }
+
     fn handle_review(&mut self, key: crossterm::event::KeyEvent) {
         match key.code {
             KeyCode::Enter => {
@@ -491,12 +555,21 @@ impl SetupWizard {
         }
         std::fs::write(&self.config_path, config)?;
 
-        // Save API key to .env
+        // Save API key and Telegram Bot Token to .env
+        let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+        let env_dir = std::path::PathBuf::from(&home).join(".claw10");
+        std::fs::create_dir_all(&env_dir)?;
+
+        let mut env_content = String::new();
         if !self.api_key.is_empty() {
-            let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
-            let env_dir = std::path::PathBuf::from(&home).join(".claw10");
-            std::fs::create_dir_all(&env_dir)?;
-            std::fs::write(env_dir.join(".env"), format!("{}={}\n", provider.env_var, self.api_key))?;
+            env_content.push_str(&format!("{}={}\n", provider.env_var, self.api_key));
+        }
+        if self.setup_telegram && !self.telegram_token.is_empty() {
+            env_content.push_str(&format!("TELEGRAM_BOT_TOKEN={}\n", self.telegram_token));
+        }
+
+        if !env_content.is_empty() {
+            std::fs::write(env_dir.join(".env"), env_content)?;
         }
 
         Ok(())
@@ -570,6 +643,8 @@ impl SetupWizard {
             Step::ModelFetch => self.draw_model_fetch(frame, inner),
             Step::ModelList => self.draw_model_list(frame, inner),
             Step::ModelSelect => self.draw_model_select(frame, inner),
+            Step::TelegramSetupPrompt => self.draw_telegram_setup_prompt(frame, inner),
+            Step::TelegramTokenInput => self.draw_telegram_token_input(frame, inner),
             Step::Review => self.draw_review(frame, inner),
             Step::Complete => self.draw_complete(frame, inner),
         }
@@ -1005,6 +1080,137 @@ impl SetupWizard {
         }
     }
 
+    fn draw_telegram_setup_prompt(&self, frame: &mut Frame, area: Rect) {
+        let vertical_layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(3), Constraint::Min(0)])
+            .split(area);
+
+        let title_lines = vec![
+            Line::from(vec![
+                Span::styled("Setup Telegram Bot", Style::default().fg(Color::Rgb(254, 192, 126)).add_modifier(Modifier::BOLD)),
+            ]),
+            Line::from(vec![
+                Span::styled("Apakah Anda ingin mengaktifkan Telegram Bot?", Style::default().fg(Color::Rgb(200, 200, 200))),
+            ]),
+        ];
+
+        let title = Paragraph::new(title_lines)
+            .alignment(ratatui::layout::Alignment::Center)
+            .style(Style::default().bg(Color::Rgb(15, 15, 15)));
+        frame.render_widget(title, vertical_layout[0]);
+
+        let card_width = 40u16;
+        let left_padding = area.width.saturating_sub(card_width) / 2;
+        let horizontal_chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Length(left_padding),
+                Constraint::Length(card_width),
+                Constraint::Min(0),
+            ])
+            .split(vertical_layout[1]);
+
+        let opt_area = horizontal_chunks[1];
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(3), Constraint::Min(0)])
+            .split(opt_area);
+
+        let prompt_block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Rgb(218, 165, 32)))
+            .title(" Setup Telegram? ")
+            .title_alignment(ratatui::layout::Alignment::Center);
+        let prompt_inner = prompt_block.inner(chunks[0]);
+
+        let display = if self.setup_telegram { " [Y] Ya  /  N  Tidak " } else { "  Y  Ya  / [N] Tidak " };
+        let prompt_para = Paragraph::new(Line::from(vec![
+            Span::styled(display, Style::default().fg(Color::Rgb(218, 165, 32))),
+        ]))
+        .alignment(ratatui::layout::Alignment::Center)
+        .style(Style::default().bg(Color::Rgb(25, 25, 25)));
+
+        frame.render_widget(ratatui::widgets::Clear, chunks[0]);
+        frame.render_widget(prompt_block, chunks[0]);
+        frame.render_widget(prompt_para, prompt_inner);
+    }
+
+    fn draw_telegram_token_input(&self, frame: &mut Frame, area: Rect) {
+        let vertical_layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(3), Constraint::Min(0)])
+            .split(area);
+
+        let title_lines = vec![
+            Line::from(vec![
+                Span::styled("Masukkan Token Bot Telegram", Style::default().fg(Color::Rgb(254, 192, 126)).add_modifier(Modifier::BOLD)),
+            ]),
+            Line::from(vec![
+                Span::styled("Dapatkan token dari @BotFather di Telegram", Style::default().fg(Color::Rgb(120, 120, 120))),
+            ]),
+        ];
+
+        let title = Paragraph::new(title_lines)
+            .alignment(ratatui::layout::Alignment::Center)
+            .style(Style::default().bg(Color::Rgb(15, 15, 15)));
+        frame.render_widget(title, vertical_layout[0]);
+
+        let card_width = 60u16;
+        let left_padding = area.width.saturating_sub(card_width) / 2;
+        let horizontal_chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Length(left_padding),
+                Constraint::Length(card_width),
+                Constraint::Min(0),
+            ])
+            .split(vertical_layout[1]);
+
+        let input_area = horizontal_chunks[1];
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(3), Constraint::Length(1), Constraint::Min(0)])
+            .split(input_area);
+
+        let input_block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Rgb(218, 165, 32)))
+            .title(" Token Bot Telegram ")
+            .title_alignment(ratatui::layout::Alignment::Center);
+        let input_inner = input_block.inner(chunks[0]);
+
+        let display = if self.telegram_token.is_empty() {
+            " misal: 123456789:ABC-DEF1234ghIkl..."
+        } else {
+            self.telegram_token.as_str()
+        };
+        let input_para = Paragraph::new(Line::from(vec![
+            Span::styled(display, Style::default().fg(if self.telegram_token.is_empty() { Color::Gray } else { Color::Rgb(218, 165, 32) })),
+        ]))
+        .alignment(ratatui::layout::Alignment::Center)
+        .style(Style::default().bg(Color::Rgb(25, 25, 25)));
+
+        frame.render_widget(ratatui::widgets::Clear, chunks[0]);
+        frame.render_widget(input_block, chunks[0]);
+        frame.render_widget(input_para, input_inner);
+
+        if !self.error_msg.is_empty() {
+            let err = Paragraph::new(Line::from(vec![
+                Span::styled(format!(" {}", self.error_msg), Style::default().fg(Color::Red)),
+            ]))
+            .alignment(ratatui::layout::Alignment::Center)
+            .style(Style::default().bg(Color::Rgb(15, 15, 15)));
+            frame.render_widget(err, chunks[1]);
+        }
+
+        if !self.telegram_token.is_empty() {
+            let text_len = self.telegram_token.len() as u16;
+            let cursor_x = input_inner.x + (input_inner.width.saturating_sub(text_len) / 2) + text_len;
+            frame.set_cursor_position((cursor_x.min(input_inner.x + input_inner.width.saturating_sub(1)), input_inner.y));
+        }
+    }
+
     fn draw_review(&self, frame: &mut Frame, area: Rect) {
         let provider = self.current_provider();
         let model = &self.custom_model;
@@ -1021,7 +1227,7 @@ impl SetupWizard {
         .style(Style::default().bg(Color::Rgb(15, 15, 15)));
         frame.render_widget(title, chunks[0]);
 
-        let lines = vec![
+        let mut lines = vec![
             Line::from(vec![
                 Span::styled("  Provider:    ", Style::default().fg(Color::Rgb(150, 150, 150))),
                 Span::styled(provider.name, Style::default().fg(Color::Rgb(254, 192, 126)).add_modifier(Modifier::BOLD)),
@@ -1040,14 +1246,26 @@ impl SetupWizard {
             ]),
             Line::from(""),
             Line::from(vec![
-                Span::styled("  File config: ", Style::default().fg(Color::Rgb(150, 150, 150))),
-                Span::styled(self.config_path.display().to_string(), Style::default().fg(Color::Rgb(120, 120, 120))),
-            ]),
-            Line::from(""),
-            Line::from(vec![
-                Span::styled("  Tekan Enter untuk menyimpan, Esc untuk kembali", Style::default().fg(Color::Rgb(100, 100, 100))),
+                Span::styled("  Telegram:    ", Style::default().fg(Color::Rgb(150, 150, 150))),
+                Span::styled(if self.setup_telegram { "Aktif" } else { "Non-aktif" }, Style::default().fg(if self.setup_telegram { Color::Green } else { Color::Red })),
             ]),
         ];
+        if self.setup_telegram && !self.telegram_token.is_empty() {
+            lines.push(Line::from(vec![
+                Span::styled("  Tele Token:  ", Style::default().fg(Color::Rgb(150, 150, 150))),
+                Span::styled("********", Style::default().fg(Color::Rgb(200, 200, 200))),
+            ]));
+        }
+        lines.push(Line::from(""));
+        lines.push(Line::from(vec![
+            Span::styled("  File config: ", Style::default().fg(Color::Rgb(150, 150, 150))),
+            Span::styled(self.config_path.display().to_string(), Style::default().fg(Color::Rgb(120, 120, 120))),
+        ]));
+        lines.push(Line::from(""));
+        lines.push(Line::from(vec![
+            Span::styled("  Tekan Enter untuk menyimpan, Esc untuk kembali", Style::default().fg(Color::Rgb(100, 100, 100))),
+        ]));
+
 
         let review_height = lines.len() as u16;
 
@@ -1159,6 +1377,14 @@ impl SetupWizard {
             ),
             Step::ModelSelect => (
                 "Ketik nama model  |  Enter: lanjut  |  Esc: kembali",
+                Color::Rgb(150, 150, 150),
+            ),
+            Step::TelegramSetupPrompt => (
+                "y: Ya  |  n: Tidak  |  Esc: kembali",
+                Color::Rgb(150, 150, 150),
+            ),
+            Step::TelegramTokenInput => (
+                "Ketik Token Bot Telegram  |  Enter: lanjut  |  Esc: kembali",
                 Color::Rgb(150, 150, 150),
             ),
             Step::Review => (

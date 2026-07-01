@@ -59,7 +59,7 @@ impl AppState {
         let event_bus: Arc<dyn EventBus> = create_event_bus();
         start_event_subscribers(Arc::clone(&event_bus));
 
-        Self {
+        let state = Self {
             scheduler_service: Arc::new(ScheduleService::new(Arc::clone(&kv_store))),
             worker_service: Arc::new(WorkerService::new(Arc::clone(&kv_store))),
             memory_service: Arc::new(MemoryService::new(Arc::clone(&kv_store))),
@@ -72,8 +72,11 @@ impl AppState {
             kv_store,
             model_router: None,
             tool_registry: None,
-        }
+        };
 
+        auto_register_telegram_if_needed(Arc::clone(&state.kv_store), Arc::clone(&state.gateway_service));
+
+        state
     }
 
     /// Create AppState dengan model router dan tool registry untuk agent execution.
@@ -94,6 +97,46 @@ impl AppState {
             Arc::clone(&state.worker_service),
         );
         state
+    }
+}
+
+/// Auto-register Telegram bot jika diset di env
+fn auto_register_telegram_if_needed(kv_store: Arc<dyn Store>, gateway_service: Arc<claw10_gateway::GatewayService>) {
+    if let Ok(token) = std::env::var("TELEGRAM_BOT_TOKEN") {
+        if token.trim().is_empty() {
+            return;
+        }
+        let store_clone = Arc::clone(&kv_store);
+        let gateway_clone = Arc::clone(&gateway_service);
+        tokio::spawn(async move {
+            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+            if let Ok(agents) = store_clone.scan_prefix::<claw10_domain::Agent>("agent:").await {
+                if let Some((_, agent)) = agents.first() {
+                    let mut exists = false;
+                    if let Ok(channels) = store_clone.scan_prefix::<claw10_domain::Channel>("gateway:channel:").await {
+                        for (_, ch) in channels {
+                            if ch.channel_type == claw10_domain::ChannelType::Telegram {
+                                if let Some(bot_token) = ch.config.get("bot_token").and_then(|v| v.as_str()) {
+                                    if bot_token == token {
+                                        exists = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if !exists {
+                        let config = serde_json::json!({
+                            "bot_token": token,
+                            "agent_id": agent.id.0.to_string(),
+                        });
+                        let channel = gateway_clone.register_channel(claw10_domain::ChannelType::Telegram, config).await;
+                        tracing::info!("Auto-registered Telegram bot channel ID: {}", channel.id);
+                    }
+                }
+            }
+        });
     }
 }
 
