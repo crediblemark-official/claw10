@@ -18,6 +18,12 @@ pub fn start_telegram_poller(state: AppState) {
         return;
     }
 
+    let chat_id = std::env::var("TELEGRAM_CHAT_ID").unwrap_or_default();
+    if chat_id.trim().is_empty() {
+        tracing::info!("[Telegram Poller] TELEGRAM_CHAT_ID belum dikonfigurasi. Poller backend dinonaktifkan.");
+        return;
+    }
+
     tokio::spawn(async move {
         // Beri jeda kecil agar state dan DB sudah siap
         tokio::time::sleep(tokio::time::Duration::from_millis(800)).await;
@@ -90,6 +96,11 @@ pub fn start_telegram_poller(state: AppState) {
         let mut offset = 0i64;
 
         loop {
+            if std::env::var("TELEGRAM_CHAT_ID").unwrap_or_default().trim().is_empty() {
+                tracing::info!("[Telegram Poller] TELEGRAM_CHAT_ID dikosongkan. Menghentikan loop poller.");
+                break;
+            }
+
             let url = format!(
                 "https://api.telegram.org/bot{token}/getUpdates?offset={offset}&timeout=20"
             );
