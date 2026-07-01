@@ -210,8 +210,8 @@ async fn main() {
     // Jalankan auto-update asinkron di background saat startup
     let cmd_clone = command.clone();
     tokio::spawn(async move {
-        // Jangan jalankan auto-update jika user memanggil subcommand uninstall/setup/version/check
-        if !matches!(cmd_clone, Commands::Uninstall { .. } | Commands::Setup { .. } | Commands::Version | Commands::Update | Commands::Check) {
+        // Jangan jalankan auto-update jika setup wizard aktif, jika di mode TUI, atau jika memanggil command pengecualian
+        if !needs_setup && !is_tui && !matches!(cmd_clone, Commands::Uninstall { .. } | Commands::Setup { .. } | Commands::Version | Commands::Update | Commands::Check) {
             let _ = update::check_and_perform_update(true).await;
         }
     });

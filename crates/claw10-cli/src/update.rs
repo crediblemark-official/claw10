@@ -44,14 +44,19 @@ pub async fn check_and_perform_update(is_auto: bool) -> Result<(), Box<dyn std::
     let local_version = env!("CARGO_PKG_VERSION");
 
     if is_newer(&remote_version, local_version) {
-        println!("\n📢 Mendeteksi versi baru Claw10 OS: v{} (Versi lokal Anda: v{})", remote_version, local_version);
-        println!("Menjalankan pembaruan otomatis...");
+        if !is_auto {
+            println!("\n📢 Mendeteksi versi baru Claw10 OS: v{} (Versi lokal Anda: v{})", remote_version, local_version);
+            println!("Menjalankan pembaruan otomatis...");
+        }
 
         let install_script_url = "https://raw.githubusercontent.com/crediblemark-official/claw10/master/install.sh";
         let script_res = client.get(install_script_url).header("User-Agent", "claw10-cli").send().await?;
         
         if !script_res.status().is_success() {
-            return Err(format!("Gagal mengunduh installer script: {}", script_res.status()).into());
+            if !is_auto {
+                return Err(format!("Gagal mengunduh installer script: {}", script_res.status()).into());
+            }
+            return Ok(());
         }
 
         let script_content = script_res.text().await?;
@@ -65,17 +70,29 @@ pub async fn check_and_perform_update(is_auto: bool) -> Result<(), Box<dyn std::
             std::fs::set_permissions(&tmp_script_path, std::fs::Permissions::from_mode(0o755))?;
         }
 
-        println!("Menjalankan skrip instalasi untuk memperbarui biner...");
-        let status = std::process::Command::new("sh")
-            .arg(tmp_script_path.to_str().unwrap())
-            .status();
+        if !is_auto {
+            println!("Menjalankan skrip instalasi untuk memperbarui biner...");
+        }
+
+        let mut cmd = std::process::Command::new("sh");
+        cmd.arg(tmp_script_path.to_str().unwrap());
+        if is_auto {
+            cmd.stdout(std::process::Stdio::null())
+               .stderr(std::process::Stdio::null());
+        }
+
+        let status = cmd.status();
 
         match status {
             Ok(s) if s.success() => {
-                println!("✓ Claw10 OS berhasil diperbarui ke v{}!", remote_version);
+                if !is_auto {
+                    println!("✓ Claw10 OS berhasil diperbarui ke v{}!", remote_version);
+                }
             }
             _ => {
-                eprintln!("✗ Gagal menjalankan pembaruan otomatis.");
+                if !is_auto {
+                    eprintln!("✗ Gagal menjalankan pembaruan otomatis.");
+                }
             }
         }
     } else if !is_auto {
