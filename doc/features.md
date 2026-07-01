@@ -194,7 +194,7 @@ Persistent Agent dapat berlangganan:
 Internal canonical formats:
 
 * Rust structs;
-* PostgreSQL rows;
+* Sled database key-value entries;
 * JSON;
 * Protobuf.
 

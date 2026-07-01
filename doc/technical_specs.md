@@ -371,8 +371,8 @@ expected_value_of_child >
 * lineage;
 * legacy trace;
 * checkpoint and hibernation;
-* PostgreSQL;
-* NATS JetStream;
+* Embedded Sled KV database;
+* In-Memory Event Bus (with optional NATS JetStream feature flag);
 * basic memory;
 * candidate skills;
 * TOON and JSON context;
@@ -412,7 +412,7 @@ expected_value_of_child >
 * organization;
 * mission;
 * task;
-* PostgreSQL;
+* Sled KV Database;
 * audit;
 * CLI.
 
@@ -569,9 +569,9 @@ claw10/
 | TUI              | Ratatui                                    |
 | Terminal input   | Crossterm                                  |
 | CLI              | Clap                                       |
-| Database         | PostgreSQL                                 |
-| Query            | SQLx                                       |
-| Event bus        | NATS JetStream                             |
+| Database         | Sled KV database (embedded)                |
+| Storage Abstr.   | InMemory / Sled namespace                  |
+| Event bus        | In-Memory (with optional NATS)             |
 | Memory vectors   | pgvector, lalu Qdrant                      |
 | Artifact storage | Local, lalu S3-compatible                  |
 | Secrets          | Encrypted local vault, lalu external Vault |

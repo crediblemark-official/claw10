@@ -196,8 +196,8 @@ flowchart TB
     end
 
     subgraph DATA["Data Plane"]
-        PG[(PostgreSQL)]
-        BUS[(NATS JetStream)]
+        SLED[(Sled KV Store)]
+        BUS[(In-Memory Event Bus)]
         VECTORDB[(Vector Memory)]
         OBJECT[(Artifact Storage)]
         VAULT[(Secret Vault)]
