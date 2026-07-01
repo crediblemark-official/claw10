@@ -790,7 +790,7 @@ Alasan:
 2. Serialisasi via bincode — serde binary, minimal overhead
 3. Single file persistent — tidak perlu server terpisah
 4. Performa tinggi — concurrent B-tree, lock-free
-5. Paling hemat token dibanding SQLite/PostgreSQL
+5. Paling hemat token dibanding format SQL tradisional
 
 Implementasi:
 - `claw10-store` crate: Store trait + SledStore + InMemoryStore (testing)

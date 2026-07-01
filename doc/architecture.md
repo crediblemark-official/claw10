@@ -163,7 +163,7 @@ Untuk deployment lokal dan efisiensi resource, seluruh status entitas disimpan m
 *   Menyediakan abstraksi store yang terisolasi berdasarkan namespace.
 
 > [!NOTE]
-> Pada arsitektur skala besar (multi-tenant), Sled dapat digantikan atau disinkronkan dengan **PostgreSQL** untuk menyimpan metadata relasional yang kompleks.
+> Pada arsitektur skala besar (multi-tenant), Sled dapat digantikan atau disinkronkan dengan database relasional terpusat untuk menyimpan metadata relasional yang kompleks.
 
 ## 37.2 Event Bus & Message Queue
 
