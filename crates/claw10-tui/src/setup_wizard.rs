@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::collections::HashSet;
 
 use crossterm::event::{read, Event, KeyCode, KeyEventKind};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen};
@@ -52,6 +53,7 @@ pub struct SetupWizard {
     fetch_failed: bool,
     setup_telegram: bool,
     telegram_token: String,
+    configured_env_vars: HashSet<String>,
 }
 
 enum Step {
@@ -70,6 +72,22 @@ enum Step {
 
 impl SetupWizard {
     pub fn new(config_path: PathBuf) -> Self {
+        let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+        let env_path = std::path::PathBuf::from(&home).join(".claw10").join(".env");
+        let mut configured_env_vars = HashSet::new();
+        if let Ok(content) = std::fs::read_to_string(&env_path) {
+            for line in content.lines() {
+                let parts: Vec<&str> = line.splitn(2, '=').collect();
+                if parts.len() == 2 {
+                    let key = parts[0].trim();
+                    let val = parts[1].trim();
+                    if !val.is_empty() {
+                        configured_env_vars.insert(key.to_string());
+                    }
+                }
+            }
+        }
+
         Self {
             step: Step::Welcome,
             providers: PROVIDERS.to_vec(),
@@ -87,6 +105,7 @@ impl SetupWizard {
             fetch_failed: false,
             setup_telegram: false,
             telegram_token: String::new(),
+            configured_env_vars,
         }
     }
 
@@ -350,6 +369,9 @@ impl SetupWizard {
             }
             KeyCode::Enter => self.next_step(),
             KeyCode::Esc => self.prev_step(),
+            KeyCode::Tab | KeyCode::Char('s') | KeyCode::Char('S') => {
+                self.step = Step::Review;
+            }
             _ => {}
         }
     }
@@ -746,15 +768,24 @@ impl SetupWizard {
                 height: 1,
             };
 
+            let is_configured = self.configured_env_vars.contains(provider.env_var);
             let text = if is_selected {
-                Line::from(vec![
+                let mut spans = vec![
                     Span::styled("\u{25B6} ", Style::default().fg(Color::Rgb(254, 192, 126)).add_modifier(Modifier::BOLD)),
                     Span::styled(provider.name, Style::default().fg(Color::Rgb(254, 192, 126)).add_modifier(Modifier::BOLD)),
-                ])
+                ];
+                if is_configured {
+                    spans.push(Span::styled(" [config]", Style::default().fg(Color::Rgb(46, 139, 87)).add_modifier(Modifier::BOLD)));
+                }
+                Line::from(spans)
             } else {
-                Line::from(vec![
+                let mut spans = vec![
                     Span::styled(provider.name, Style::default().fg(Color::Rgb(160, 160, 160))),
-                ])
+                ];
+                if is_configured {
+                    spans.push(Span::styled(" [config]", Style::default().fg(Color::Rgb(46, 139, 87))));
+                }
+                Line::from(spans)
             };
 
             let para = Paragraph::new(text)
@@ -1356,7 +1387,7 @@ impl SetupWizard {
                 Color::Rgb(150, 150, 150),
             ),
             Step::ProviderSelect => (
-                "j/k/\u{2191}/\u{2193}: pilih  |  Enter: lanjut  |  Esc: kembali",
+                "j/k/h/l: pilih  |  Enter: lanjut  |  s/Tab: skip ke review  |  Esc: kembali",
                 Color::Rgb(150, 150, 150),
             ),
             Step::ApiKeyInput => (
