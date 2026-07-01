@@ -93,9 +93,9 @@ async fn main() {
     let is_tui = match &command {
         Commands::Tui { .. } => true,
         Commands::Serve { tui, .. } => *tui,
+        Commands::Setup { .. } => true,
         Commands::RunAgent { .. } => false,
         Commands::Version => false,
-        Commands::Setup { .. } => false,
     };
 
     // Load local environment variables from ~/.claw10/.env so that API keys

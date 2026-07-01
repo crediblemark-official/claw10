@@ -53,7 +53,7 @@ pub fn start_telegram_poller(state: AppState) {
                         .unwrap_or(false)
             });
 
-        let (channel_id, channel) = match telegram_channel {
+        let (_channel_id, channel) = match telegram_channel {
             Some(pair) => pair,
             None => {
                 tracing::info!("[Telegram Poller] Tidak ditemukan channel Telegram aktif untuk token ini.");
@@ -179,7 +179,7 @@ pub fn start_telegram_poller(state: AppState) {
 
                 // Teruskan ke agen dan balas ke Telegram
                 let state_clone = state.clone();
-                let channel_id_clone = channel_id.clone();
+                let channel_id_clone = channel.id.clone();
                 let agent_uuid_clone = agent_uuid;
                 let text_clone = text.clone();
                 let from_chat_id_clone = from_chat_id.clone();
