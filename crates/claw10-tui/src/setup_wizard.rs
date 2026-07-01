@@ -623,6 +623,11 @@ impl SetupWizard {
                     return;
                 }
             };
+
+            // Hapus webhook aktif agar API getUpdates bisa berfungsi dengan benar
+            let del_url = format!("https://api.telegram.org/bot{}/deleteWebhook", token);
+            let _ = client.get(&del_url).send();
+
             let mut offset = 0i64;
             let mut detected_chat_id: Option<String> = None;
 
@@ -662,6 +667,10 @@ impl SetupWizard {
                                             }
                                         }
                                     }
+                                } else {
+                                    let desc = json.get("description").and_then(|v| v.as_str()).unwrap_or("Unknown error");
+                                    let _ = tx.send(BindingEvent::Error(format!("Telegram API Error: {desc}")));
+                                    return;
                                 }
                             }
                         }
