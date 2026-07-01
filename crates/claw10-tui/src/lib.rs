@@ -1,4 +1,5 @@
 mod app;
+pub mod setup_service;
 pub(crate) mod setup_wizard;
 pub(crate) mod spawn_tool;
 pub(crate) mod tui_agent;

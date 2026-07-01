@@ -10,13 +10,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph, List, ListItem};
 use ratatui::Frame;
 
-#[derive(Clone)]
-struct ProviderOption {
-    name: &'static str,
-    slot: &'static str,
-    env_var: &'static str,
-    base_url: &'static str,
-}
+use crate::setup_service::{ProviderOption, BindingEvent};
 
 const PROVIDERS: &[ProviderOption] = &[
     ProviderOption { name: "OpenAI", slot: "openai", env_var: "OPENAI_API_KEY", base_url: "https://api.openai.com/v1" },
@@ -35,12 +29,6 @@ const PROVIDERS: &[ProviderOption] = &[
     ProviderOption { name: "OpenRouter", slot: "openrouter", env_var: "OPENROUTER_API_KEY", base_url: "https://openrouter.ai/api/v1" },
     ProviderOption { name: "Custom Provider", slot: "custom", env_var: "CUSTOM_API_KEY", base_url: "" },
 ];
-
-enum BindingEvent {
-    ChatDetected { username: String, chat_id: String },
-    CodeMatched { chat_id: String },
-    Error(String),
-}
 
 pub struct SetupWizard {
     step: Step,
@@ -241,45 +229,15 @@ impl SetupWizard {
             return;
         }
 
-        // Jalankan fetch di thread OS terpisah untuk menghindari error drop tokio runtime
         let handle = std::thread::spawn(move || {
-            let client = reqwest::blocking::Client::new();
-            let url = format!("{}/models", base_url.trim_end_matches('/'));
-            client
-                .get(&url)
-                .header("Authorization", format!("Bearer {}", api_key))
-                .header("Content-Type", "application/json")
-                .timeout(std::time::Duration::from_secs(10))
-                .send()
-                .map_err(|e| e.to_string())
-                .and_then(|resp| {
-                    if !resp.status().is_success() {
-                        return Err(format!("HTTP {}", resp.status().as_u16()));
-                    }
-                    resp.json::<serde_json::Value>()
-                        .map_err(|e| e.to_string())
-                })
+            crate::setup_service::fetch_provider_models(&base_url, &api_key)
         });
 
         match handle.join() {
-            Ok(Ok(body)) => {
-                let models = body["data"]
-                    .as_array()
-                    .map(|arr| {
-                        arr.iter()
-                            .filter_map(|v| v["id"].as_str().map(String::from))
-                            .collect::<Vec<_>>()
-                    })
-                    .unwrap_or_default();
-
-                if models.is_empty() {
-                    self.error_msg = "Tidak ada model dari API.".to_string();
-                    self.fallback_to_static();
-                } else {
-                    self.fetched_models = models;
-                    self.model_search.clear();
-                    self.model_list_selected = 0;
-                }
+            Ok(Ok(models)) => {
+                self.fetched_models = models;
+                self.model_search.clear();
+                self.model_list_selected = 0;
             }
             Ok(Err(e)) => {
                 self.error_msg = format!("Gagal fetch API: {e}.");
@@ -612,74 +570,7 @@ impl SetupWizard {
         let code = format!("{:06}", (now % 1_000_000).abs());
         self.binding_code = code.clone();
 
-        std::thread::spawn(move || {
-            let client = match reqwest::blocking::Client::builder()
-                .timeout(std::time::Duration::from_secs(4))
-                .build()
-            {
-                Ok(c) => c,
-                Err(e) => {
-                    let _ = tx.send(BindingEvent::Error(format!("Gagal inisialisasi HTTP client: {e}")));
-                    return;
-                }
-            };
-
-            // Hapus webhook aktif agar API getUpdates bisa berfungsi dengan benar
-            let del_url = format!("https://api.telegram.org/bot{}/deleteWebhook", token);
-            let _ = client.get(&del_url).send();
-
-            let mut offset = 0i64;
-            let mut detected_chat_id: Option<String> = None;
-
-            loop {
-                let url = format!("https://api.telegram.org/bot{}/getUpdates?offset={}&timeout=3", token, offset);
-                match client.get(&url).send() {
-                    Ok(res) => {
-                        if let Ok(json) = res.json::<serde_json::Value>() {
-                            if let Some(ok) = json.get("ok").and_then(|v| v.as_bool()) {
-                                if ok {
-                                    if let Some(result) = json.get("result").and_then(|v| v.as_array()) {
-                                        for update in result {
-                                            if let Some(update_id) = update.get("update_id").and_then(|v| v.as_i64()) {
-                                                offset = update_id + 1;
-                                            }
-                                            if let Some(message) = update.get("message") {
-                                                if let Some(chat) = message.get("chat") {
-                                                    if let Some(chat_id) = chat.get("id").map(|v| v.to_string()) {
-                                                        let username = chat.get("username")
-                                                            .and_then(|v| v.as_str())
-                                                            .unwrap_or("User")
-                                                            .to_string();
-                                                        
-                                                        let text = message.get("text").and_then(|v| v.as_str()).unwrap_or("").trim().to_string();
-
-                                                        if text == code || text.contains(&code) {
-                                                            let _ = tx.send(BindingEvent::CodeMatched { chat_id });
-                                                            return; // Stop thread
-                                                        }
-
-                                                        if detected_chat_id.is_none() {
-                                                            detected_chat_id = Some(chat_id.clone());
-                                                            let _ = tx.send(BindingEvent::ChatDetected { username, chat_id: chat_id.clone() });
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                } else {
-                                    let desc = json.get("description").and_then(|v| v.as_str()).unwrap_or("Unknown error");
-                                    let _ = tx.send(BindingEvent::Error(format!("Telegram API Error: {desc}")));
-                                    return;
-                                }
-                            }
-                        }
-                    }
-                    Err(_) => {}
-                }
-                std::thread::sleep(std::time::Duration::from_millis(500));
-            }
-        });
+        crate::setup_service::spawn_telegram_polling_thread(token, code, tx);
     }
 
     fn handle_review(&mut self, key: crossterm::event::KeyEvent) {
@@ -696,66 +587,22 @@ impl SetupWizard {
         }
     }
 
-    fn save_config(&self) -> Result<(), Box<dyn std::error::Error>> {
+    fn save_config(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let provider = self.current_provider();
         let model = self.custom_model.as_str();
 
-        let config = if provider.slot == "custom" {
-            format!(
-                "# Claw10 OS configuration\n\
-                 # Generated by `claw10 setup`\n\n\
-                 [custom.my-provider]\n\
-                 base_url = \"{url}\"\n\
-                 api_key = \"${env_var}\"\n\
-                 models = [\"{model}\"]\n\n\
-                 [alias.default]\n\
-                 slot = \"my-provider\"\n\
-                 model = \"{model}\"\n\
-                 api_key = \"${env_var}\"\n",
-                url = self.custom_url,
-                env_var = provider.env_var,
-                model = model,
-            )
-        } else {
-            format!(
-                "# Claw10 OS configuration\n\
-                 # Generated by `claw10 setup`\n\n\
-                 [alias.default]\n\
-                 slot = \"{slot}\"\n\
-                 model = \"{model}\"\n\
-                 api_key = \"${env_var}\"\n",
-                slot = provider.slot,
-                model = model,
-                env_var = provider.env_var,
-            )
-        };
+        let telegram_token = if self.setup_telegram { self.telegram_token.as_str() } else { "" };
+        let telegram_chat_id = if self.setup_telegram { self.telegram_chat_id.as_str() } else { "" };
 
-        if let Some(parent) = self.config_path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-        std::fs::write(&self.config_path, config)?;
-
-        // Save API key and Telegram Bot Token to .env
-        let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
-        let env_dir = std::path::PathBuf::from(&home).join(".claw10");
-        std::fs::create_dir_all(&env_dir)?;
-
-        let mut env_content = String::new();
-        if !self.api_key.is_empty() {
-            env_content.push_str(&format!("{}={}\n", provider.env_var, self.api_key));
-        }
-        if self.setup_telegram && !self.telegram_token.is_empty() {
-            env_content.push_str(&format!("TELEGRAM_BOT_TOKEN={}\n", self.telegram_token));
-            if !self.telegram_chat_id.is_empty() {
-                env_content.push_str(&format!("TELEGRAM_CHAT_ID={}\n", self.telegram_chat_id));
-            }
-        }
-
-        if !env_content.is_empty() {
-            std::fs::write(env_dir.join(".env"), env_content)?;
-        }
-
-        Ok(())
+        crate::setup_service::save_config_to_disk(
+            &self.config_path,
+            provider,
+            model,
+            &self.custom_url,
+            &self.api_key,
+            telegram_token,
+            telegram_chat_id,
+        )
     }
 
     fn draw(&self, frame: &mut Frame) {
