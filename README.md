@@ -4,8 +4,8 @@
 
 Claw10 OS adalah sistem operasi untuk kawanan agen AI yang dapat merekrut agen baru secara rekursif, memiliki siklus hidup persisten maupun ephemeral, serta dikontrol melalui API HTTP, TUI (Terminal User Interface), dan CLI.
 
-![Claw10 Workspace Selector](assets/tui_workspace.png)
-![Claw10 TUI Chat Interface](assets/tui_chat.png)
+![Claw10 Workspace Selector](doc/tui_workspace.png)
+![Claw10 TUI Chat Interface](doc/tui_chat.png)
 
 **Status:** Core runtime, TUI, API, model router, dan control-plane sudah berfungsi. Proyek ini dioptimalkan untuk **single-user, local-first** deployment.
 
