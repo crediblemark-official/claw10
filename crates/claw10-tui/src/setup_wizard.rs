@@ -593,16 +593,18 @@ impl SetupWizard {
     fn save_config(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let provider = self.current_provider();
         
+        let model_string;
         let model = if self.custom_model.is_empty() {
-            match provider.slot {
-                "nvidia" => "meta/llama-3.3-70b-instruct",
-                "openai" => "gpt-4o",
-                "anthropic" => "claude-3-5-sonnet-latest",
-                "google-gemini" => "gemini-1.5-flash",
-                "deepseek" => "deepseek-chat",
-                "groq" => "llama-3.3-70b-versatile",
-                "ollama" => "llama3",
-                _ => "meta/llama-3.3-70b-instruct",
+            if let Some(m) = self.fetched_models.first() {
+                m.as_str()
+            } else {
+                let static_list = self.load_static_models();
+                if let Some(first_static) = static_list.first() {
+                    model_string = claw10_model_router::models::resolve_static_model(first_static, provider.slot);
+                    &model_string
+                } else {
+                    ""
+                }
             }
         } else {
             self.custom_model.as_str()

@@ -1,4 +1,5 @@
 pub const MODELS: &[&str] = &[
+    "llama-3.3-70b-instruct",
     "minimax-m3",
     "diffusiongemma-26b-a4b-it",
     "nemotron-3-ultra-550b-a55b",
@@ -58,7 +59,6 @@ pub const MODELS: &[&str] = &[
     "nv-embedcode-7b-v1",
     "phi-4-mini-instruct",
     "phi-4-multimodal-instruct",
-    "llama-3.3-70b-instruct",
     "studio-voice",
     "llama-3.2-3b-instruct",
     "llama-3.2-11b-vision-instruct",
