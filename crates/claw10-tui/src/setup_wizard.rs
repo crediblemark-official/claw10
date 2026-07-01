@@ -99,6 +99,10 @@ impl SetupWizard {
             }
         }
 
+        let telegram_token = configured_env_vars.get("TELEGRAM_BOT_TOKEN").cloned().unwrap_or_default();
+        let telegram_chat_id = configured_env_vars.get("TELEGRAM_CHAT_ID").cloned().unwrap_or_default();
+        let setup_telegram = !telegram_token.is_empty();
+
         Self {
             step: Step::Welcome,
             providers: PROVIDERS.to_vec(),
@@ -114,9 +118,9 @@ impl SetupWizard {
             model_search: String::new(),
             model_list_selected: 0,
             fetch_failed: false,
-            setup_telegram: false,
-            telegram_token: String::new(),
-            telegram_chat_id: String::new(),
+            setup_telegram,
+            telegram_token,
+            telegram_chat_id,
             binding_code: String::new(),
             binding_status: String::new(),
             binding_rx: None,
@@ -201,6 +205,8 @@ impl SetupWizard {
                                 if key.code == KeyCode::Esc {
                                     self.binding_rx = None;
                                     self.prev_step();
+                                } else if key.code == KeyCode::Enter && !self.telegram_chat_id.is_empty() {
+                                    self.next_step();
                                 }
                             }
                             Step::Review => self.handle_review(key),
@@ -591,7 +597,14 @@ impl SetupWizard {
     fn start_telegram_binding_poll(&mut self) {
         let (tx, rx) = std::sync::mpsc::channel();
         self.binding_rx = Some(rx);
-        self.binding_status = "Buka Telegram Anda, cari bot Anda, lalu kirim pesan /start...".to_string();
+        if !self.telegram_chat_id.is_empty() {
+            self.binding_status = format!(
+                "Sudah terhubung (Chat ID: {}). Tekan Enter untuk lanjut, atau kirim /start untuk pairing ulang.",
+                self.telegram_chat_id
+            );
+        } else {
+            self.binding_status = "Buka Telegram Anda, cari bot Anda, lalu kirim pesan /start...".to_string();
+        }
 
         let token = self.telegram_token.clone();
         // Generate pseudo-random 6-digit code menggunakan timestamp nanos
@@ -1646,7 +1659,11 @@ impl SetupWizard {
                 Color::Rgb(150, 150, 150),
             ),
             Step::TelegramBindingWait => (
-                "Kirim /start ke bot lalu ketik kode verifikasi  |  Esc: kembali",
+                if self.telegram_chat_id.is_empty() {
+                    "Kirim /start ke bot lalu ketik kode verifikasi  |  Esc: kembali"
+                } else {
+                    "Kirim /start untuk pairing baru  |  Enter: lanjut  |  Esc: kembali"
+                },
                 Color::Rgb(150, 150, 150),
             ),
             Step::Review => (
