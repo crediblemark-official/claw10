@@ -340,7 +340,7 @@ impl SetupWizard {
 
     fn load_static_models(&self) -> Vec<String> {
         let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
-        let cache_file = std::path::PathBuf::from(&home).join(".claw10").join("models_cache.json");
+        let cache_file = std::path::PathBuf::from(&home).join(".claw10").join("models.json");
         let slot = self.current_provider().slot;
 
         if cache_file.exists() {
@@ -358,24 +358,7 @@ impl SetupWizard {
             }
         }
 
-        use claw10_model_router::models;
-        match slot {
-            "openai" => models::openai::MODELS.iter().map(|s| s.to_string()).collect(),
-            "anthropic" => models::anthropic::MODELS.iter().map(|s| s.to_string()).collect(),
-            "groq" => models::groq::MODELS.iter().map(|s| s.to_string()).collect(),
-            "openrouter" => models::openrouter::MODELS.iter().map(|s| s.to_string()).collect(),
-            "nvidia" => models::nvidia::MODELS.iter().map(|s| s.to_string()).collect(),
-            "deepseek" => models::deepseek::MODELS.iter().map(|s| s.to_string()).collect(),
-            "gemini" | "google-gemini" => models::gemini::MODELS.iter().map(|s| s.to_string()).collect(),
-            "mistral" => models::mistral::MODELS.iter().map(|s| s.to_string()).collect(),
-            "together" => models::together::MODELS.iter().map(|s| s.to_string()).collect(),
-            "fireworks" => models::fireworks::MODELS.iter().map(|s| s.to_string()).collect(),
-            "perplexity" => models::perplexity::MODELS.iter().map(|s| s.to_string()).collect(),
-            "xai" => models::xai::MODELS.iter().map(|s| s.to_string()).collect(),
-            "cohere" => models::cohere::MODELS.iter().map(|s| s.to_string()).collect(),
-            "ollama" => models::ollama::MODELS.iter().map(|s| s.to_string()).collect(),
-            _ => Vec::new(),
-        }
+        Vec::new()
     }
 
     fn handle_welcome(&mut self, key: crossterm::event::KeyEvent) {
@@ -630,7 +613,7 @@ impl SetupWizard {
             } else {
                 let static_list = self.load_static_models();
                 if let Some(first_static) = static_list.first() {
-                    model_string = claw10_model_router::models::resolve_static_model(first_static, provider.slot);
+                    model_string = first_static.clone();
                     &model_string
                 } else {
                     ""

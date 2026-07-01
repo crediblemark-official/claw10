@@ -7,8 +7,6 @@ pub mod provider;
 pub mod providers;
 pub mod router;
 pub mod types;
-#[path = "../models/mod.rs"]
-pub mod models;
 
 pub use error::*;
 pub use openai_compat::*;

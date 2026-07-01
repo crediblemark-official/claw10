@@ -109,17 +109,8 @@ impl TuiApp {
             if let Ok(provider) = router.registry().get_provider(&provider_name) {
                 match provider.fetch_models().await {
                     Ok(mut models) => {
-                        // Muat priority models dari berkas JSON
-                        let priority_names = {
-                            let path = format!("models/{}.json", provider_name.to_lowercase());
-                            if let Ok(content) = std::fs::read_to_string(&path) {
-                                serde_json::from_str::<Vec<String>>(&content).unwrap_or_default()
-                            } else {
-                                Vec::new()
-                            }
-                        };
+                        let priority_names = load_cached_models(&provider_name);
 
-                        // Gabungkan model statis dari JSON jika belum ada di list hasil fetch
                         for name in priority_names {
                             let name_lower = name.to_lowercase();
                             let exists = models.iter().any(|m| {
@@ -127,9 +118,8 @@ impl TuiApp {
                                     || name_lower.contains(&m.id.to_lowercase())
                             });
                             if !exists {
-                                let id = claw10_model_router::models::resolve_static_model(&name, &provider_name);
                                 models.push(claw10_model_router::types::ModelProfile {
-                                    id,
+                                    id: name.clone(),
                                     provider: provider_name.clone(),
                                     model_name: name,
                                     context_window: 128_000,
@@ -148,24 +138,9 @@ impl TuiApp {
                         self.model_sel_step = ModelSelectionStep::SelectFamily;
                     }
                     Err(_) => {
-                        // Fallback: gunakan profile yang sudah diregistrasi untuk provider ini
-                        let mut profiles: Vec<_> = router
-                            .registry()
-                            .list_profiles()
-                            .into_iter()
-                            .filter(|p| p.provider == provider_name)
-                            .collect();
-                        
-                        // Juga muat dari JSON jika fallback
-                        let priority_names = {
-                            let path = format!("models/{}.json", provider_name.to_lowercase());
-                            if let Ok(content) = std::fs::read_to_string(&path) {
-                                serde_json::from_str::<Vec<String>>(&content).unwrap_or_default()
-                            } else {
-                                Vec::new()
-                            }
-                        };
+                        let priority_names = load_cached_models(&provider_name);
 
+                        let mut profiles: Vec<claw10_model_router::types::ModelProfile> = Vec::new();
                         for name in priority_names {
                             let name_lower = name.to_lowercase();
                             let exists = profiles.iter().any(|p| {
@@ -173,9 +148,8 @@ impl TuiApp {
                                     || name_lower.contains(&p.id.to_lowercase())
                             });
                             if !exists {
-                                let id = claw10_model_router::models::resolve_static_model(&name, &provider_name);
                                 profiles.push(claw10_model_router::types::ModelProfile {
-                                    id,
+                                    id: name.clone(),
                                     provider: provider_name.clone(),
                                     model_name: name,
                                     context_window: 128_000,
@@ -447,4 +421,23 @@ impl TuiApp {
         }
         self.register_all_providers().await;
     }
+}
+
+fn load_cached_models(provider_name: &str) -> Vec<String> {
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+    let cache_file = std::path::PathBuf::from(&home).join(".claw10").join("models.json");
+    let clean_provider = provider_name.split('.').next().unwrap_or(provider_name).to_lowercase();
+
+    if cache_file.exists() {
+        if let Ok(content) = std::fs::read_to_string(&cache_file) {
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
+                if let Some(arr) = json.get(&clean_provider).and_then(|v| v.as_array()) {
+                    return arr.iter()
+                        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                        .collect();
+                }
+            }
+        }
+    }
+    Vec::new()
 }

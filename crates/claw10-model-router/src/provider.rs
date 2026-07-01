@@ -55,43 +55,40 @@ impl ModelRegistry {
     pub fn new() -> Self {
         let mut profiles = Vec::new();
         
-        // Load model nvidia statis secara compile-time
-        for &name in crate::models::nvidia::MODELS {
-            let id = crate::models::resolve_static_model(name, "nvidia");
-            profiles.push(ModelProfile {
-                id,
-                provider: "nvidia".to_string(),
-                model_name: name.to_string(),
-                context_window: 128_000,
-                max_output_tokens: 8_192,
-                cost_per_1m_input: 0.0,
-                cost_per_1m_output: 0.0,
-                suitable_for: vec!["general".to_string()],
-            });
+        let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+        let cache_file = std::path::PathBuf::from(&home).join(".claw10").join("models.json");
+        
+        if cache_file.exists() {
+            if let Ok(content) = std::fs::read_to_string(&cache_file) {
+                if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
+                    if let Some(obj) = json.as_object() {
+                        for (provider_name, models_arr) in obj {
+                            if let Some(arr) = models_arr.as_array() {
+                                for val in arr {
+                                    if let Some(model_id) = val.as_str() {
+                                        profiles.push(ModelProfile {
+                                            id: model_id.to_string(),
+                                            provider: provider_name.clone(),
+                                            model_name: model_id.to_string(),
+                                            context_window: 128_000,
+                                            max_output_tokens: 8_192,
+                                            cost_per_1m_input: 0.0,
+                                            cost_per_1m_output: 0.0,
+                                            suitable_for: vec!["general".to_string()],
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
         
-        // Load model openrouter statis secara compile-time
-        for &name in crate::models::openrouter::MODELS {
-            let id = crate::models::resolve_static_model(name, "openrouter");
-            profiles.push(ModelProfile {
-                id,
-                provider: "openrouter".to_string(),
-                model_name: name.to_string(),
-                context_window: 128_000,
-                max_output_tokens: 8_192,
-                cost_per_1m_input: 0.0,
-                cost_per_1m_output: 0.0,
-                suitable_for: vec!["general".to_string()],
-            });
-        }
-
-        #[allow(unused_mut)]
-        let mut registry = Self {
+        Self {
             providers: HashMap::new(),
             profiles: RwLock::new(profiles),
-        };
-
-        registry
+        }
     }
 
     pub fn register(&mut self, provider: Box<dyn ModelProvider>) {

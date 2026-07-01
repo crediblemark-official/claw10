@@ -639,15 +639,7 @@ impl TuiApp {
             }
         }
 
-        // 2. Jika tidak ada, panggil compile-time static resolver
-        let resolved = claw10_model_router::models::resolve_static_model(name, "nvidia");
-        if resolved.starts_with("nvidia/") {
-            let openrouter_resolved = claw10_model_router::models::resolve_static_model(name, "openrouter");
-            if !openrouter_resolved.starts_with("openrouter/") {
-                return openrouter_resolved;
-            }
-        }
-        resolved
+        name.to_string()
     }
 
     pub(crate) fn set_active_model(&mut self, model_id: String) {
