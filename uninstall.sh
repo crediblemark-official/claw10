@@ -21,7 +21,12 @@ echo ""
 # Non-interactive mode: set CLAW10_UNINSTALL_FORCE=1 to skip confirmation
 if [ -z "$CLAW10_UNINSTALL_FORCE" ]; then
     printf "Are you sure you want to uninstall Claw10? [y/N] "
-    read -r response
+    # Jika stdin bukan tty (misalnya di-pipe dari curl), baca dari /dev/tty
+    if [ -t 0 ]; then
+        read -r response
+    else
+        read -r response < /dev/tty 2>/dev/null || response="n"
+    fi
     case "$response" in
         [yY][eE][sS]|[yY]) ;;
         *) echo "Uninstall cancelled."; exit 0 ;;
