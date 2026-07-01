@@ -347,8 +347,9 @@ async fn run_agent_and_reply(
     );
 
     let (session, _events) = runtime
-        .execute_agent(&agent_id, objective, HashMap::new(), None)
+        .execute_agent(&agent_id, objective, HashMap::new(), None, None)
         .await
+
         .map_err(|e| match &e {
             AgentError::AgentNotFound(_) => ApiError::NotFound(format!("agent {}", agent_id.0)),
             AgentError::BudgetExhausted => ApiError::Validation("budget exhausted".into()),

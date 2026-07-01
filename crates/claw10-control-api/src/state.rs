@@ -259,8 +259,9 @@ pub fn start_background_scheduler(
                             let objective =
                                 format!("Scheduled {action}: review state and take action");
                             match runtime
-                                .execute_agent(&agent_id, objective, Default::default(), None)
+                                .execute_agent(&agent_id, objective, Default::default(), None, None)
                                 .await
+
                             {
                                 Ok((session, _)) => {
                                     tracing::info!(

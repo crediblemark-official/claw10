@@ -411,7 +411,9 @@ impl TuiApp {
                                                         ctx,
                                                         None,
                                                         agent_tx.clone(),
+                                                        None,
                                                     ).await {
+
                                                         Ok(_) => {}
                                                         Err(e) => {
                                                             let _ = agent_tx.send(AgentEvent::Error {

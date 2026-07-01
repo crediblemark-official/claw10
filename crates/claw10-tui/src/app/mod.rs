@@ -908,8 +908,9 @@ impl TuiApp {
                             tokio::spawn(async move {
                                 let ctx = std::collections::HashMap::new();
                                 if let Err(e) = runtime_clone
-                                    .execute_agent_streaming(&child_id, objective, ctx, None, agent_tx.clone())
+                                    .execute_agent_streaming(&child_id, objective, ctx, None, agent_tx.clone(), None)
                                     .await
+
                                 {
                                     let _ = agent_tx.send(AgentEvent::Error {
                                         message: format!("Child Agent error: {e}"),

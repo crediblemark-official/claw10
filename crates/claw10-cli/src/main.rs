@@ -527,7 +527,8 @@ async fn main() {
             let mut context = std::collections::HashMap::new();
             context.insert("mission_statement".to_string(), "CLI SWARM EXECUTION".to_string());
 
-            match runtime.execute_agent(&agent_id, objective, context, None).await {
+            match runtime.execute_agent(&agent_id, objective, context, None, None).await {
+
                 Ok((session, events)) => {
                     println!("\n--- Eksekusi Selesai ---");
                     for event in events {

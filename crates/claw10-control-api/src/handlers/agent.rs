@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use claw10_agent::{AgentRuntime, AgentStore, error::AgentError};
-use claw10_domain::{Agent, AgentState, WorkerId};
+use claw10_domain::{Agent, AgentState, TaskId, WorkerId};
 use claw10_event::Claw10Event;
 use claw10_event::events::TerminationReason;
 use claw10_lifecycle::LifecycleService;
@@ -80,6 +80,7 @@ pub struct ExecuteRequest {
     pub objective: String,
     pub context: Option<HashMap<String, String>>,
     pub worker_id: Option<String>,
+    pub task_id: Option<String>,
 }
 
 /// Response from execute_agent.
@@ -180,6 +181,15 @@ pub async fn execute_agent(
         })
         .transpose()?;
 
+    let task_id_override = body
+        .task_id
+        .map(|t| {
+            t.parse::<Uuid>()
+                .map(TaskId)
+                .map_err(|e| ApiError::Validation(format!("invalid task_id: {e}")))
+        })
+        .transpose()?;
+
     let runtime = AgentRuntime::new(
         agent_store,
         model_router,
@@ -196,6 +206,7 @@ pub async fn execute_agent(
             body.objective,
             body.context.unwrap_or_default(),
             None,
+            task_id_override,
         )
         .await
         .map_err(|e| match &e {
@@ -203,6 +214,7 @@ pub async fn execute_agent(
             AgentError::BudgetExhausted => ApiError::Validation("budget exhausted".into()),
             _ => ApiError::Internal(e.to_string()),
         })?;
+
 
     let _ = state.telemetry.record("agent.executed", "success", |e| {
         e.with_agent_id(id.to_string())

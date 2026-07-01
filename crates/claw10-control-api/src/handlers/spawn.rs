@@ -310,7 +310,7 @@ pub async fn approve_spawn(
             );
 
             match runtime
-                .execute_agent(&child_id, objective.clone(), Default::default(), None)
+                .execute_agent(&child_id, objective.clone(), Default::default(), None, None)
                 .await
             {
                 Ok((session, _)) => {

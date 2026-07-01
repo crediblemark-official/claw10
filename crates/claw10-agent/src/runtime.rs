@@ -24,8 +24,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use claw10_domain::{
-    Agent, AgentId, AgentState, MemoryType, RuntimeLease, TaskId, WorkerId,
+    Agent, AgentId, AgentState, MemoryType, RuntimeLease, Task, TaskId, TaskState, WorkerId,
 };
+
 use claw10_context::{ContextPipeline, ContextSources, PipelineConfig};
 use claw10_lifecycle::LifecycleService;
 use claw10_memory::{MemoryService, StoreMemoryInput};
@@ -111,6 +112,7 @@ impl AgentRuntime {
         objective: String,
         context: HashMap<String, String>,
         worker_override: Option<WorkerId>,
+        task_id_override: Option<TaskId>,
     ) -> Result<(AgentSession, Vec<AgentEvent>), AgentError> {
         let mut agent = self.agent_store.get_or_not_found(agent_id).await?;
 
@@ -137,11 +139,19 @@ impl AgentRuntime {
             tracing::warn!("Gagal membuat workspace_dir {workspace_dir}: {e}");
         }
 
+        // Tentukan task_id sesungguhnya
+        let task_id = task_id_override.clone().unwrap_or_else(|| TaskId(uuid::Uuid::now_v7()));
+
+        // Update task state ke Running di database jika di-pass
+        if let Some(ref tid) = task_id_override {
+            self.update_task_state(tid, TaskState::Running).await;
+        }
+
         // ── Build ToolContext ────────────────────────────────────
         let tool_context = ToolContext {
             tenant_id: "default".to_string(),
             mission_id: agent.mission_id.clone(),
-            task_id: TaskId(uuid::Uuid::now_v7()),
+            task_id,
             agent_id: agent.id.clone(),
             worker_id: worker_id.clone(),
             idempotency_key: uuid::Uuid::now_v7().to_string(),
@@ -161,17 +171,34 @@ impl AgentRuntime {
         }
 
         // ── Execute ──────────────────────────────────────────────
-        let (session, events) = self
+        let (session, events) = match self
             .executor
             .execute(&mut agent, &objective, context, tool_context, max_turns)
-            .await?;
+            .await
+        {
+            Ok(res) => res,
+            Err(e) => {
+                if let Some(ref tid) = task_id_override {
+                    self.update_task_state(tid, TaskState::Failed).await;
+                }
+                return Err(e);
+            }
+        };
 
         // ── Persist updated agent ────────────────────────────────
         if session.state == SessionState::Completed {
             agent.state = AgentState::Active;
             // Simpan semua Thought events sebagai memori
             self.write_session_memory(&agent, &objective, &events).await;
+
+            // Update status task ke Completed/Accepted di database
+            if let Some(ref tid) = task_id_override {
+                self.update_task_state(tid, TaskState::Accepted).await;
+            }
+        } else if let Some(ref tid) = task_id_override {
+            self.update_task_state(tid, TaskState::Failed).await;
         }
+
         agent.turn_count = session.turn_count as u64;
         agent.total_cost_usd = session.total_cost_usd;
         agent.updated_at = chrono::Utc::now();
@@ -187,6 +214,7 @@ impl AgentRuntime {
         Ok((session, events))
     }
 
+
     /// Versi streaming dari `execute_agent` — AgentEvent langsung dikirim ke `event_tx`
     /// sehingga TUI dapat menampilkan progres real-time (thinking, tool call, done).
     ///
@@ -200,6 +228,7 @@ impl AgentRuntime {
         context: HashMap<String, String>,
         worker_override: Option<WorkerId>,
         event_tx: crate::executor::EventSender,
+        task_id_override: Option<TaskId>,
     ) -> Result<AgentSession, AgentError> {
         let mut agent = self.agent_store.get_or_not_found(agent_id).await?;
 
@@ -218,18 +247,32 @@ impl AgentRuntime {
             self.agent_store.save(&agent).await?;
         }
 
+        // ── Siapkan workspace_dir untuk agent ────────────────────
+        let workspace_dir = format!("/tmp/claw10/{}", agent.id.0);
+        if let Err(e) = std::fs::create_dir_all(&workspace_dir) {
+            tracing::warn!("Gagal membuat workspace_dir {workspace_dir}: {e}");
+        }
+
+        // Tentukan task_id sesungguhnya
+        let task_id = task_id_override.clone().unwrap_or_else(|| TaskId(uuid::Uuid::now_v7()));
+
+        // Update task state ke Running di database jika di-pass
+        if let Some(ref tid) = task_id_override {
+            self.update_task_state(tid, TaskState::Running).await;
+        }
+
         // ── Build ToolContext ────────────────────────────────────
         let tool_context = ToolContext {
             tenant_id: "default".to_string(),
             mission_id: agent.mission_id.clone(),
-            task_id: TaskId(uuid::Uuid::now_v7()),
+            task_id,
             agent_id: agent.id.clone(),
             worker_id: worker_id.clone(),
             idempotency_key: uuid::Uuid::now_v7().to_string(),
             risk_level: "medium".to_string(),
             approval_id: None,
             budget_remaining: agent.budget.remaining(),
-            workspace_dir: format!("/tmp/claw10/{}", agent.id.0),
+            workspace_dir: workspace_dir.clone(),
         };
 
         // ── Compute max turns from genome ────────────────────────
@@ -242,22 +285,45 @@ impl AgentRuntime {
         }
 
         // ── Execute streaming ────────────────────────────────────
-        let session = self
+        let session = match self
             .executor
             .execute_streaming(&mut agent, &objective, context, tool_context, max_turns, event_tx)
-            .await?;
+            .await
+        {
+            Ok(res) => res,
+            Err(e) => {
+                if let Some(ref tid) = task_id_override {
+                    self.update_task_state(tid, TaskState::Failed).await;
+                }
+                return Err(e);
+            }
+        };
 
         // ── Persist updated agent ────────────────────────────────
         if session.state == SessionState::Completed {
             agent.state = AgentState::Active;
+
+            // Update status task ke Completed/Accepted di database
+            if let Some(ref tid) = task_id_override {
+                self.update_task_state(tid, TaskState::Accepted).await;
+            }
+        } else if let Some(ref tid) = task_id_override {
+            self.update_task_state(tid, TaskState::Failed).await;
         }
         agent.turn_count = session.turn_count as u64;
         agent.total_cost_usd = session.total_cost_usd;
         agent.updated_at = chrono::Utc::now();
         self.agent_store.save(&agent).await?;
 
+        // ── Cleanup workspace setelah agent selesai ──────────────
+        if let Err(e) = std::fs::remove_dir_all(&workspace_dir) {
+            // Jangan gagalkan eksekusi karena cleanup error
+            tracing::debug!("Cleanup workspace {workspace_dir} gagal (mungkin sudah kosong): {e}");
+        }
+
         Ok(session)
     }
+
 
     /// Hibernate an agent: creates checkpoint, releases lease, persists.
     ///
@@ -502,7 +568,22 @@ impl AgentRuntime {
         }
         Ok(())
     }
+
+
+    /// Memperbarui status task di database.
+    async fn update_task_state(&self, task_id: &TaskId, state: TaskState) {
+        let store = self.agent_store.store();
+        let key = format!("task:{}", task_id.0);
+        if let Ok(Some(mut task)) = store.get::<Task>(&key).await {
+            task.state = state;
+            task.updated_at = chrono::Utc::now();
+            if let Err(e) = store.set(&key, &task).await {
+                tracing::warn!("Gagal memperbarui status task {}: {e}", task_id.0);
+            }
+        }
+    }
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -642,8 +723,10 @@ mod tests {
                 "do something".into(),
                 HashMap::new(),
                 None,
+                None,
             )
             .await;
+
 
         assert!(result.is_err(), "expected error for hibernating agent");
         let err = result.unwrap_err();
@@ -664,8 +747,9 @@ mod tests {
         store.save(&agent).await.unwrap();
 
         let result = runtime
-            .execute_agent(&agent.id, "do something".into(), HashMap::new(), None)
+            .execute_agent(&agent.id, "do something".into(), HashMap::new(), None, None)
             .await;
+
 
         assert!(result.is_err(), "expected error for terminated agent");
     }
@@ -694,8 +778,9 @@ mod tests {
         let agent = sample_agent();
         // Agent is not saved, so it will fail with NotFound
         let result = runtime
-            .execute_agent(&agent.id, "test".into(), HashMap::new(), None)
+            .execute_agent(&agent.id, "test".into(), HashMap::new(), None, None)
             .await;
+
 
         assert!(result.is_err(), "expected NotFound error");
     }
@@ -954,16 +1039,17 @@ mod tests {
         agent.genome.model_policy.fallback_profiles = vec!["gpt-4o-mini".into()];
         store.save(&agent).await.unwrap();
 
-        // Execute
         let (session, events) = runtime
             .execute_agent(
                 &agent.id,
                 "complete the task".into(),
                 HashMap::new(),
                 default_worker_id,
+                None,
             )
             .await
             .expect("runtime.execute_agent should succeed with mock provider");
+
 
         // Verify session state
         assert!(
@@ -1042,9 +1128,10 @@ mod tests {
         context.insert("user_id".into(), "user-123".into());
 
         let (session, events) = runtime
-            .execute_agent(&agent.id, "test with context".into(), context, None)
+            .execute_agent(&agent.id, "test with context".into(), context, None, None)
             .await
             .expect("execute_agent with context should succeed");
+
 
         assert!(session.turn_count > 0, "should have completed at least 1 turn");
 

@@ -159,7 +159,8 @@ async fn test_real_llm_api_call() {
     let mut context = std::collections::HashMap::new();
     context.insert("mission_statement".to_string(), "TEST REAL API".to_string());
 
-    let (session, events) = runtime.execute_agent(&agent.id, objective.to_string(), context, None).await.unwrap();
+    let (session, events) = runtime.execute_agent(&agent.id, objective.to_string(), context, None, None).await.unwrap();
+
     assert_eq!(session.state, claw10_agent::session::SessionState::Completed);
     assert!(session.turn_count >= 1);
     assert!(!events.is_empty());
