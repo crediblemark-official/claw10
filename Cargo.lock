@@ -503,6 +503,7 @@ dependencies = [
  "claw10-tool",
  "claw10-worker",
  "nats",
+ "reqwest",
  "serde",
  "serde_json",
  "thiserror 2.0.18",

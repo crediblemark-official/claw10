@@ -96,6 +96,8 @@ impl AppState {
             Some(tool_registry),
             Arc::clone(&state.worker_service),
         );
+        // Mulai background polling getUpdates Telegram jika token dikonfigurasi
+        crate::telegram_poller::start_telegram_poller(state.clone());
         state
     }
 }

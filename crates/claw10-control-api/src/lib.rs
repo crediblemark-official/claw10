@@ -6,6 +6,7 @@ pub mod middleware;
 pub mod router;
 pub mod state;
 pub mod store;
+pub mod telegram_poller;
 
 
 pub use error::*;
