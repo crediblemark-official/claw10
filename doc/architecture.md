@@ -154,61 +154,36 @@ Vector harus menghapus:
 
 # 37. Data Architecture
 
-## 37.1 PostgreSQL
+Claw10 OS dirancang dengan pendekatan **local-first dan single-user**. Berikut adalah arsitektur penyimpanan data yang diimplementasikan saat ini serta rencana pengembangan skala besarnya:
 
-Menyimpan:
+## 37.1 Embedded Sled KV Store (Implementasi Saat Ini)
 
-* tenant;
-* organization;
-* identity;
-* agent;
-* lineage;
-* mission;
-* task;
-* lease;
-* spawn request;
-* approval;
-* policy;
-* budget;
-* memory metadata;
-* skill metadata;
-* artifact metadata;
-* legacy metadata.
+Untuk deployment lokal dan efisiensi resource, seluruh status entitas disimpan menggunakan **Sled** (embedded key-value database engine untuk Rust):
+*   Menyimpan data `agent`, `mission`, `task`, `lineage`, `policy`, `budget`, `memory`, `skill`, `artifact`, dan metadata runtime secara lokal di bawah folder `~/.claw10/db/`.
+*   Menyediakan abstraksi store yang terisolasi berdasarkan namespace.
 
-## 37.2 NATS JetStream
+> [!NOTE]
+> Pada arsitektur skala besar (multi-tenant), Sled dapat digantikan atau disinkronkan dengan **PostgreSQL** untuk menyimpan metadata relasional yang kompleks.
 
-Digunakan untuk:
+## 37.2 Event Bus & Message Queue
 
-* task dispatch;
-* commands;
-* state events;
-* heartbeat;
-* wake events;
-* child completion;
-* approval result.
+*   **In-Memory Event Bus (InternalBus):** Digunakan secara default untuk komunikasi antar-tim agen dan memproses tugas di latar belakang (single-node).
+*   **NATS JetStream (Opsional):** Dapat diaktifkan melalui feature-flag `nats` untuk skenario clustering, task dispatch terdistribusi, pengiriman perintah jarak jauh, dan failover antar-worker.
 
-## 37.3 Vector Database
+## 37.3 Vector Database (Semantic Memory)
 
-Digunakan untuk semantic memory retrieval.
+Digunakan untuk semantic memory retrieval secara lokal guna memperkaya konteks agen.
 
-## 37.4 Object Storage
+## 37.4 Object & File Storage
 
-Digunakan untuk:
+*   Menggunakan sistem berkas lokal (file system) di folder `~/.claw10/` dan folder temporary `/tmp/claw10/` untuk menyimpan:
+    *   File workspace agen.
+    *   Artifact hasil eksekusi tugas.
+    *   Jejak legacy agen yang dihentikan (terminated agent archive).
 
-* artifact;
-* screenshot;
-* reports;
-* dataset;
-* test output;
-* legacy bundles.
+## 37.5 Secret Management
 
-## 37.5 Secret Vault
-
-Menyimpan credential dan secret leases.
-
-## 37.6 Append-Only Audit
-
-Menyimpan critical audit events.
+Menyimpan API Key, Token Bot Telegram, dan kredensial sensitif lainnya di dalam file environment lokal `~/.claw10/.env` yang dimuat secara otomatis oleh CLI saat startup.
 
 ---
 
