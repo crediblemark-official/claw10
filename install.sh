@@ -95,23 +95,30 @@ if [ "$CARGO_BUILD" = "1" ]; then
 fi
 
 # Add to PATH if not already present
-if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
-    SHELL_NAME=$(basename "$SHELL")
-    case "$SHELL_NAME" in
-        bash)   RC_FILE="$HOME/.bashrc";;
-        zsh)    RC_FILE="$HOME/.zshrc";;
-        fish)   RC_FILE="$HOME/.config/fish/config.fish";;
-        *)      RC_FILE="";;
-    esac
+case ":$PATH:" in
+    *":$INSTALL_DIR:"*) ;;
+    *)
+        SHELL_NAME=$(basename "$SHELL")
+        case "$SHELL_NAME" in
+            bash)   RC_FILE="$HOME/.bashrc";;
+            zsh)    RC_FILE="$HOME/.zshrc";;
+            fish)   RC_FILE="$HOME/.config/fish/config.fish";;
+            *)      RC_FILE="";;
+        esac
 
-    if [ -n "$RC_FILE" ]; then
-        mkdir -p "$(dirname "$RC_FILE")"
-        echo "export PATH=\"$INSTALL_DIR:\$PATH\"" >> "$RC_FILE"
-        echo "Added $INSTALL_DIR to PATH in $RC_FILE"
-    else
-        echo "Please add $INSTALL_DIR to your PATH manually."
-    fi
-fi
+        if [ -n "$RC_FILE" ]; then
+            mkdir -p "$(dirname "$RC_FILE")"
+            if [ "$SHELL_NAME" = "fish" ]; then
+                echo "set -gx PATH \$PATH $INSTALL_DIR" >> "$RC_FILE"
+            else
+                echo "export PATH=\"$INSTALL_DIR:\$PATH\"" >> "$RC_FILE"
+            fi
+            echo "Added $INSTALL_DIR to PATH in $RC_FILE"
+        else
+            echo "Please add $INSTALL_DIR to your PATH manually."
+        fi
+        ;;
+esac
 
 echo ""
 echo "Claw10 OS installed to: $INSTALL_DIR/$BINARY"

@@ -30,6 +30,7 @@ fn load_claw10_env() {
 #[derive(Parser)]
 #[command(
     name = "claw10",
+    version = env!("CARGO_PKG_VERSION"),
     about = "Claw10 OS - Recursive Agent Swarm Operating System"
 )]
 struct Cli {

@@ -19,7 +19,7 @@ echo ""
 INSTALL_DIR="${CLAW10_INSTALL_DIR:-$HOME/.local/bin}"
 BINARY="$INSTALL_DIR/claw10"
 if [ -f "$BINARY" ]; then
-    CURRENT_VERSION=$($BINARY --version 2>/dev/null || echo "unknown")
+    CURRENT_VERSION=$($BINARY --version 2>/dev/null || $BINARY version 2>/dev/null || echo "unknown")
     echo "Current version: $CURRENT_VERSION"
 else
     echo "Claw10 is not currently installed."
@@ -43,7 +43,7 @@ fi
 
 echo ""
 if [ -f "$BINARY" ]; then
-    NEW_VERSION=$($BINARY --version 2>/dev/null || echo "unknown")
+    NEW_VERSION=$($BINARY --version 2>/dev/null || $BINARY version 2>/dev/null || echo "unknown")
     echo "Updated to: $NEW_VERSION"
 fi
 echo "Your config and data in ~/.claw10 have been preserved."
