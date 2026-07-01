@@ -149,10 +149,18 @@ impl ModelRegistry {
     }
 
     pub fn get_provider(&self, name: &str) -> Result<&dyn ModelProvider, ModelError> {
-        self.providers
-            .get(name)
-            .map(Box::as_ref)
-            .ok_or_else(|| ModelError::ProviderNotFound(name.to_string()))
+        if let Some(provider) = self.providers.get(name) {
+            return Ok(provider.as_ref());
+        }
+
+        let prefix = format!("{}.", name);
+        for (k, v) in &self.providers {
+            if k.starts_with(&prefix) {
+                return Ok(v.as_ref());
+            }
+        }
+
+        Err(ModelError::ProviderNotFound(name.to_string()))
     }
 
     /// Cari profile berdasarkan model_id. Mengembalikan clone agar thread-safe.
