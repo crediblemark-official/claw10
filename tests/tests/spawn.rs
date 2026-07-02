@@ -330,7 +330,7 @@ async fn test_descendant_teardown() {
         all
     };
 
-    let mut credentials: Vec<Credential> = all_agents.iter().map(|a| make_credential(a)).collect();
+    let mut credentials: Vec<Credential> = all_agents.iter().map(make_credential).collect();
 
     let tasks = vec![];
 

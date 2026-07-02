@@ -46,7 +46,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
 
     let input_lines: Vec<String> = raw_input_lines
         .into_iter()
-        .map(|line| format!("  {}", line))
+        .map(|line| format!("  {line}"))
         .collect();
 
     // Hitung tinggi tambahan untuk slash command suggestions
@@ -75,10 +75,8 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                 }
             }
             suggestion_height = height;
-        } else {
-            if !app.active_suggestions.is_empty() {
-                suggestion_height = 2 + app.active_suggestions.len() + 1; // Header + suggestions + footer + spacer
-            }
+        } else if !app.active_suggestions.is_empty() {
+            suggestion_height = 2 + app.active_suggestions.len() + 1; // Header + suggestions + footer + spacer
         }
     }
 
@@ -241,7 +239,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                 lines.push(Line::from(vec![
                     Span::raw("  "),
                     Span::styled("🔧 ", Style::default().fg(Color::LightBlue)),
-                    Span::styled(format!("Tool: {model} (F3/Ctrl+G to collapse)", model = model), Style::default().fg(Color::Gray).add_modifier(Modifier::ITALIC)),
+                    Span::styled(format!("Tool: {model} (F3/Ctrl+G to collapse)"), Style::default().fg(Color::Gray).add_modifier(Modifier::ITALIC)),
                 ]));
                 lines.push(Line::from(""));
  
@@ -261,7 +259,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                 lines.push(Line::from(vec![
                     Span::raw("  "),
                     Span::styled("🔧 ", Style::default().fg(Color::Gray)),
-                    Span::styled(format!("Tool: {model} {status_icon} (F3/Ctrl+G to expand)", model = model), Style::default().fg(Color::Gray).add_modifier(Modifier::ITALIC)),
+                    Span::styled(format!("Tool: {model} {status_icon} (F3/Ctrl+G to expand)"), Style::default().fg(Color::Gray).add_modifier(Modifier::ITALIC)),
                 ]));
             }
 
@@ -276,7 +274,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
             // Cek apakah item asisten ini adalah item terakhir dan sedang streaming
             let is_last_item = idx == app.chat_history.len().saturating_sub(1);
             let model_display = if is_last_item && app.is_streaming {
-                format!("{} (Merespons...)", model)
+                format!("{model} (Merespons...)")
             } else {
                 model.clone()
             };
@@ -308,8 +306,8 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
     }
 
     // Render streaming status real-time di paling bawah body chat jika sedang streaming
-    if app.is_streaming {
-        if let Some(ref status_text) = app.stream_status {
+    if app.is_streaming
+        && let Some(ref status_text) = app.stream_status {
             let item_height = 2; // 1 baris status + 1 baris spacer kosong
             let item_start = current_y_offset;
             let item_end = item_start + item_height;
@@ -332,7 +330,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                         
                         lines.push(Line::from(vec![
                             Span::raw("  "),
-                            Span::styled(format!("{} ", spinner), Style::default().fg(Color::Yellow)),
+                            Span::styled(format!("{spinner} "), Style::default().fg(Color::Yellow)),
                             Span::styled(status_text, Style::default().fg(Color::Rgb(254, 192, 126)).add_modifier(Modifier::ITALIC)),
                             Span::styled(" (F3/Ctrl+G to expand processes)", Style::default().fg(Color::Gray)),
                         ]));
@@ -346,7 +344,6 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                 }
             }
         }
-    }
 
     // 2. Input Box (Tambahkan margin horizontal 2 spasi kiri-kanan agar simetris)
     let horizontal_input_layout = Layout::default()
@@ -387,7 +384,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
     let status_label = if app.is_streaming {
         const SPINNER_FRAMES: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
         let spinner = SPINNER_FRAMES[app.spinner_tick % SPINNER_FRAMES.len()];
-        format!("TUI {} Merespons...", spinner)
+        format!("TUI {spinner} Merespons...")
     } else {
         "TUI".to_string()
     };
@@ -429,14 +426,12 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                 if !app.active_suggestions.is_empty() {
                     chat_input_lines.push(Line::from(Span::styled("   [Commands] ---------------------------------------------", Style::default().fg(Color::Gray))));
                     
-                    let all_descs = vec![
-                        ("/model <id>", "   - Ganti model aktif secara cepat"),
+                    let all_descs = [("/model <id>", "   - Ganti model aktif secara cepat"),
                         ("/help", "         - Tampilkan daftar perintah lengkap"),
                         ("/refresh", "      - Segarkan database agen dan task"),
                         ("/clear", "        - Bersihkan cache, history, dan context"),
                         ("/workspace", "    - Kembali ke Workspace Selector"),
-                        ("/q", "            - Keluar dari aplikasi TUI"),
-                    ];
+                        ("/q", "            - Keluar dari aplikasi TUI")];
                     
                     for (idx, (cmd_name, _)) in app.active_suggestions.iter().enumerate() {
                         let is_selected = idx == app.suggestion_index;
@@ -449,11 +444,10 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                         let display_name = if cmd_name == "/model " { "/model <id>" } else { cmd_name.as_str() };
                         let desc = all_descs.iter()
                             .find(|(name, _)| *name == display_name || name.starts_with(cmd_name))
-                            .map(|(_, d)| *d)
-                            .unwrap_or("");
+                            .map_or("", |(_, d)| *d);
                             
                         chat_input_lines.push(Line::from(vec![
-                            Span::styled(format!("{}{:<15}", prefix, display_name), style),
+                            Span::styled(format!("{prefix}{display_name:<15}"), style),
                             Span::styled(desc, Style::default().fg(Color::Gray)),
                         ]));
                     }
@@ -479,7 +473,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                 let search_indicator = if search_query.is_empty() {
                     String::new()
                 } else {
-                    format!(" Cari: '{}' |", search_query)
+                    format!(" Cari: '{search_query}' |")
                 };
 
                 let pagination = if total_items > 0 {
@@ -489,7 +483,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                 };
 
                 chat_input_lines.push(Line::from(Span::styled(
-                    format!("   [Select Model]{}---------------------------------", pagination),
+                    format!("   [Select Model]{pagination}---------------------------------"),
                     Style::default().fg(Color::Gray),
                 )));
 
@@ -498,7 +492,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                 } else {
                     if start_idx > 0 {
                         chat_input_lines.push(Line::from(Span::styled(
-                            format!("     ▲ (Ada {} model sebelumnya...)", start_idx),
+                            format!("     ▲ (Ada {start_idx} model sebelumnya...)"),
                             Style::default().fg(Color::Gray).add_modifier(Modifier::ITALIC),
                         )));
                     }
@@ -526,15 +520,15 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                             .unwrap_or_else(|| "Unknown".to_string());
                         
                         chat_input_lines.push(Line::from(vec![
-                            Span::styled(format!("{}{:<25}", prefix, model_id), style),
-                            Span::styled(format!(" ({})", provider), Style::default().fg(Color::Gray)),
+                            Span::styled(format!("{prefix}{model_id:<25}"), style),
+                            Span::styled(format!(" ({provider})"), Style::default().fg(Color::Gray)),
                         ]));
                     }
 
                     let remaining = total_items.saturating_sub(end_idx);
                     if remaining > 0 {
                         chat_input_lines.push(Line::from(Span::styled(
-                            format!("     ▼ (Ada {} model lainnya...)", remaining),
+                            format!("     ▼ (Ada {remaining} model lainnya...)"),
                             Style::default().fg(Color::Gray).add_modifier(Modifier::ITALIC),
                         )));
                     }
@@ -571,7 +565,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
                 .fg(status_color)
                 .add_modifier(Modifier::BOLD),
         ),
-        Span::styled(format!(" · {} ", active_model_name), Style::default().fg(Color::White)),
+        Span::styled(format!(" · {active_model_name} "), Style::default().fg(Color::White)),
         Span::styled(provider_name, Style::default().fg(Color::Gray)),
         Span::raw(middle_spacer),
         Span::styled("esc", Style::default().fg(Color::Rgb(218, 165, 32)).add_modifier(Modifier::BOLD)),
@@ -834,7 +828,7 @@ fn draw_accordion_content(frame: &mut Frame, area: Rect, app: &TuiApp, tab: Tab)
                         ListItem::new(Line::from(vec![
                             Span::styled("  ", Style::default().bg(Color::Rgb(0, 0, 0))),
                             status_indicator,
-                            Span::styled(format!("{}", a.name), style),
+                            Span::styled(a.name.clone(), style),
                         ]))
                     })
                     .collect();
@@ -856,7 +850,7 @@ fn draw_accordion_content(frame: &mut Frame, area: Rect, app: &TuiApp, tab: Tab)
                     .map(|w| {
                         let id_prefix = w.id.0.to_string().chars().take(8).collect::<String>();
                         ListItem::new(Line::from(vec![
-                            Span::styled(format!("  {}", id_prefix), Style::default().fg(Color::White).bg(Color::Rgb(0, 0, 0))),
+                            Span::styled(format!("  {id_prefix}"), Style::default().fg(Color::White).bg(Color::Rgb(0, 0, 0))),
                             Span::styled(format!(" {:?}", w.state), Style::default().fg(Color::Rgb(200, 200, 200)).bg(Color::Rgb(0, 0, 0))),
                         ]))
                     })
@@ -959,7 +953,7 @@ fn draw_accordion_content(frame: &mut Frame, area: Rect, app: &TuiApp, tab: Tab)
                     .map(|m| {
                         let scope = m.scope.chars().take(20).collect::<String>();
                         ListItem::new(Span::styled(
-                            format!("  {}", scope),
+                            format!("  {scope}"),
                             Style::default().fg(Color::White).bg(Color::Rgb(0, 0, 0)),
                         ))
                     })
@@ -1104,7 +1098,7 @@ fn draw_accordion_content(frame: &mut Frame, area: Rect, app: &TuiApp, tab: Tab)
 }
 
 /// Melakukan parsing markdown bold sederhana (**text**) menjadi kumpulan Span.
-/// Karakter asterisk (**) tidak ikut ditampilkan, melainkan diganti dengan Modifier::BOLD.
+/// Karakter asterisk (**) tidak ikut ditampilkan, melainkan diganti dengan `Modifier::BOLD`.
 fn parse_markdown_line(text: &str, base_style: Style) -> Line<'static> {
     let mut spans = Vec::new();
     let mut current_pos = 0;

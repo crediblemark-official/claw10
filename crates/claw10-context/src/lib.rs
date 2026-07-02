@@ -79,17 +79,15 @@ impl ContextPipeline {
     pub async fn build_context(&self, sources: ContextSources<'_>) -> Result<String, ContextError> {
         let mut ctx = ToonContext::new();
 
-        if self.config.include_task {
-            if let Some(task) = sources.task {
+        if self.config.include_task
+            && let Some(task) = sources.task {
                 ctx.add_section("task", ToonEncoder::encode_task(task));
             }
-        }
 
-        if self.config.include_mission {
-            if let Some(mission) = sources.mission {
+        if self.config.include_mission
+            && let Some(mission) = sources.mission {
                 ctx.add_section("mission", ToonEncoder::encode_mission(mission));
             }
-        }
 
         if self.config.include_memories && !sources.memories.is_empty() {
             ctx.add_section("memory", ToonEncoder::encode_memories(sources.memories));
@@ -118,11 +116,10 @@ impl ContextPipeline {
             ctx.add_section("agents", ToonEncoder::encode_agent_roster(sources.agents));
         }
 
-        if self.config.include_lineage {
-            if let Some(lineage) = sources.lineage {
+        if self.config.include_lineage
+            && let Some(lineage) = sources.lineage {
                 ctx.add_section("lineage", ToonEncoder::encode_lineage(lineage));
             }
-        }
 
         if self.config.include_workers && !sources.workers.is_empty() {
             ctx.add_section("workers", ToonEncoder::encode_workers(sources.workers));
@@ -177,7 +174,7 @@ impl ContextPipeline {
 
 /// Rough token estimate: 1 token ≈ 4 characters.
 fn estimate_tokens(text: &str) -> usize {
-    (text.len() + 3) / 4
+    text.len().div_ceil(4)
 }
 
 #[cfg(test)]

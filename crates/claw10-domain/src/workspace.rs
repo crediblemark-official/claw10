@@ -33,17 +33,20 @@ impl Workspace {
     }
 
     /// Namespace prefix yang digunakan di database: `"ws:{id}:"`.
+    #[must_use]
     pub fn namespace(&self) -> String {
         format!("ws:{}:", self.id)
     }
 
     /// Key database untuk menyimpan metadata workspace ini.
+    #[must_use]
     pub fn store_key(&self) -> String {
         format!("workspace:{}", self.id)
     }
 }
 
 /// Hitung workspace ID dari nama: 8 karakter hex SHA-256 dari nama workspace.
+#[must_use]
 pub fn workspace_id_from_name(name: &str) -> String {
     use std::hash::{DefaultHasher, Hash, Hasher};
     let mut hasher = DefaultHasher::new();

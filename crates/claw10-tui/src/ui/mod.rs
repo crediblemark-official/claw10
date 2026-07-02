@@ -157,7 +157,7 @@ pub fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
 
         let mut current_line = String::new();
         for word in words {
-            let space_needed = if current_line.is_empty() { 0 } else { 1 };
+            let space_needed = usize::from(!current_line.is_empty());
             if current_line.chars().count() + space_needed + word.chars().count() > max_width {
                 // Baris penuh, flush ke lines
                 lines.push(current_line);

@@ -24,7 +24,7 @@ impl TuiApp {
                 let trimmed = val.trim().to_string();
                 if !trimmed.is_empty() {
                     // Sinkronisasi dengan environment variable
-                    let env_var = crate::app::palette::provider_api_key_env(&slot.name);
+                    let env_var = crate::app::palette::provider_api_key_env(slot.name);
                     unsafe { std::env::set_var(&env_var, &trimmed) };
                     kv_map.insert(store_key, trimmed);
                 }
@@ -105,79 +105,75 @@ impl TuiApp {
         // Clone Arc agar bisa digunakan bebas tanpa borrow conflict di blok async
         let router_arc = self.state.model_router.clone();
 
-        if let Some(router) = &router_arc {
-            if let Ok(provider) = router.registry().get_provider(&provider_name) {
-                match provider.fetch_models().await {
-                    Ok(mut models) => {
-                        let priority_names = load_cached_models(&provider_name);
+        if let Some(router) = &router_arc
+            && let Ok(provider) = router.registry().get_provider(&provider_name) {
+                if let Ok(mut models) = provider.fetch_models().await {
+                    let priority_names = load_cached_models(&provider_name);
 
-                        for name in priority_names {
-                            let name_lower = name.to_lowercase();
-                            let exists = models.iter().any(|m| {
-                                m.id.to_lowercase().contains(&name_lower) 
-                                    || name_lower.contains(&m.id.to_lowercase())
+                    for name in priority_names {
+                        let name_lower = name.to_lowercase();
+                        let exists = models.iter().any(|m| {
+                            m.id.to_lowercase().contains(&name_lower)
+                                || name_lower.contains(&m.id.to_lowercase())
+                        });
+                        if !exists {
+                            models.push(claw10_model_router::types::ModelProfile {
+                                id: name.clone(),
+                                provider: provider_name.clone(),
+                                model_name: name,
+                                context_window: 128_000,
+                                max_output_tokens: 8_192,
+                                cost_per_1m_input: 0.0,
+                                cost_per_1m_output: 0.0,
+                                suitable_for: vec!["general".to_string()],
                             });
-                            if !exists {
-                                models.push(claw10_model_router::types::ModelProfile {
-                                    id: name.clone(),
-                                    provider: provider_name.clone(),
-                                    model_name: name,
-                                    context_window: 128_000,
-                                    max_output_tokens: 8_192,
-                                    cost_per_1m_input: 0.0,
-                                    cost_per_1m_output: 0.0,
-                                    suitable_for: vec!["general".to_string()],
-                                });
-                            }
                         }
-
-                        // Inject semua model yang di-fetch & dari JSON ke registry agar bisa di-route
-                        router.inject_profiles(models.clone());
-                        let families = group_models_by_family(models);
-                        self.model_sel_families = families;
-                        self.model_sel_step = ModelSelectionStep::SelectFamily;
                     }
-                    Err(_) => {
-                        let priority_names = load_cached_models(&provider_name);
 
-                        let mut profiles: Vec<claw10_model_router::types::ModelProfile> = Vec::new();
-                        for name in priority_names {
-                            let name_lower = name.to_lowercase();
-                            let exists = profiles.iter().any(|p| {
-                                p.id.to_lowercase().contains(&name_lower)
-                                    || name_lower.contains(&p.id.to_lowercase())
+                    // Inject semua model yang di-fetch & dari JSON ke registry agar bisa di-route
+                    router.inject_profiles(models.clone());
+                    let families = group_models_by_family(models);
+                    self.model_sel_families = families;
+                    self.model_sel_step = ModelSelectionStep::SelectFamily;
+                } else {
+                    let priority_names = load_cached_models(&provider_name);
+
+                    let mut profiles: Vec<claw10_model_router::types::ModelProfile> = Vec::new();
+                    for name in priority_names {
+                        let name_lower = name.to_lowercase();
+                        let exists = profiles.iter().any(|p| {
+                            p.id.to_lowercase().contains(&name_lower)
+                                || name_lower.contains(&p.id.to_lowercase())
+                        });
+                        if !exists {
+                            profiles.push(claw10_model_router::types::ModelProfile {
+                                id: name.clone(),
+                                provider: provider_name.clone(),
+                                model_name: name,
+                                context_window: 128_000,
+                                max_output_tokens: 8_192,
+                                cost_per_1m_input: 0.0,
+                                cost_per_1m_output: 0.0,
+                                suitable_for: vec!["general".to_string()],
                             });
-                            if !exists {
-                                profiles.push(claw10_model_router::types::ModelProfile {
-                                    id: name.clone(),
-                                    provider: provider_name.clone(),
-                                    model_name: name,
-                                    context_window: 128_000,
-                                    max_output_tokens: 8_192,
-                                    cost_per_1m_input: 0.0,
-                                    cost_per_1m_output: 0.0,
-                                    suitable_for: vec!["general".to_string()],
-                                });
-                            }
                         }
-
-                        if profiles.is_empty() {
-                            self.status_message =
-                                format!("No models available for {provider_name}");
-                            self.reset_model_selection();
-                            self.command_mode = CommandMode::None;
-                            return;
-                        }
-
-                        // Inject profiles fallback
-                        router.inject_profiles(profiles.clone());
-                        let families = group_models_by_family(profiles);
-                        self.model_sel_families = families;
-                        self.model_sel_step = ModelSelectionStep::SelectFamily;
                     }
+
+                    if profiles.is_empty() {
+                        self.status_message =
+                            format!("No models available for {provider_name}");
+                        self.reset_model_selection();
+                        self.command_mode = CommandMode::None;
+                        return;
+                    }
+
+                    // Inject profiles fallback
+                    router.inject_profiles(profiles.clone());
+                    let families = group_models_by_family(profiles);
+                    self.model_sel_families = families;
+                    self.model_sel_step = ModelSelectionStep::SelectFamily;
                 }
             }
-        }
     }
 
     pub(crate) fn reset_model_selection(&mut self) {
@@ -408,7 +404,7 @@ impl TuiApp {
     }
 
     pub(crate) async fn persist_api_key(&self, provider: &str, api_key: &str) {
-        let key = format!("config:{}_api_key", provider);
+        let key = format!("config:{provider}_api_key");
         let _ = self
             .global_store
             .set::<String>(&key, &api_key.to_string())
@@ -428,16 +424,13 @@ fn load_cached_models(provider_name: &str) -> Vec<String> {
     let cache_file = std::path::PathBuf::from(&home).join(".claw10").join("models.json");
     let clean_provider = provider_name.split('.').next().unwrap_or(provider_name).to_lowercase();
 
-    if cache_file.exists() {
-        if let Ok(content) = std::fs::read_to_string(&cache_file) {
-            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
-                if let Some(arr) = json.get(&clean_provider).and_then(|v| v.as_array()) {
+    if cache_file.exists()
+        && let Ok(content) = std::fs::read_to_string(&cache_file)
+            && let Ok(json) = serde_json::from_str::<serde_json::Value>(&content)
+                && let Some(arr) = json.get(&clean_provider).and_then(|v| v.as_array()) {
                     return arr.iter()
-                        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                        .filter_map(|v| v.as_str().map(std::string::ToString::to_string))
                         .collect();
                 }
-            }
-        }
-    }
     Vec::new()
 }

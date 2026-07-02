@@ -1,4 +1,4 @@
-//! Helper untuk inisialisasi AgentRuntime dan default agent di sesi TUI.
+//! Helper untuk inisialisasi `AgentRuntime` dan default agent di sesi TUI.
 //!
 //! Setiap sesi TUI memiliki satu "tui-agent" yang berjalan sebagai
 //! root agent. Semua pesan user diteruskan sebagai objective ke agent ini.
@@ -20,9 +20,9 @@ use claw10_model_router::router::ModelRouter;
 use claw10_tool::registry::ToolRegistry;
 use claw10_worker::WorkerService;
 
-/// Bangun AgentRuntime dengan BudgetService dan default worker TUI.
+/// Bangun `AgentRuntime` dengan `BudgetService` dan default worker TUI.
 ///
-/// Mengembalikan `(runtime, worker_id)` untuk disimpan di TuiApp.
+/// Mengembalikan `(runtime, worker_id)` untuk disimpan di `TuiApp`.
 pub async fn build_tui_runtime(
     kv_store: Arc<dyn claw10_store::Store>,
     model_router: Arc<ModelRouter>,

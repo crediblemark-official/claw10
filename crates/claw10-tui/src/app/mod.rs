@@ -125,11 +125,11 @@ pub struct TuiApp {
     /// Waktu refresh sidebar terakhir
     pub last_refresh: std::time::Instant,
     // ── Agent Runtime fields ─────────────────────────────────────
-    /// AgentRuntime yang digunakan untuk full agent reasoning loop.
+    /// `AgentRuntime` yang digunakan untuk full agent reasoning loop.
     pub(crate) agent_runtime: Option<std::sync::Arc<AgentRuntime>>,
     /// ID agent aktif (root agent sesi TUI saat ini).
     pub(crate) active_agent_id: Option<AgentId>,
-    /// Receiver AgentEvent dari running agent (untuk update TUI real-time).
+    /// Receiver `AgentEvent` dari running agent (untuk update TUI real-time).
     pub(crate) agent_rx: Option<tokio::sync::mpsc::UnboundedReceiver<AgentEvent>>,
     /// Request approval tool yang sedang tertunda (pending).
     pub pending_tool_approval: Option<claw10_domain::approval::ToolApprovalRequest>,
@@ -518,11 +518,10 @@ impl TuiApp {
         tokio::spawn(async move {
             use crossterm::event;
             loop {
-                if let Ok(event) = event::read() {
-                    if tx_clone.send(event).await.is_err() {
+                if let Ok(event) = event::read()
+                    && tx_clone.send(event).await.is_err() {
                         break;
                     }
-                }
             }
         });
 
@@ -569,7 +568,7 @@ impl TuiApp {
                 Some(event) = rx.recv() => {
                     self.handle_event(event).await;
                 }
-                _ = tokio::time::sleep(std::time::Duration::from_millis(50)) => {
+                () = tokio::time::sleep(std::time::Duration::from_millis(50)) => {
                     // Tick kosong — loop kembali untuk flush stream & redraw
                 }
             }
@@ -580,7 +579,7 @@ impl TuiApp {
         Ok(())
     }
 
-    /// Inisialisasi AgentRuntime dari services yang tersedia di AppState.
+    /// Inisialisasi `AgentRuntime` dari services yang tersedia di `AppState`.
     /// Dipanggil setelah model router berhasil dikonfigurasi.
     pub(crate) async fn init_agent_runtime(&mut self) {
         let router = match self.state.model_router.as_ref() {
@@ -593,11 +592,10 @@ impl TuiApp {
         tokio::spawn(async move {
             let providers = router_clone.registry().list_providers();
             for provider_name in providers {
-                if let Ok(provider) = router_clone.registry().get_provider(&provider_name) {
-                    if let Ok(models) = provider.fetch_models().await {
+                if let Ok(provider) = router_clone.registry().get_provider(&provider_name)
+                    && let Ok(models) = provider.fetch_models().await {
                         router_clone.inject_profiles(models);
                     }
-                }
             }
         });
 
@@ -759,22 +757,20 @@ impl TuiApp {
         
         self.chat_history.push((
             "System".to_string(),
-            "".to_string(),
+            String::new(),
             "Cache, history, dan context untuk sesi ini berhasil dibersihkan.".to_string(),
         ));
     }
 
     /// Pastikan agent aktif sudah ada di store. Jika belum, buat dan simpan.
-    /// Mengembalikan AgentId yang siap digunakan.
+    /// Mengembalikan `AgentId` yang siap digunakan.
     pub(crate) async fn ensure_agent(&mut self) -> Option<AgentId> {
         if let Some(id) = self.active_agent_id.clone() {
             return Some(id);
         }
 
         // Pastikan runtime sudah ada
-        if self.agent_runtime.is_none() {
-            return None;
-        }
+        self.agent_runtime.as_ref()?;
 
         let agent_id = AgentId(uuid::Uuid::now_v7());
         let mission_id = MissionId(uuid::Uuid::now_v7());
@@ -797,7 +793,7 @@ impl TuiApp {
         Some(agent_id)
     }
 
-    /// Deteksi spawn requests yang Approved, proses via SpawnBroker,
+    /// Deteksi spawn requests yang Approved, proses via `SpawnBroker`,
     /// jalankan reasoning loop anak-anaknya, dan ubah state request ke Completed.
     pub(crate) async fn process_approved_spawns(&mut self) {
             use claw10_control_api::store::{AGENT_PREFIX, MISSION_PREFIX, SPAWNREQ_PREFIX};
@@ -879,7 +875,7 @@ impl TuiApp {
 
                         self.chat_history.push((
                             "System".to_string(),
-                            "".to_string(),
+                            String::new(),
                             format!(
                                 "Spawned child agent '{}' (role: {}) untuk objective: '{}'",
                                 child.name, child.role, objective
@@ -920,7 +916,7 @@ impl TuiApp {
 
                     self.chat_history.push((
                         "System".to_string(),
-                        "".to_string(),
+                        String::new(),
                         format!("Spawn request {} failed: {e}", req.id.0),
                     ));
                 }

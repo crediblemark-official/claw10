@@ -64,7 +64,7 @@ Type any message to start a chat with the active model.",
                     unsafe { std::env::set_var(&env_var, &api_key) };
                     self.register_all_providers().await;
                     self.persist_api_key(&provider_type, &api_key).await;
-                    format!("{} API key set & saved.", provider_type)
+                    format!("{provider_type} API key set & saved.")
                 }
             }
             "refresh" => {
@@ -137,9 +137,9 @@ Type any message to start a chat with the active model.",
                     if matched {
                         self.set_active_model(target_model.to_string());
                         self.init_agent_runtime().await;
-                        format!("Model berhasil dialihkan ke: {}", target_model)
+                        format!("Model berhasil dialihkan ke: {target_model}")
                     } else {
-                        format!("Model '{}' tidak terkonfigurasi. Gunakan ':model' untuk melihat daftar.", target_model)
+                        format!("Model '{target_model}' tidak terkonfigurasi. Gunakan ':model' untuk melihat daftar.")
                     }
                 }
             }
@@ -283,8 +283,8 @@ Type any message to start a chat with the active model.",
                                 "Pesan terakhir kosong, tidak ada yang bisa disimpan.".into()
                             } else {
                                 match tokio::fs::write(filename, content).await {
-                                    Ok(_) => format!("Berhasil menyimpan jawaban terakhir ke file '{}'", filename),
-                                    Err(e) => format!("Gagal menulis file: {}", e),
+                                    Ok(()) => format!("Berhasil menyimpan jawaban terakhir ke file '{filename}'"),
+                                    Err(e) => format!("Gagal menulis file: {e}"),
                                 }
                             }
                         }
@@ -443,8 +443,7 @@ Type any message to start a chat with the active model.",
                     if self
                         .pending_tool_approval
                         .as_ref()
-                        .map(|p| p.id == req.id)
-                        .unwrap_or(false)
+                        .is_some_and(|p| p.id == req.id)
                     {
                         self.pending_tool_approval = None;
                     }

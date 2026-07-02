@@ -58,10 +58,10 @@ impl ModelRegistry {
         let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
         let cache_file = std::path::PathBuf::from(&home).join(".claw10").join("models.json");
         
-        if cache_file.exists() {
-            if let Ok(content) = std::fs::read_to_string(&cache_file) {
-                if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
-                    if let Some(obj) = json.as_object() {
+        if cache_file.exists()
+            && let Ok(content) = std::fs::read_to_string(&cache_file)
+                && let Ok(json) = serde_json::from_str::<serde_json::Value>(&content)
+                    && let Some(obj) = json.as_object() {
                         for (provider_name, models_arr) in obj {
                             if let Some(arr) = models_arr.as_array() {
                                 for val in arr {
@@ -81,9 +81,6 @@ impl ModelRegistry {
                             }
                         }
                     }
-                }
-            }
-        }
         
         Self {
             providers: HashMap::new(),

@@ -71,7 +71,7 @@ fn test_get_multiple_roles() {
     let mut registry = IcvsPromptRegistry::new();
     for role in &["root", "director", "planner", "coding", "security_guardian"] {
         let prompts = registry.get_role_prompt(role).unwrap();
-        assert!(!prompts.is_empty(), "role {} should have prompts", role);
+        assert!(!prompts.is_empty(), "role {role} should have prompts");
     }
 }
 

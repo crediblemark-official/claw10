@@ -140,7 +140,7 @@ fn test_json_context_format_when_empty() {
     let mut request = make_request();
     request.memories = vec![];
     request.team = vec![];
-    request.task.objective = "".into();
+    request.task.objective = String::new();
     let bundle = assembler.build(request).unwrap();
     assert_eq!(bundle.metadata.context_format, crate::bundle::ContextFormat::Json);
 }
@@ -194,8 +194,7 @@ fn test_build_with_all_roles() {
         let bundle = assembler.build(request).unwrap();
         assert!(
             bundle.system_messages.iter().any(|m| m.contains("Agent")),
-            "role {} should produce a valid bundle",
-            role
+            "role {role} should produce a valid bundle"
         );
     }
 }
@@ -240,12 +239,10 @@ fn test_estimate_input_tokens_via_assembler() {
     let bundle = assembler.build(request).unwrap();
     let estimated = bundle.estimate_input_tokens();
     assert!(estimated > 0, "estimated tokens should be positive");
-    let total_bytes = bundle.system_messages.iter().map(|s| s.len()).sum::<usize>()
+    let total_bytes = bundle.system_messages.iter().map(std::string::String::len).sum::<usize>()
         + bundle.context_message.len();
     assert!(
         estimated >= (total_bytes / 4) as u32,
-        "token estimate {} seems too low for {} bytes",
-        estimated,
-        total_bytes
+        "token estimate {estimated} seems too low for {total_bytes} bytes"
     );
 }

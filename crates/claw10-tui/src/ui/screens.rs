@@ -38,7 +38,7 @@ fn draw_footer(frame: &mut Frame, area: Rect, app: &TuiApp, title: &str) {
 }
 
 fn empty_rows(message: &str) -> Vec<Row<'static>> {
-    vec![Row::new(vec![Cell::from(format!("  {}", message)).style(Style::default().fg(Color::Rgb(140, 140, 140)))])]
+    vec![Row::new(vec![Cell::from(format!("  {message}")).style(Style::default().fg(Color::Rgb(140, 140, 140)))])]
 }
 
 fn draw_table_columns(frame: &mut Frame, area: Rect, percentages: &[u16]) {
@@ -50,7 +50,7 @@ fn draw_table_columns(frame: &mut Frame, area: Rect, percentages: &[u16]) {
 
     let mut current_x = area.x;
     for &pct in percentages.iter().take(percentages.len() - 1) {
-        let col_width = (area.width as u32 * pct as u32 / 100) as u16;
+        let col_width = (u32::from(area.width) * u32::from(pct) / 100) as u16;
         current_x += col_width;
 
         if current_x < area.x + area.width {
@@ -96,9 +96,9 @@ pub fn draw_missions(frame: &mut Frame, area: Rect, app: &TuiApp) {
                     m.budget.spent_usd, m.budget.allocated_usd
                 );
                 Row::new(vec![
-                    Cell::from(format!("  {}", objective)),
+                    Cell::from(format!("  {objective}")),
                     Cell::from(format!("  {:?}", m.state)),
-                    Cell::from(format!("  {}", budget)),
+                    Cell::from(format!("  {budget}")),
                 ])
                 .style(style)
             })
@@ -151,9 +151,9 @@ pub fn draw_tasks(frame: &mut Frame, area: Rect, app: &TuiApp) {
                 let objective = t.objective.chars().take(45).collect::<String>();
                 let mission_id = t.mission_id.0.to_string();
                 Row::new(vec![
-                    Cell::from(format!("  {}", objective)),
+                    Cell::from(format!("  {objective}")),
                     Cell::from(format!("  {:?}", t.state)),
-                    Cell::from(format!("  {}", mission_id)),
+                    Cell::from(format!("  {mission_id}")),
                 ])
                 .style(style)
             })
@@ -205,7 +205,7 @@ pub fn draw_memory(frame: &mut Frame, area: Rect, app: &TuiApp) {
                 };
                 let preview = m.content.chars().take(50).collect::<String>();
                 Row::new(vec![
-                    Cell::from(format!("  {}", preview)),
+                    Cell::from(format!("  {preview}")),
                     Cell::from(format!("  {:?}", m.status)),
                     Cell::from(format!("  {}", m.scope)),
                 ])
@@ -261,7 +261,7 @@ pub fn draw_approvals(frame: &mut Frame, area: Rect, app: &TuiApp) {
                 Row::new(vec![
                     Cell::from(format!("  {}", a.tool_name)),
                     Cell::from(format!("  {:?}", a.state)),
-                    Cell::from(format!("  {}", created)),
+                    Cell::from(format!("  {created}")),
                 ])
                 .style(style)
             })
@@ -434,7 +434,7 @@ pub fn draw_skills(frame: &mut Frame, area: Rect, app: &TuiApp) {
                     Cell::from(format!("  {}", s.name)),
                     Cell::from(format!("│  {}", s.version)),
                     Cell::from(format!("│  {:?}", s.state)),
-                    Cell::from(format!("│  {}", tools)),
+                    Cell::from(format!("│  {tools}")),
                 ])
                 .style(style)
             })
@@ -492,8 +492,8 @@ pub fn draw_artifacts(frame: &mut Frame, area: Rect, app: &TuiApp) {
                 Row::new(vec![
                     Cell::from(format!("  {}", a.name)),
                     Cell::from(format!("│  {}", a.mime_type)),
-                    Cell::from(format!("│  {}", size)),
-                    Cell::from(format!("│  {}", owner)),
+                    Cell::from(format!("│  {size}")),
+                    Cell::from(format!("│  {owner}")),
                 ])
                 .style(style)
             })
@@ -546,7 +546,7 @@ pub fn draw_incidents(frame: &mut Frame, area: Rect, app: &TuiApp) {
                 Row::new(vec![
                     Cell::from(format!("  {}", inc.severity)),
                     Cell::from(format!("│  {:?}", inc.state)),
-                    Cell::from(format!("│  {}", desc)),
+                    Cell::from(format!("│  {desc}")),
                 ])
                 .style(style)
             })

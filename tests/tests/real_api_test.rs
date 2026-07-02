@@ -33,8 +33,8 @@ async fn test_real_llm_api_call() {
             continue;
         }
 
-        if let Ok(key) = std::env::var(config.api_key_env) {
-            if !key.trim().is_empty() {
+        if let Ok(key) = std::env::var(config.api_key_env)
+            && !key.trim().is_empty() {
                 registry.register(Box::new(
                     claw10_model_router::openai_compat::OpenAiCompatibleProvider::with_config(
                         config.name,
@@ -44,7 +44,6 @@ async fn test_real_llm_api_call() {
                     )
                 ));
             }
-        }
     }
 
     let model_router = Arc::new(ModelRouter::new(registry));

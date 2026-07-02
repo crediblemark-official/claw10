@@ -59,7 +59,9 @@ impl AppState {
         let event_bus: Arc<dyn EventBus> = create_event_bus();
         start_event_subscribers(Arc::clone(&event_bus));
 
-        let state = Self {
+
+
+        Self {
             scheduler_service: Arc::new(ScheduleService::new(Arc::clone(&kv_store))),
             worker_service: Arc::new(WorkerService::new(Arc::clone(&kv_store))),
             memory_service: Arc::new(MemoryService::new(Arc::clone(&kv_store))),
@@ -72,9 +74,7 @@ impl AppState {
             kv_store,
             model_router: None,
             tool_registry: None,
-        };
-
-        state
+        }
     }
 
     /// Create AppState dengan model router dan tool registry untuk agent execution.
@@ -213,14 +213,12 @@ fn auto_register_telegram_if_needed(
                 let mut exists = false;
                 if let Ok(channels) = store_clone.scan_prefix::<claw10_domain::Channel>("gateway:channel:").await {
                     for (_, ch) in channels {
-                        if ch.channel_type == claw10_domain::ChannelType::Telegram {
-                            if let Some(bot_token) = ch.config.get("bot_token").and_then(|v| v.as_str()) {
-                                if bot_token == token {
+                        if ch.channel_type == claw10_domain::ChannelType::Telegram
+                            && let Some(bot_token) = ch.config.get("bot_token").and_then(|v| v.as_str())
+                                && bot_token == token {
                                     exists = true;
                                     break;
                                 }
-                            }
-                        }
                     }
                 }
                 if !exists {
@@ -247,8 +245,8 @@ fn get_preferred_model_from_config(model_router: &ModelRouter) -> String {
     config_path.push(".claw10");
     config_path.push("config.toml");
     
-    if config_path.exists() {
-        if let Ok(content) = std::fs::read_to_string(&config_path) {
+    if config_path.exists()
+        && let Ok(content) = std::fs::read_to_string(&config_path) {
             let mut in_alias_default = false;
             for line in content.lines() {
                 let trimmed = line.trim();
@@ -259,17 +257,15 @@ fn get_preferred_model_from_config(model_router: &ModelRouter) -> String {
                 if trimmed.starts_with('[') {
                     in_alias_default = false;
                 }
-                if in_alias_default && trimmed.starts_with("model") {
-                    if let Some(val) = trimmed.split('=').nth(1) {
+                if in_alias_default && trimmed.starts_with("model")
+                    && let Some(val) = trimmed.split('=').nth(1) {
                         let model = val.trim().trim_matches('"').trim_matches('\'').to_string();
                         if !model.is_empty() {
                             return model;
                         }
                     }
-                }
             }
         }
-    }
 
     // 2. Jika tidak ada di config.toml, ambil model terdaftar pertama dari router registry
     let profiles = model_router.registry().list_profiles();
@@ -340,9 +336,9 @@ pub fn start_background_scheduler(
                     // Cari agent yang terikat pada worker yang mati ini, lalu hibernate
                     if let Ok(all_agents) = kv_store.scan_prefix::<claw10_domain::Agent>("agent:").await {
                         for (_, mut agent) in all_agents {
-                            if agent.state == claw10_domain::AgentState::Active {
-                                if let Some(ref lease) = agent.current_runtime {
-                                    if lease.worker_id == worker.id.0.to_string() {
+                            if agent.state == claw10_domain::AgentState::Active
+                                && let Some(ref lease) = agent.current_runtime
+                                    && lease.worker_id == worker.id.0.to_string() {
                                         tracing::warn!(
                                             "Liveness Daemon: Agent {} terikat pada worker {} yang mati. Hibernating agent...",
                                             agent.id.0,
@@ -353,8 +349,6 @@ pub fn start_background_scheduler(
                                             let _ = kv_store.set(&format!("checkpoint:{}", checkpoint.id.0), &checkpoint).await;
                                         }
                                     }
-                                }
-                            }
                         }
                     }
                 }

@@ -21,11 +21,11 @@ impl SpawnTool {
 
 #[async_trait]
 impl Tool for SpawnTool {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "spawn"
     }
 
-    fn description(&self) -> &str {
+    fn description(&self) -> &'static str {
         "Request spawning a new child agent to perform a specific sub-task/objective. Useful for dividing work and recursive delegation."
     }
 
@@ -77,7 +77,7 @@ impl Tool for SpawnTool {
             .ok_or_else(|| ToolError::InvalidArguments("missing objective".to_string()))?;
 
         let budget_usd = args.get("budget_usd")
-            .and_then(|v| v.as_f64())
+            .and_then(serde_json::Value::as_f64)
             .unwrap_or(1.0);
 
         let model_profile = args.get("model_profile")
@@ -90,9 +90,9 @@ impl Tool for SpawnTool {
             mission_id: context.mission_id.clone(),
             task_id: Some(context.task_id.0.to_string()),
             requested_by: context.agent_id.clone(),
-            reason: format!("LLM spawn call for child role '{}'", role),
+            reason: format!("LLM spawn call for child role '{role}'"),
             team: SwarmTeamSpec {
-                name: format!("{}-team", role),
+                name: format!("{role}-team"),
                 lifecycle_mode: claw10_domain::LifecycleMode::Ephemeral,
                 ttl_seconds: Some(3600),
                 idle_timeout_seconds: Some(300),
@@ -133,8 +133,7 @@ impl Tool for SpawnTool {
         loop {
             if start.elapsed() > timeout {
                 return Ok(ToolOutput::fail(format!(
-                    "Spawn request untuk child '{}' timeout setelah 300 detik.",
-                    role
+                    "Spawn request untuk child '{role}' timeout setelah 300 detik."
                 )));
             }
 
@@ -152,8 +151,7 @@ impl Tool for SpawnTool {
                     }
                     SpawnState::Denied => {
                         return Ok(ToolOutput::fail(format!(
-                            "Spawn request untuk child '{}' ditolak oleh user.",
-                            role
+                            "Spawn request untuk child '{role}' ditolak oleh user."
                         )));
                     }
                     _ => {}

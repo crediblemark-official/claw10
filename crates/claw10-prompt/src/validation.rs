@@ -13,7 +13,7 @@ impl SchemaValidator {
     #[must_use]
     pub fn validate(value: &Value, schema: &Value) -> SchemaValidationOutcome {
         match validate_value(value, schema) {
-            Ok(_) => SchemaValidationOutcome {
+            Ok(()) => SchemaValidationOutcome {
                 valid: true,
                 errors: Vec::new(),
             },
@@ -32,7 +32,7 @@ fn validate_value(value: &Value, schema: &Value) -> Result<(), Vec<String>> {
         match schema_type {
             "object" => {
                 if !value.is_object() {
-                    errors.push(format!("expected object, got {:?}", value));
+                    errors.push(format!("expected object, got {value:?}"));
                     return Err(errors);
                 }
                 if let Some(required) = schema.get("required").and_then(Value::as_array) {
@@ -54,39 +54,37 @@ fn validate_value(value: &Value, schema: &Value) -> Result<(), Vec<String>> {
             }
             "array" => {
                 if !value.is_array() {
-                    errors.push(format!("expected array, got {:?}", value));
+                    errors.push(format!("expected array, got {value:?}"));
                     return Err(errors);
                 }
                 if let Some(items) = schema.get("items") {
                     let arr = value.as_array().unwrap();
                     for (i, item) in arr.iter().enumerate() {
                         validate_value(item, items).unwrap_or_else(|e| {
-                            errors.extend(e.into_iter().map(|msg| format!("[{i}] {msg}")))
+                            errors.extend(e.into_iter().map(|msg| format!("[{i}] {msg}")));
                         });
                     }
                 }
             }
             "string" => {
                 if !value.is_string() {
-                    errors.push(format!("expected string, got {:?}", value));
+                    errors.push(format!("expected string, got {value:?}"));
                 }
-                if let Some(enum_values) = schema.get("enum").and_then(Value::as_array) {
-                    if !enum_values.iter().any(|e| e == value) {
+                if let Some(enum_values) = schema.get("enum").and_then(Value::as_array)
+                    && !enum_values.iter().any(|e| e == value) {
                         errors.push(format!(
-                            "expected one of {:?}, got {:?}",
-                            enum_values, value
+                            "expected one of {enum_values:?}, got {value:?}"
                         ));
                     }
-                }
             }
             "number" | "integer" => {
                 if !value.is_number() {
-                    errors.push(format!("expected number, got {:?}", value));
+                    errors.push(format!("expected number, got {value:?}"));
                 }
             }
             "boolean" => {
                 if !value.is_boolean() {
-                    errors.push(format!("expected boolean, got {:?}", value));
+                    errors.push(format!("expected boolean, got {value:?}"));
                 }
             }
             _ => {}
@@ -127,11 +125,10 @@ impl SemanticValidator for DefaultSemanticValidator {
     ) -> SemanticValidationOutcome {
         let mut risks = Vec::new();
 
-        if let Some(confidence) = response.get("confidence").and_then(Value::as_f64) {
-            if confidence < 0.3 {
+        if let Some(confidence) = response.get("confidence").and_then(Value::as_f64)
+            && confidence < 0.3 {
                 risks.push(format!("low confidence: {confidence}"));
             }
-        }
 
         SemanticValidationOutcome {
             valid: risks.is_empty(),

@@ -430,7 +430,7 @@ async fn perform_memory_distillation(
         "distillation",
     ).unwrap_or_default();
 
-    let system_content = prompts.get(0)
+    let system_content = prompts.first()
         .map(|p| p.content.clone())
         .unwrap_or_else(|| "Anda adalah asisten pemelihara memori yang sangat ringkas.".to_string());
 
@@ -571,7 +571,7 @@ async fn run_bootstrap_interview(
         "bootstrap",
     ).unwrap_or_default();
 
-    let system_prompt = prompts.get(0)
+    let system_prompt = prompts.first()
         .map(|p| p.content.clone())
         .unwrap_or_else(|| "Anda adalah asisten AI yang ramah. Lakukan wawancara.".to_string());
 

@@ -71,7 +71,7 @@ impl IcvsCompiler {
                 report
                     .errors
                     .iter()
-                    .map(|e| e.to_string())
+                    .map(std::string::ToString::to_string)
                     .collect::<Vec<_>>()
                     .join("; "),
             ));
@@ -228,7 +228,7 @@ impl IcvsCompiler {
                 report
                     .errors
                     .iter()
-                    .map(|e| e.to_string())
+                    .map(std::string::ToString::to_string)
                     .collect::<Vec<_>>()
                     .join("; "),
             ))

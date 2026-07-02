@@ -689,7 +689,7 @@ async fn test_e2e_spawn_validation_swarm_size_exceeded() {
     for i in 0..100 {
         let mut dummy = root.clone();
         dummy.id = AgentId(uuid::Uuid::now_v7());
-        dummy.name = format!("dummy-{}", i);
+        dummy.name = format!("dummy-{i}");
         let dummy_key = format!("{AGENT_PREFIX}{}", dummy.id.0);
         store.set(&dummy_key, &dummy).await.unwrap();
     }

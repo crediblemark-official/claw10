@@ -23,7 +23,7 @@ struct MockProvider;
 #[async_trait::async_trait]
 #[allow(dead_code)]
 impl claw10_model_router::provider::ModelProvider for MockProvider {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "mock"
     }
 
@@ -225,7 +225,7 @@ async fn test_webhook_routes_to_agent_and_dispatches_reply() {
     // 4. Register a Webhook channel bound to the agent.
     let server_addr = spawn_server(state.clone()).await;
     let register_resp: serde_json::Value = reqwest::Client::new()
-        .post(format!("http://{}/v1/gateway/channels", server_addr))
+        .post(format!("http://{server_addr}/v1/gateway/channels"))
         .json(&serde_json::json!({
             "channel_type": "Webhook",
             "config": {
@@ -244,8 +244,7 @@ async fn test_webhook_routes_to_agent_and_dispatches_reply() {
     // 5. Send incoming generic webhook.
     let resp = reqwest::Client::new()
         .post(format!(
-            "http://{}/v1/gateway/webhooks/{}",
-            server_addr, channel_id
+            "http://{server_addr}/v1/gateway/webhooks/{channel_id}"
         ))
         .json(&serde_json::json!({
             "sender": "98765",

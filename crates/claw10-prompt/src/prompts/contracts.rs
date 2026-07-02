@@ -1,5 +1,6 @@
 use serde_json::{Value, json};
 
+#[must_use]
 pub fn mission_proposal_schema() -> Value {
     json!({
         "type": "object",
@@ -16,6 +17,7 @@ pub fn mission_proposal_schema() -> Value {
     })
 }
 
+#[must_use]
 pub fn task_graph_proposal_schema() -> Value {
     json!({
         "type": "object",
@@ -41,6 +43,7 @@ pub fn task_graph_proposal_schema() -> Value {
     })
 }
 
+#[must_use]
 pub fn spawn_proposal_schema() -> Value {
     json!({
         "type": "object",
@@ -84,6 +87,7 @@ pub fn spawn_proposal_schema() -> Value {
     })
 }
 
+#[must_use]
 pub fn work_result_schema() -> Value {
     json!({
         "type": "object",
@@ -99,6 +103,7 @@ pub fn work_result_schema() -> Value {
     })
 }
 
+#[must_use]
 pub fn verification_decision_schema() -> Value {
     json!({
         "type": "object",
@@ -111,6 +116,7 @@ pub fn verification_decision_schema() -> Value {
     })
 }
 
+#[must_use]
 pub fn final_handoff_schema() -> Value {
     json!({
         "type": "object",
@@ -130,6 +136,7 @@ pub fn final_handoff_schema() -> Value {
     })
 }
 
+#[must_use]
 pub fn checkpoint_schema() -> Value {
     json!({
         "type": "object",
@@ -148,6 +155,7 @@ pub fn checkpoint_schema() -> Value {
     })
 }
 
+#[must_use]
 pub fn get_schema(output_type: &str) -> Option<Value> {
     match output_type {
         "MissionProposal" => Some(mission_proposal_schema()),

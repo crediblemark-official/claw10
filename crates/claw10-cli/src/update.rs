@@ -4,8 +4,8 @@ pub fn is_newer(remote: &str, local: &str) -> bool {
     let local_parts: Vec<u32> = local.split('.').filter_map(|s| s.trim().parse::<u32>().ok()).collect();
 
     for i in 0..std::cmp::max(remote_parts.len(), local_parts.len()) {
-        let r = remote_parts.get(i).cloned().unwrap_or(0);
-        let l = local_parts.get(i).cloned().unwrap_or(0);
+        let r = remote_parts.get(i).copied().unwrap_or(0);
+        let l = local_parts.get(i).copied().unwrap_or(0);
         if r > l {
             return true;
         } else if r < l {
@@ -45,7 +45,7 @@ pub async fn check_and_perform_update(is_auto: bool) -> Result<(), Box<dyn std::
 
     if is_newer(&remote_version, local_version) {
         if !is_auto {
-            println!("\n📢 Mendeteksi versi baru Claw10 OS: v{} (Versi lokal Anda: v{})", remote_version, local_version);
+            println!("\n📢 Mendeteksi versi baru Claw10 OS: v{remote_version} (Versi lokal Anda: v{local_version})");
             println!("Menjalankan pembaruan otomatis...");
         }
 
@@ -86,7 +86,7 @@ pub async fn check_and_perform_update(is_auto: bool) -> Result<(), Box<dyn std::
         match status {
             Ok(s) if s.success() => {
                 if !is_auto {
-                    println!("✓ Claw10 OS berhasil diperbarui ke v{}!", remote_version);
+                    println!("✓ Claw10 OS berhasil diperbarui ke v{remote_version}!");
                 }
             }
             _ => {
@@ -96,7 +96,7 @@ pub async fn check_and_perform_update(is_auto: bool) -> Result<(), Box<dyn std::
             }
         }
     } else if !is_auto {
-        println!("✓ Claw10 OS Anda sudah menggunakan versi terbaru (v{}).", local_version);
+        println!("✓ Claw10 OS Anda sudah menggunakan versi terbaru (v{local_version}).");
     }
 
     Ok(())
@@ -124,11 +124,11 @@ pub async fn check_version_only() -> Result<(), Box<dyn std::error::Error>> {
     let local_version = env!("CARGO_PKG_VERSION");
 
     if is_newer(&remote_version, local_version) {
-        println!("📢 Versi baru Claw10 OS telah tersedia: v{}", remote_version);
-        println!("Versi lokal Anda saat ini: v{}", local_version);
+        println!("📢 Versi baru Claw10 OS telah tersedia: v{remote_version}");
+        println!("Versi lokal Anda saat ini: v{local_version}");
         println!("Jalankan 'claw10 update' untuk memperbarui secara otomatis.");
     } else {
-        println!("✓ Claw10 OS Anda sudah menggunakan versi terbaru (v{}).", local_version);
+        println!("✓ Claw10 OS Anda sudah menggunakan versi terbaru (v{local_version}).");
     }
 
     Ok(())

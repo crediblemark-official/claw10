@@ -14,15 +14,15 @@ pub fn get_palette_items() -> Vec<(String, String, String, String)> {
         ("Suggested".into(), "Switch session".into(), "ctrl+x l".into(), "/session_switch".into()),
         ("Suggested".into(), "New session".into(), "ctrl+x n".into(), "/session_new".into()),
         ("Suggested".into(), "Switch model".into(), "ctrl+x m".into(), "/model_switch".into()),
-        ("Suggested".into(), "Clear Cache, History & Context".into(), "".into(), "/clear_all".into()),
-        ("Suggested".into(), "Share session".into(), "".into(), "/session_share".into()),
+        ("Suggested".into(), "Clear Cache, History & Context".into(), String::new(), "/clear_all".into()),
+        ("Suggested".into(), "Share session".into(), String::new(), "/session_share".into()),
     ];
     items.extend([
         ("Session".into(), "Switch session".into(), "ctrl+x l".into(), "/session_switch".into()),
         ("Session".into(), "New session".into(), "ctrl+x n".into(), "/session_new".into()),
-        ("Session".into(), "Share session".into(), "".into(), "/session_share".into()),
+        ("Session".into(), "Share session".into(), String::new(), "/session_share".into()),
         ("Session".into(), "Rename session".into(), "ctrl+r".into(), "/session_rename".into()),
-        ("System".into(), "Clear Cache, History & Context".into(), "".into(), "/clear_all".into()),
+        ("System".into(), "Clear Cache, History & Context".into(), String::new(), "/clear_all".into()),
     ]);
     items
 }

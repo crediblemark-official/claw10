@@ -71,10 +71,10 @@ pub fn save_config_to_disk(
         env_content.push_str(&format!("{}={}\n", provider.env_var, api_key));
     }
     if !telegram_token.is_empty() {
-        env_content.push_str(&format!("TELEGRAM_BOT_TOKEN={}\n", telegram_token));
+        env_content.push_str(&format!("TELEGRAM_BOT_TOKEN={telegram_token}\n"));
     }
     if !telegram_chat_id.is_empty() {
-        env_content.push_str(&format!("TELEGRAM_CHAT_ID={}\n", telegram_chat_id));
+        env_content.push_str(&format!("TELEGRAM_CHAT_ID={telegram_chat_id}\n"));
     }
 
     let env_path = env_dir.join(".env");
@@ -84,6 +84,7 @@ pub fn save_config_to_disk(
 }
 
 /// Men-spawn thread background untuk mendengarkan getUpdates Telegram bot secara realtime
+#[must_use]
 pub fn spawn_telegram_polling_thread(
     token: String,
     code: String,
@@ -102,7 +103,7 @@ pub fn spawn_telegram_polling_thread(
         };
 
         // Hapus webhook aktif agar API getUpdates bisa berfungsi dengan benar
-        let del_url = format!("https://api.telegram.org/bot{}/deleteWebhook", token);
+        let del_url = format!("https://api.telegram.org/bot{token}/deleteWebhook");
         let _ = client.get(&del_url).send();
 
         let mut offset = 0i64;
@@ -110,58 +111,50 @@ pub fn spawn_telegram_polling_thread(
 
         loop {
             let url = format!(
-                "https://api.telegram.org/bot{}/getUpdates?offset={}&timeout=3",
-                token, offset
+                "https://api.telegram.org/bot{token}/getUpdates?offset={offset}&timeout=3"
             );
-            match client.get(&url).send() {
-                Ok(res) => {
-                    if let Ok(json) = res.json::<serde_json::Value>() {
-                        if let Some(ok) = json.get("ok").and_then(|v| v.as_bool()) {
-                            if ok {
-                                if let Some(result) = json.get("result").and_then(|v| v.as_array()) {
-                                    for update in result {
-                                        if let Some(update_id) = update.get("update_id").and_then(|v| v.as_i64()) {
-                                            offset = update_id + 1;
-                                        }
-                                        if let Some(message) = update.get("message") {
-                                            if let Some(chat) = message.get("chat") {
-                                                if let Some(chat_id) = chat.get("id").map(|v| v.to_string()) {
-                                                    let username = chat.get("username")
-                                                        .and_then(|v| v.as_str())
-                                                        .unwrap_or("User")
-                                                        .to_string();
-                                                    
-                                                    let text = message.get("text")
-                                                        .and_then(|v| v.as_str())
-                                                        .unwrap_or("")
-                                                        .trim()
-                                                        .to_string();
+            if let Ok(res) = client.get(&url).send()
+                && let Ok(json) = res.json::<serde_json::Value>()
+                    && let Some(ok) = json.get("ok").and_then(serde_json::Value::as_bool) {
+                        if ok {
+                            if let Some(result) = json.get("result").and_then(|v| v.as_array()) {
+                                for update in result {
+                                    if let Some(update_id) = update.get("update_id").and_then(serde_json::Value::as_i64) {
+                                        offset = update_id + 1;
+                                    }
+                                    if let Some(message) = update.get("message")
+                                        && let Some(chat) = message.get("chat")
+                                            && let Some(chat_id) = chat.get("id").map(std::string::ToString::to_string) {
+                                                let username = chat.get("username")
+                                                    .and_then(|v| v.as_str())
+                                                    .unwrap_or("User")
+                                                    .to_string();
 
-                                                    // Jika pesan mengandung kode verifikasi secara persis, langsung trigger CodeMatched!
-                                                    if text == code || text.contains(&code) {
-                                                        let _ = tx.send(BindingEvent::CodeMatched { chat_id });
-                                                        return; // Stop thread
-                                                    }
+                                                let text = message.get("text")
+                                                    .and_then(|v| v.as_str())
+                                                    .unwrap_or("")
+                                                    .trim()
+                                                    .to_string();
 
-                                                    if detected_chat_id.is_none() {
-                                                        detected_chat_id = Some(chat_id.clone());
-                                                        let _ = tx.send(BindingEvent::ChatDetected { username, chat_id: chat_id.clone() });
-                                                    }
+                                                // Jika pesan mengandung kode verifikasi secara persis, langsung trigger CodeMatched!
+                                                if text == code || text.contains(&code) {
+                                                    let _ = tx.send(BindingEvent::CodeMatched { chat_id });
+                                                    return; // Stop thread
+                                                }
+
+                                                if detected_chat_id.is_none() {
+                                                    detected_chat_id = Some(chat_id.clone());
+                                                    let _ = tx.send(BindingEvent::ChatDetected { username, chat_id: chat_id.clone() });
                                                 }
                                             }
-                                        }
-                                    }
                                 }
-                            } else {
-                                let desc = json.get("description").and_then(|v| v.as_str()).unwrap_or("Unknown error");
-                                let _ = tx.send(BindingEvent::Error(format!("Telegram API Error: {desc}")));
-                                return;
                             }
+                        } else {
+                            let desc = json.get("description").and_then(|v| v.as_str()).unwrap_or("Unknown error");
+                            let _ = tx.send(BindingEvent::Error(format!("Telegram API Error: {desc}")));
+                            return;
                         }
                     }
-                }
-                Err(_) => {}
-            }
             std::thread::sleep(std::time::Duration::from_millis(500));
         }
     })
@@ -176,10 +169,10 @@ pub fn fetch_provider_models(
         .timeout(std::time::Duration::from_secs(5))
         .build()?;
 
-    let url = format!("{}/models", base_url);
+    let url = format!("{base_url}/models");
     let res = client
         .get(&url)
-        .header("Authorization", format!("Bearer {}", api_key))
+        .header("Authorization", format!("Bearer {api_key}"))
         .header("Accept", "application/json")
         .send()?;
 

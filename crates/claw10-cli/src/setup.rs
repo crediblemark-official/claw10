@@ -30,12 +30,12 @@ pub async fn perform_uninstall(force: bool) -> Result<(), Box<dyn std::error::Er
     if !force {
         println!("Claw10 OS Uninstaller");
         println!("========================");
-        println!("");
+        println!();
         println!("Perintah ini akan menghapus:");
         println!("  - Daemon Service (systemd)");
         println!("  - Folder Database & Konfigurasi (~/.claw10)");
         println!("  - File Eksekusi Binary (claw10)");
-        println!("");
+        println!();
         print!("Apakah Anda yakin ingin menghapus Claw10 dari sistem? [y/N]: ");
         use std::io::Write;
         let _ = std::io::stdout().flush();
@@ -71,9 +71,7 @@ pub async fn perform_uninstall(force: bool) -> Result<(), Box<dyn std::error::Er
     }
 
     println!("[3/4] Membersihkan entri PATH dari file konfigurasi shell...");
-    let shell_name = std::env::var("SHELL")
-        .map(|s| std::path::Path::new(&s).file_name().unwrap().to_string_lossy().into_owned())
-        .unwrap_or_else(|_| "bash".to_string());
+    let shell_name = std::env::var("SHELL").map_or_else(|_| "bash".to_string(), |s| std::path::Path::new(&s).file_name().unwrap().to_string_lossy().into_owned());
     
     let rc_files = match shell_name.as_str() {
         "bash" => vec![std::path::PathBuf::from(&home).join(".bashrc")],
@@ -89,9 +87,9 @@ pub async fn perform_uninstall(force: bool) -> Result<(), Box<dyn std::error::Er
     let cargo_dir = std::path::PathBuf::from(&home).join(".cargo/bin");
 
     for rc in rc_files {
-        if rc.exists() {
-            if let Ok(content) = std::fs::read_to_string(&rc) {
-                let mut lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
+        if rc.exists()
+            && let Ok(content) = std::fs::read_to_string(&rc) {
+                let mut lines: Vec<String> = content.lines().map(std::string::ToString::to_string).collect();
                 let original_len = lines.len();
                 
                 // Hapus baris PATH claw10
@@ -107,7 +105,6 @@ pub async fn perform_uninstall(force: bool) -> Result<(), Box<dyn std::error::Er
                     }
                 }
             }
-        }
     }
 
     println!("[4/4] Menghapus file binary claw10...");
@@ -124,11 +121,10 @@ pub async fn perform_uninstall(force: bool) -> Result<(), Box<dyn std::error::Er
     }
 
     // Hapus binary saat ini yang sedang dieksekusi jika berbeda dari path di atas
-    if let Ok(current_exe) = std::env::current_exe() {
-        if current_exe.exists() {
+    if let Ok(current_exe) = std::env::current_exe()
+        && current_exe.exists() {
             let _ = std::fs::remove_file(&current_exe);
         }
-    }
 
     // Pembersihan sisa logs dan folder /tmp/claw10
     println!("\n[Tambahan] Membersihkan berkas log dan folder temporary...");
@@ -143,11 +139,10 @@ pub async fn perform_uninstall(force: bool) -> Result<(), Box<dyn std::error::Er
         if let Ok(entries) = std::fs::read_dir(&logs_dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
-                if let Some(filename) = path.file_name().and_then(|f| f.to_str()) {
-                    if filename.starts_with("claw10") {
+                if let Some(filename) = path.file_name().and_then(|f| f.to_str())
+                    && filename.starts_with("claw10") {
                         let _ = std::fs::remove_file(&path);
                     }
-                }
             }
         }
         println!("✓ Berkas log claw10 di ~/logs/ berhasil dibersihkan.");

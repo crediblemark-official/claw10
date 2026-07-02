@@ -10,8 +10,8 @@ use std::env;
 /// Mendukung pengecekan header `X-Api-Key` atau `Authorization: Bearer <key>`.
 /// Jika `CLAW10_API_KEY` tidak diset atau kosong, verifikasi di-bypass (dev/local mode).
 pub async fn auth_middleware(req: Request<Body>, next: Next) -> Result<Response, StatusCode> {
-    if let Ok(expected_key) = env::var("CLAW10_API_KEY") {
-        if !expected_key.is_empty() {
+    if let Ok(expected_key) = env::var("CLAW10_API_KEY")
+        && !expected_key.is_empty() {
             let actual_key = req
                 .headers()
                 .get("x-api-key")
@@ -35,7 +35,6 @@ pub async fn auth_middleware(req: Request<Body>, next: Next) -> Result<Response,
                 }
             }
         }
-    }
 
     Ok(next.run(req).await)
 }

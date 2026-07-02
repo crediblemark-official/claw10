@@ -13,8 +13,8 @@ pub enum TelemetryError {
 /// A structured telemetry event for observability pipeline consumption.
 ///
 /// Follows the Claw10 Telemetry Specification (PRD §36).
-/// Required fields: timestamp, event_type, status.
-/// Optional fields for correlation: tenant_id, mission_id, task_id, agent_id, etc.
+/// Required fields: timestamp, `event_type`, status.
+/// Optional fields for correlation: `tenant_id`, `mission_id`, `task_id`, `agent_id`, etc.
 #[derive(Debug, Clone, Serialize)]
 pub struct TelemetryEvent {
     pub timestamp: DateTime<Utc>,

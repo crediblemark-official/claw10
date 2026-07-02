@@ -23,6 +23,7 @@ impl PromptAssembler {
         }
     }
 
+    #[must_use]
     pub fn with_version(mut self, version: &str) -> Self {
         self.prompt_version = version.to_string();
         self
@@ -121,6 +122,7 @@ impl PromptAssembler {
         Ok(bundle)
     }
 
+    #[must_use]
     pub fn validate_response(
         response: &Value,
         contract: &OutputContractInput,

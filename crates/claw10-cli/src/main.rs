@@ -24,7 +24,7 @@ fn load_claw10_env() {
 
     if env_path.exists() {
         match dotenvy::from_path(&env_path) {
-            Ok(_) => tracing::debug!("loaded env from {}", env_path.display()),
+            Ok(()) => tracing::debug!("loaded env from {}", env_path.display()),
             Err(e) => tracing::warn!("failed to load {}: {e}", env_path.display()),
         }
     }
@@ -234,23 +234,20 @@ async fn main() {
         Commands::Serve { bind, db, tui } => {
             let addr: SocketAddr = bind.parse().expect("invalid bind address");
 
-            let kv_store: Arc<dyn claw10_store::Store> = match db {
-                Some(path) => {
-                    tracing::info!("using sled database at {path}");
-                    match claw10_store::SledStore::new(&path) {
-                        Ok(store) => Arc::new(store),
-                        Err(e) => {
-                            eprintln!("Error: Gagal membuka database sled di '{path}'.");
-                            eprintln!("Detail: {e}");
-                            eprintln!("Pastikan tidak ada proses Claw10 server atau TUI lain yang sedang berjalan menggunakan database ini.");
-                            std::process::exit(1);
-                        }
+            let kv_store: Arc<dyn claw10_store::Store> = if let Some(path) = db {
+                tracing::info!("using sled database at {path}");
+                match claw10_store::SledStore::new(&path) {
+                    Ok(store) => Arc::new(store),
+                    Err(e) => {
+                        eprintln!("Error: Gagal membuka database sled di '{path}'.");
+                        eprintln!("Detail: {e}");
+                        eprintln!("Pastikan tidak ada proses Claw10 server atau TUI lain yang sedang berjalan menggunakan database ini.");
+                        std::process::exit(1);
                     }
                 }
-                None => {
-                    tracing::info!("using in-memory store");
-                    Arc::new(claw10_store::InMemoryStore::new())
-                }
+            } else {
+                tracing::info!("using in-memory store");
+                Arc::new(claw10_store::InMemoryStore::new())
             };
 
             let mut registry = claw10_model_router::provider::ModelRegistry::new();
@@ -352,7 +349,7 @@ async fn main() {
                     let port = addr.port();
                     let _ = std::process::Command::new("sh")
                         .arg("-c")
-                        .arg(format!("fuser -k {}/tcp || kill -9 $(lsof -t -i:{})", port, port))
+                        .arg(format!("fuser -k {port}/tcp || kill -9 $(lsof -t -i:{port})"))
                         .output();
                         
                     tokio::time::sleep(tokio::time::Duration::from_millis(600)).await;
@@ -363,14 +360,14 @@ async fn main() {
                             l
                         }
                         Err(err) => {
-                            eprintln!("Error: Gagal melakukan bind ke {} meskipun telah mencoba membebaskan port.", addr);
+                            eprintln!("Error: Gagal melakukan bind ke {addr} meskipun telah mencoba membebaskan port.");
                             eprintln!("Detail: {err}");
                             std::process::exit(1);
                         }
                     }
                 }
                 Err(e) => {
-                    eprintln!("Error: Gagal melakukan bind ke {}: {}", addr, e);
+                    eprintln!("Error: Gagal melakukan bind ke {addr}: {e}");
                     std::process::exit(1);
                 }
             };
@@ -415,22 +412,19 @@ async fn main() {
             println!("Claw10 OS v{}", env!("CARGO_PKG_VERSION"));
         }
         Commands::RunAgent { db, objective, model } => {
-            let kv_store: Arc<dyn claw10_store::Store> = match db {
-                Some(path) => {
-                    tracing::info!("using sled database at {path}");
-                    match claw10_store::SledStore::new(&path) {
-                        Ok(store) => Arc::new(store),
-                        Err(e) => {
-                            eprintln!("Error: Gagal membuka database sled di '{path}'.");
-                            eprintln!("Detail: {e}");
-                            std::process::exit(1);
-                        }
+            let kv_store: Arc<dyn claw10_store::Store> = if let Some(path) = db {
+                tracing::info!("using sled database at {path}");
+                match claw10_store::SledStore::new(&path) {
+                    Ok(store) => Arc::new(store),
+                    Err(e) => {
+                        eprintln!("Error: Gagal membuka database sled di '{path}'.");
+                        eprintln!("Detail: {e}");
+                        std::process::exit(1);
                     }
                 }
-                None => {
-                    tracing::info!("using in-memory store");
-                    Arc::new(claw10_store::InMemoryStore::new())
-                }
+            } else {
+                tracing::info!("using in-memory store");
+                Arc::new(claw10_store::InMemoryStore::new())
             };
 
             // Setup router & registry
@@ -512,17 +506,14 @@ async fn main() {
             let worker_id = worker.id.clone();
 
             // Dapatkan model aktif (override atau ambil dari registry)
-            let active_model = match model {
-                Some(m) => m,
-                None => {
-                    let profiles = model_router.registry().list_profiles();
-                    if profiles.is_empty() {
-                        eprintln!("Error: Tidak ada provider model LLM yang terkonfigurasi.");
-                        eprintln!("Pasang API key terlebih dahulu menggunakan TUI (Ctrl+P -> Set API Key) atau via env var.");
-                        std::process::exit(1);
-                    }
-                    profiles[0].id.clone()
+            let active_model = if let Some(m) = model { m } else {
+                let profiles = model_router.registry().list_profiles();
+                if profiles.is_empty() {
+                    eprintln!("Error: Tidak ada provider model LLM yang terkonfigurasi.");
+                    eprintln!("Pasang API key terlebih dahulu menggunakan TUI (Ctrl+P -> Set API Key) atau via env var.");
+                    std::process::exit(1);
                 }
+                profiles[0].id.clone()
             };
 
             // Dapatkan atau buat default Agent
@@ -619,8 +610,8 @@ async fn main() {
             );
 
             println!("=== Claw10 Agent CLI Executor ===");
-            println!("Objective: \"{}\"", objective);
-            println!("Model: {}", active_model);
+            println!("Objective: \"{objective}\"");
+            println!("Model: {active_model}");
             println!("Memulai eksekusi agent...");
 
             let mut context = std::collections::HashMap::new();
@@ -636,19 +627,19 @@ async fn main() {
                                 println!("\n[Thought]\n{}", content.trim());
                             }
                             claw10_agent::events::AgentEvent::ModelCall { tokens, cost, .. } => {
-                                println!("[Model Call] Tokens used: {} | Cost: ${:.5}", tokens, cost);
+                                println!("[Model Call] Tokens used: {tokens} | Cost: ${cost:.5}");
                             }
                             claw10_agent::events::AgentEvent::ToolCall { tool, args, result } => {
-                                println!("[Tool Call] Running tool '{}' with args: {}", tool, args);
-                                println!("[Tool Response] Output:\n{}", result);
+                                println!("[Tool Call] Running tool '{tool}' with args: {args}");
+                                println!("[Tool Response] Output:\n{result}");
                             }
                             claw10_agent::events::AgentEvent::ObjectiveComplete { summary, evidence } => {
                                 println!("\n[Objective Complete]");
-                                println!("Ringkasan: {}", summary);
-                                println!("Bukti (Evidence): {:?}", evidence);
+                                println!("Ringkasan: {summary}");
+                                println!("Bukti (Evidence): {evidence:?}");
                             }
                             claw10_agent::events::AgentEvent::Error { message } => {
-                                println!("[Error Event] {}", message);
+                                println!("[Error Event] {message}");
                             }
                             _ => {}
                         }

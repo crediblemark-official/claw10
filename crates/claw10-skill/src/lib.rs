@@ -196,24 +196,13 @@ impl SkillService {
 }
 
 fn is_valid_transition(from: &SkillState, to: &SkillState) -> bool {
-    use SkillState::*;
+    use SkillState::{Candidate, Scanning, Testing, Rejected, Review, Failed, Approved, Staged, Active, Deprecated, Quarantined, Retired};
     matches!(
         (from, to),
-        (Candidate, Scanning)
-            | (Scanning, Testing)
-            | (Scanning, Rejected)
-            | (Testing, Review)
-            | (Testing, Failed)
-            | (Review, Approved)
-            | (Review, Rejected)
-            | (Approved, Staged)
-            | (Staged, Active)
-            | (Active, Deprecated)
-            | (Active, Quarantined)
-            | (Deprecated, Retired)
-            | (Deprecated, Active)
-            | (Quarantined, Scanning)
-            | (Quarantined, Retired)
+        (Candidate | Quarantined, Scanning) | (Scanning, Testing | Rejected) |
+(Testing, Review | Failed) | (Review, Approved | Rejected) |
+(Approved, Staged) | (Staged | Deprecated, Active) |
+(Active, Deprecated | Quarantined) | (Deprecated | Quarantined, Retired)
     )
 }
 

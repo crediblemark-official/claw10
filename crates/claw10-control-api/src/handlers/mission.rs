@@ -81,7 +81,7 @@ pub async fn create_mission(
     let owner_id = IdentityId(
         req.owner_id
             .as_deref()
-            .map(|s| Uuid::parse_str(s))
+            .map(Uuid::parse_str)
             .transpose()
             .map_err(|e| ApiError::Validation(format!("invalid owner_id: {e}")))?
             .unwrap_or_else(Uuid::nil),

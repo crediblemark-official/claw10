@@ -5,25 +5,23 @@ fn make_svc() -> SkillService {
     SkillService::new(store)
 }
 
-fn sample_skill(svc: &SkillService) -> impl std::future::Future<Output = Skill> + use<'_> {
-    async {
-        svc.create_skill(
-            "web-search".into(),
-            "Search the web".into(),
-            "1.0.0".into(),
-            serde_json::json!({"query": "string"}),
-            serde_json::json!({"results": "array"}),
-            vec!["search".into()],
-            vec!["http".into()],
-            vec![],
-            SkillCostProfile {
-                estimated_cost_usd: 0.01,
-                average_duration_seconds: 2.0,
-            },
-        )
-        .await
-        .unwrap()
-    }
+async fn sample_skill(svc: &SkillService) -> Skill {
+    svc.create_skill(
+        "web-search".into(),
+        "Search the web".into(),
+        "1.0.0".into(),
+        serde_json::json!({"query": "string"}),
+        serde_json::json!({"results": "array"}),
+        vec!["search".into()],
+        vec!["http".into()],
+        vec![],
+        SkillCostProfile {
+            estimated_cost_usd: 0.01,
+            average_duration_seconds: 2.0,
+        },
+    )
+    .await
+    .unwrap()
 }
 
 #[tokio::test]

@@ -39,7 +39,7 @@ impl ArtifactService {
     fn compute_hash(content: &[u8]) -> String {
         use sha2::Digest;
         let hash = sha2::Sha256::digest(content);
-        hash.iter().map(|b| format!("{:02x}", b)).collect::<String>()
+        hash.iter().map(|b| format!("{b:02x}")).collect::<String>()
     }
 
     pub async fn store_artifact(

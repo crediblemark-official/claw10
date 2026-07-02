@@ -228,7 +228,7 @@ pub fn resolve_providers(
 
             // Resolve API key: try alias.api_key first (with $ENV expansion),
             // then fall through to slot's env var / KV
-            let api_key = resolve_api_key(&alias.api_key, &slot.api_key_env, &kv_get);
+            let api_key = resolve_api_key(&alias.api_key, slot.api_key_env, &kv_get);
             let api_key = match api_key {
                 Some(k) => k,
                 None => {
@@ -346,18 +346,16 @@ fn resolve_api_key(
     // 1. Try inline value or $ENV_VAR reference
     if !inline_or_ref.is_empty() {
         if let Some(env_name) = inline_or_ref.strip_prefix('$') {
-            if let Ok(val) = std::env::var(env_name) {
-                if !val.is_empty() {
+            if let Ok(val) = std::env::var(env_name)
+                && !val.is_empty() {
                     return Some(val);
                 }
-            }
             // Fall through: check KV store with this env name as key
             let store_key = format!("config:{}_api_key", env_name.to_lowercase());
-            if let Some(val) = kv_get(&store_key) {
-                if !val.is_empty() {
+            if let Some(val) = kv_get(&store_key)
+                && !val.is_empty() {
                     return Some(val);
                 }
-            }
         } else {
             // Literal inline key
             return Some(inline_or_ref.to_string());
@@ -366,18 +364,16 @@ fn resolve_api_key(
 
     // 2. Try slot's default env var
     if !slot_env.is_empty() {
-        if let Ok(val) = std::env::var(slot_env) {
-            if !val.is_empty() {
+        if let Ok(val) = std::env::var(slot_env)
+            && !val.is_empty() {
                 return Some(val);
             }
-        }
         // 3. Try KV store with slot name
         let store_key = format!("config:{}_api_key", slot_env.to_lowercase().trim_end_matches("_API_KEY"));
-        if let Some(val) = kv_get(&store_key) {
-            if !val.is_empty() {
+        if let Some(val) = kv_get(&store_key)
+            && !val.is_empty() {
                 return Some(val);
             }
-        }
     }
 
     None

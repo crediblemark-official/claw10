@@ -9,8 +9,8 @@ use crate::app::palette::{get_palette_items, provider_api_key_env};
 
 impl TuiApp {
     pub(crate) async fn handle_event(&mut self, event: Event) {
-        if let Event::Key(key) = event {
-            if key.kind == KeyEventKind::Press {
+        if let Event::Key(key) = event
+            && key.kind == KeyEventKind::Press {
                 // 1. Handle Ctrl+C to quit
                 if key.code == KeyCode::Char('c') && key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
                     self.should_quit = true;
@@ -30,9 +30,7 @@ impl TuiApp {
                 // 2b. Handle Ctrl+G / F3 / Ctrl+I / Ctrl+T to toggle show_internal_process
                 let is_toggle_key = match key.code {
                     KeyCode::F(3) => true,
-                    KeyCode::Char('g') | KeyCode::Char('G') |
-                    KeyCode::Char('i') | KeyCode::Char('I') |
-                    KeyCode::Char('t') | KeyCode::Char('T') => {
+                    KeyCode::Char('g' | 'G' | 'i' | 'I' | 't' | 'T') => {
                         key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL)
                     }
                     _ => false,
@@ -69,9 +67,7 @@ impl TuiApp {
                                         unsafe { std::env::set_var(&env_var, &actual_key) };
                                         self.register_all_providers().await;
                                         self.persist_api_key(&provider, &actual_key).await;
-                                        let model_count = self.state.model_router.as_ref()
-                                            .and_then(|r| Some(r.registry().list_profiles().len()))
-                                            .unwrap_or(0);
+                                        let model_count = self.state.model_router.as_ref().map_or(0, |r| r.registry().list_profiles().len());
                                         self.status_message = format!(
                                             "{provider} API key set. {model_count} model(s) available."
                                         );
@@ -80,7 +76,6 @@ impl TuiApp {
                                         self.advance_to_model_list().await;
                                         // Init agent runtime setelah provider baru terdaftar
                                         self.init_agent_runtime().await;
-                                        return;
                                     }
                                 } else if key.trim().is_empty() {
                                     *error_message = "API key cannot be empty. Use `provider:key` format.".into();
@@ -95,7 +90,7 @@ impl TuiApp {
                                         let matched = catalog.iter().find(|c| c.name == trimmed);
                                         match matched {
                                             Some(c) => (c.name.to_string(), String::new()),
-                                            None => ("".to_string(), trimmed.clone()),
+                                            None => (String::new(), trimmed.clone()),
                                         }
                                     };
 
@@ -110,9 +105,7 @@ impl TuiApp {
                                         unsafe { std::env::set_var(&env_var, &actual_key) };
                                         self.register_all_providers().await;
                                         self.persist_api_key(&provider, &actual_key).await;
-                                        let model_count = self.state.model_router.as_ref()
-                                            .and_then(|r| Some(r.registry().list_profiles().len()))
-                                            .unwrap_or(0);
+                                        let model_count = self.state.model_router.as_ref().map_or(0, |r| r.registry().list_profiles().len());
                                         self.status_message = format!(
                                             "{provider} API key set. {model_count} model(s) available."
                                         );
@@ -162,7 +155,7 @@ impl TuiApp {
                                     }
 
                                     self.set_active_model(val.clone());
-                                    self.status_message = format!("Model manual ditambahkan: {} (via {})", val, provider_name);
+                                    self.status_message = format!("Model manual ditambahkan: {val} (via {provider_name})");
                                     self.command_mode = CommandMode::None;
                                     self.reset_model_selection();
                                 }
@@ -314,7 +307,7 @@ impl TuiApp {
                                 | Screen::Incidents
                         ) {
                             match key.code {
-                                KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('Q') => {
+                                KeyCode::Esc | KeyCode::Char('q' | 'Q') => {
                                     self.active_screen = Screen::Home;
                                 }
                                 KeyCode::Up => {
@@ -378,7 +371,7 @@ impl TuiApp {
                                     if let Some(cmd) = trimmed.strip_prefix(':').or_else(|| trimmed.strip_prefix('/')) {
                                         self.execute_command(cmd).await;
                                     } else {
-                                        self.chat_history.push(("User".to_string(), "".to_string(), trimmed.to_string()));
+                                        self.chat_history.push(("User".to_string(), String::new(), trimmed.to_string()));
                                         self.save_chat_history().await;
                                         self.active_screen = Screen::Chat;
                                         self.chat_scroll_offset.set(0);
@@ -426,7 +419,7 @@ impl TuiApp {
                                             } else {
                                                 self.chat_history.push((
                                                     "System".to_string(),
-                                                    "".into(),
+                                                    String::new(),
                                                     "Gagal inisialisasi agent. Pastikan API key sudah di-set.".into(),
                                                 ));
                                                 self.save_chat_history().await;
@@ -434,68 +427,65 @@ impl TuiApp {
                                         } else {
                                             // ── Fallback: langsung ke model router (no agent) ──
                                             let router_opt = self.state.model_router.as_ref().map(Arc::clone);
-                                            match router_opt {
-                                                Some(router) => {
-                                                    let model_id = self.active_model.clone();
-                                                    let request = ChatRequest {
-                                                        model: model_id.clone(),
-                                                        messages: vec![ModelMessage {
-                                                            role: MessageRole::User,
-                                                            content: trimmed.to_string(),
-                                                            tool_calls: None,
-                                                            tool_call_id: None,
-                                                            name: None,
-                                                        }],
-                                                        max_tokens: Some(4096),
-                                                        temperature: Some(0.7),
-                                                        tools: None,
-                                                        stop: None,
-                                                    };
+                                            if let Some(router) = router_opt {
+                                                let model_id = self.active_model.clone();
+                                                let request = ChatRequest {
+                                                    model: model_id.clone(),
+                                                    messages: vec![ModelMessage {
+                                                        role: MessageRole::User,
+                                                        content: trimmed.to_string(),
+                                                        tool_calls: None,
+                                                        tool_call_id: None,
+                                                        name: None,
+                                                    }],
+                                                    max_tokens: Some(4096),
+                                                    temperature: Some(0.7),
+                                                    tools: None,
+                                                    stop: None,
+                                                };
 
-                                                    self.stop_streaming();
+                                                self.stop_streaming();
 
-                                                    match router.route_chat_stream(&model_id, request).await {
-                                                        Ok(handle) => {
-                                                            let label = model_id.clone();
-                                                            self.chat_history.push((
-                                                                "Agent".to_string(),
-                                                                label.clone(),
-                                                                String::new(),
-                                                            ));
-                                                            self.save_chat_history().await;
-                                                            self.is_streaming = true;
-                                                            self.stream_status = Some("Menghubungi API model...".to_string());
+                                                match router.route_chat_stream(&model_id, request).await {
+                                                    Ok(handle) => {
+                                                        let label = model_id.clone();
+                                                        self.chat_history.push((
+                                                            "Agent".to_string(),
+                                                            label.clone(),
+                                                            String::new(),
+                                                        ));
+                                                        self.save_chat_history().await;
+                                                        self.is_streaming = true;
+                                                        self.stream_status = Some("Menghubungi API model...".to_string());
 
-                                                            let (stream_tx, stream_rx) = tokio::sync::mpsc::unbounded_channel();
-                                                            self.stream_rx = Some(stream_rx);
+                                                        let (stream_tx, stream_rx) = tokio::sync::mpsc::unbounded_channel();
+                                                        self.stream_rx = Some(stream_rx);
 
-                                                            let task_handle = tokio::spawn(async move {
-                                                                while let Some(event) = handle.recv().await {
-                                                                    if stream_tx.send(event).is_err() {
-                                                                        break;
-                                                                    }
+                                                        let task_handle = tokio::spawn(async move {
+                                                            while let Some(event) = handle.recv().await {
+                                                                if stream_tx.send(event).is_err() {
+                                                                    break;
                                                                 }
-                                                            });
-                                                            self.agent_task = Some(task_handle);
-                                                        }
-                                                        Err(e) => {
-                                                            self.chat_history.push((
-                                                                "System".to_string(),
-                                                                "".into(),
-                                                                format!("Model error: {e}"),
-                                                            ));
-                                                            self.save_chat_history().await;
-                                                        }
+                                                            }
+                                                        });
+                                                        self.agent_task = Some(task_handle);
+                                                    }
+                                                    Err(e) => {
+                                                        self.chat_history.push((
+                                                            "System".to_string(),
+                                                            String::new(),
+                                                            format!("Model error: {e}"),
+                                                        ));
+                                                        self.save_chat_history().await;
                                                     }
                                                 }
-                                                None => {
-                                                    self.chat_history.push((
-                                                        "System".to_string(),
-                                                        "".into(),
-                                                        "Model router belum dikonfigurasi. Set API key via Ctrl+P → Set API Key".into(),
-                                                    ));
-                                                    self.save_chat_history().await;
-                                                }
+                                            } else {
+                                                self.chat_history.push((
+                                                    "System".to_string(),
+                                                    String::new(),
+                                                    "Model router belum dikonfigurasi. Set API key via Ctrl+P → Set API Key".into(),
+                                                ));
+                                                self.save_chat_history().await;
                                             }
                                         }
                                     }
@@ -617,7 +607,6 @@ impl TuiApp {
                     }
                 }
             }
-        }
     }
 
     pub(crate) fn update_palette_filter(&mut self) {
@@ -642,7 +631,7 @@ impl TuiApp {
             "/session_switch" => {
                 self.stop_streaming();
                 self.chat_history.clear();
-                self.chat_history.push(("System".into(), "".into(), "Sesi baru berhasil dimuat.".into()));
+                self.chat_history.push(("System".into(), String::new(), "Sesi baru berhasil dimuat.".into()));
                 self.active_screen = Screen::Chat;
             }
             "/model_switch" => {
@@ -654,11 +643,11 @@ impl TuiApp {
                 self.clear_app_data().await;
             }
             "/session_share" => {
-                self.chat_history.push(("System".into(), "".into(), "Tautan sesi berhasil disalin ke clipboard!".into()));
+                self.chat_history.push(("System".into(), String::new(), "Tautan sesi berhasil disalin ke clipboard!".into()));
                 self.active_screen = Screen::Chat;
             }
             "/session_rename" => {
-                self.chat_history.push(("System".into(), "".into(), "Sesi berhasil diganti namanya.".into()));
+                self.chat_history.push(("System".into(), String::new(), "Sesi berhasil diganti namanya.".into()));
                 self.active_screen = Screen::Chat;
             }
             act if act.starts_with("/apikey") || act.starts_with("/connect") => {
@@ -676,7 +665,7 @@ impl TuiApp {
         }
     }
 
-    /// Process a single stream event, updating chat_history in place.
+    /// Process a single stream event, updating `chat_history` in place.
     pub(crate) async fn handle_stream_event(&mut self, event: StreamEvent) {
         match event {
             StreamEvent::TextDelta(delta) => {
@@ -688,7 +677,7 @@ impl TuiApp {
             }
             StreamEvent::ToolCallDelta { name, .. } => {
                 let tool_name = name.clone().unwrap_or_else(|| "tool".to_string());
-                self.stream_status = Some(format!("Menjalankan tool: {}...", tool_name));
+                self.stream_status = Some(format!("Menjalankan tool: {tool_name}..."));
             }
             StreamEvent::Usage(_usage) => {
                 // Future: show token usage in status bar
@@ -699,11 +688,10 @@ impl TuiApp {
                 self.stream_rx = None;
                 self.agent_task = None;
                 // Ensure non-empty response
-                if let Some((_, _, content)) = self.chat_history.last_mut() {
-                    if content.is_empty() {
+                if let Some((_, _, content)) = self.chat_history.last_mut()
+                    && content.is_empty() {
                         content.push_str("(empty response)");
                     }
-                }
                 self.save_chat_history().await;
             }
             StreamEvent::Error(e) => {
@@ -754,7 +742,7 @@ impl TuiApp {
         self.agent_task = None;
     }
 
-    /// Proses satu AgentEvent dan update chat_history + stream_status di TUI.
+    /// Proses satu `AgentEvent` dan update `chat_history` + `stream_status` di TUI.
     pub(crate) async fn handle_agent_event(&mut self, event: AgentEvent) {
         match event {
             AgentEvent::SessionStarted { agent_id, .. } => {
@@ -782,7 +770,7 @@ impl TuiApp {
             AgentEvent::ToolCall { tool, args, result } => {
                 if result.is_null() {
                     // Event "sedang memanggil tool"
-                    self.stream_status = Some(format!("Menjalankan tool: {}...", tool));
+                    self.stream_status = Some(format!("Menjalankan tool: {tool}..."));
                     self.chat_history.push((
                         "Tool".to_string(),
                         tool.clone(),
@@ -790,7 +778,7 @@ impl TuiApp {
                     ));
                 } else {
                     // Event "tool selesai"
-                    self.stream_status = Some(format!("Tool {} selesai.", tool));
+                    self.stream_status = Some(format!("Tool {tool} selesai."));
                     self.chat_history.push((
                         "Tool".to_string(),
                         tool.clone(),
@@ -807,24 +795,23 @@ impl TuiApp {
                 self.agent_task = None;
                 // Reset active_agent_id agar sesi berikutnya buat agent baru
                 self.active_agent_id = None;
-                if let Some((_, _, content)) = self.chat_history.last_mut() {
-                    if content.is_empty() {
+                if let Some((_, _, content)) = self.chat_history.last_mut()
+                    && content.is_empty() {
                         content.push_str(&summary);
                     }
-                }
                 self.save_chat_history().await;
             }
             AgentEvent::BudgetWarning { remaining } => {
-                self.stream_status = Some(format!("⚠ Budget tersisa: ${:.4}", remaining));
+                self.stream_status = Some(format!("⚠ Budget tersisa: ${remaining:.4}"));
                 self.chat_history.push((
                     "System".to_string(),
                     String::new(),
-                    format!("⚠ Peringatan budget: sisa ${:.4}", remaining),
+                    format!("⚠ Peringatan budget: sisa ${remaining:.4}"),
                 ));
                 self.save_chat_history().await;
             }
             AgentEvent::SessionPaused { reason } => {
-                self.stream_status = Some(format!("Agent dijeda: {}", reason));
+                self.stream_status = Some(format!("Agent dijeda: {reason}"));
                 self.is_streaming = false;
                 self.agent_rx = None;
                 self.agent_task = None;
@@ -840,7 +827,7 @@ impl TuiApp {
                 self.chat_history.push((
                     "System".to_string(),
                     String::new(),
-                    format!("Agent dihentikan: {}", reason),
+                    format!("Agent dihentikan: {reason}"),
                 ));
                 self.save_chat_history().await;
             }
@@ -853,14 +840,14 @@ impl TuiApp {
                 self.chat_history.push((
                     "System".to_string(),
                     String::new(),
-                    format!("Error agent: {}", message),
+                    format!("Error agent: {message}"),
                 ));
                 self.save_chat_history().await;
             }
         }
     }
 
-    /// Non-blocking drain semua AgentEvent yang pending sebelum render.
+    /// Non-blocking drain semua `AgentEvent` yang pending sebelum render.
     pub(crate) async fn try_flush_agent_events(&mut self) {
         let mut rx = match self.agent_rx.take() {
             Some(rx) => rx,
@@ -899,8 +886,8 @@ impl TuiApp {
             if self.state.kv_store.set(&key, &updated_req).await.is_ok() {
                 self.chat_history.push((
                     "System".to_string(),
-                    "".to_string(),
-                    format!("Persetujuan tool: {:?}", new_state),
+                    String::new(),
+                    format!("Persetujuan tool: {new_state:?}"),
                 ));
                 self.pending_tool_approval = None;
                 self.refresh().await;
@@ -920,12 +907,12 @@ fn format_tool_args(_tool: &str, args: &serde_json::Value) -> String {
                 let val_str = match v {
                     serde_json::Value::String(s) => {
                         if s.contains('\n') {
-                            format!("{}: \"\"\"\n{}\n\"\"\"", k, s)
+                            format!("{k}: \"\"\"\n{s}\n\"\"\"")
                         } else {
-                            format!("{}: {:?}", k, s)
+                            format!("{k}: {s:?}")
                         }
                     }
-                    _ => format!("{}: {}", k, v),
+                    _ => format!("{k}: {v}"),
                 };
                 parts.push(val_str);
             }
@@ -943,45 +930,43 @@ fn format_tool_result(_tool: &str, result: &serde_json::Value) -> String {
     match result {
         serde_json::Value::Object(map) => {
             if map.contains_key("exit_code") || map.contains_key("stdout") || map.contains_key("stderr") {
-                let exit_code = map.get("exit_code").and_then(|v| v.as_i64()).unwrap_or(0);
+                let exit_code = map.get("exit_code").and_then(serde_json::Value::as_i64).unwrap_or(0);
                 let stdout = map.get("stdout").and_then(|v| v.as_str()).unwrap_or("");
                 let stderr = map.get("stderr").and_then(|v| v.as_str()).unwrap_or("");
                 
                 let mut out = format!("exit_code: {exit_code}");
                 if !stdout.is_empty() {
-                    out.push_str(&format!("\nstdout:\n{}", stdout));
+                    out.push_str(&format!("\nstdout:\n{stdout}"));
                 }
                 if !stderr.is_empty() {
-                    out.push_str(&format!("\nstderr:\n{}", stderr));
+                    out.push_str(&format!("\nstderr:\n{stderr}"));
                 }
                 return out;
             }
             
-            if map.contains_key("content") && map.len() == 1 {
-                if let Some(content) = map.get("content").and_then(|v| v.as_str()) {
+            if map.contains_key("content") && map.len() == 1
+                && let Some(content) = map.get("content").and_then(|v| v.as_str()) {
                     if content.len() > 1000 {
                         return format!(
                             "content (truncated):\n{}...\n[+{} bytes]", 
                             &content[..1000], 
                             content.len() - 1000
                         );
-                    } else {
-                        return format!("content:\n{}", content);
                     }
+                    return format!("content:\n{content}");
                 }
-            }
             
             let mut parts = Vec::new();
             for (k, v) in map {
                 let val_str = match v {
                     serde_json::Value::String(s) => {
                         if s.contains('\n') {
-                            format!("{}:\n{}", k, s)
+                            format!("{k}:\n{s}")
                         } else {
-                            format!("{}: {:?}", k, s)
+                            format!("{k}: {s:?}")
                         }
                     }
-                    _ => format!("{}: {}", k, v),
+                    _ => format!("{k}: {v}"),
                 };
                 parts.push(val_str);
             }

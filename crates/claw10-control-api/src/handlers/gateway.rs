@@ -220,8 +220,8 @@ pub async fn handle_webhook(
     body: Option<axum::extract::Json<serde_json::Value>>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // WhatsApp verification GET request
-    if let Some(mode) = query.0.get("hub.mode") {
-        if mode == "subscribe" {
+    if let Some(mode) = query.0.get("hub.mode")
+        && mode == "subscribe" {
             let channel = state
                 .gateway_service
                 .get_channel(&channel_id)
@@ -241,7 +241,6 @@ pub async fn handle_webhook(
             }
             return Err(ApiError::Validation("invalid verify_token".into()));
         }
-    }
 
     let payload = body.map(|j| j.0).unwrap_or(serde_json::Value::Null);
 
@@ -290,8 +289,8 @@ pub async fn handle_webhook(
         .map_err(|e| ApiError::Internal(e.to_string()))?
         .ok_or_else(|| ApiError::NotFound(format!("channel {channel_id}")))?;
 
-    if let Some(agent_id_str) = channel.config.get("agent_id").and_then(|v| v.as_str()) {
-        if let Ok(agent_uuid) = agent_id_str.parse::<uuid::Uuid>() {
+    if let Some(agent_id_str) = channel.config.get("agent_id").and_then(|v| v.as_str())
+        && let Ok(agent_uuid) = agent_id_str.parse::<uuid::Uuid>() {
             let agent_state = state.clone();
             let sender_id = result.message.sender_id.clone();
             let objective = result.message.text.clone();
@@ -313,7 +312,6 @@ pub async fn handle_webhook(
                 }
             });
         }
-    }
 
     Ok(Json(serde_json::json!({"status": "ok"})))
 }

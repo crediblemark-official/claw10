@@ -6,9 +6,7 @@ fn test_all_roles_have_temperature() {
         let t = role.temperature();
         assert!(
             (0.0..=1.0).contains(&t),
-            "role {:?} has out-of-range temperature {}",
-            role,
-            t
+            "role {role:?} has out-of-range temperature {t}"
         );
     }
 }
@@ -17,7 +15,7 @@ fn test_all_roles_have_temperature() {
 fn test_all_roles_have_max_output_tokens() {
     for role in AgentRole::all_variants() {
         let t = role.max_output_tokens();
-        assert!(t > 0 && t <= 16384, "role {:?} has out-of-range max_output_tokens {}", role, t);
+        assert!(t > 0 && t <= 16384, "role {role:?} has out-of-range max_output_tokens {t}");
     }
 }
 
@@ -25,7 +23,7 @@ fn test_all_roles_have_max_output_tokens() {
 fn test_all_roles_have_primary_output() {
     for role in AgentRole::all_variants() {
         let o = role.primary_output();
-        assert!(!o.is_empty(), "role {:?} has empty primary_output", role);
+        assert!(!o.is_empty(), "role {role:?} has empty primary_output");
     }
 }
 

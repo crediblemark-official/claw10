@@ -153,7 +153,7 @@ impl AgentExecutor {
 
             let msg = response.message.clone();
             let has_tool_calls = response.finish_reason == FinishReason::ToolCalls
-                || response.message.tool_calls.as_ref().map_or(false, |tc| !tc.is_empty());
+                || response.message.tool_calls.as_ref().is_some_and(|tc| !tc.is_empty());
 
             tracing::info!("[Agent Loop] Respon LLM diterima untuk Turn {}. Content: '{}', has_tool_calls: {}", turn + 1, response.message.content.trim(), has_tool_calls);
 
@@ -608,7 +608,7 @@ impl AgentExecutor {
 
 
                     let has_tool_calls = response.finish_reason == FinishReason::ToolCalls
-                        || response.message.tool_calls.as_ref().map_or(false, |tc| !tc.is_empty());
+                        || response.message.tool_calls.as_ref().is_some_and(|tc| !tc.is_empty());
 
                     if !response.message.content.is_empty() {
                         event_tx
@@ -730,11 +730,10 @@ impl AgentExecutor {
 
         // Cek always_allow di database (per-agent per-tool)
         let always_allow_key = format!("always_allow:{}:{}", agent.id.0, tool_name);
-        if let Ok(Some(always)) = self.kv_store.get::<bool>(&always_allow_key).await {
-            if always {
+        if let Ok(Some(always)) = self.kv_store.get::<bool>(&always_allow_key).await
+            && always {
                 return Ok(true);
             }
-        }
 
         // Ambil command/detail dari args untuk ditampilkan ke user
         let command = args

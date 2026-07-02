@@ -405,7 +405,7 @@ impl SetupWizard {
             .iter()
             .map(|name| {
                 ListItem::new(Line::from(vec![
-                    Span::styled(format!("  {}", name), Style::default().fg(Color::Rgb(180, 180, 180))),
+                    Span::styled(format!("  {name}"), Style::default().fg(Color::Rgb(180, 180, 180))),
                 ]))
             })
             .collect();

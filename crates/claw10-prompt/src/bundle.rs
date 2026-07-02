@@ -41,7 +41,7 @@ pub struct ToolDefinition {
     pub input_schema: Value,
 }
 
-/// Structured request for the PromptAssembler.
+/// Structured request for the `PromptAssembler`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PromptBuildRequest {
     pub agent: AgentPromptInput,

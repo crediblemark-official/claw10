@@ -1,6 +1,6 @@
 //! Trait `EventBus` dan tipe-tipe pendukungnya.
 //!
-//! Semua implementasi (InMemory, NATS) harus impl trait ini.
+//! Semua implementasi (`InMemory`, NATS) harus impl trait ini.
 
 use std::future::Future;
 use std::pin::Pin;
@@ -33,7 +33,7 @@ pub struct SubscriptionId(pub String);
 pub type EventHandler =
     Arc<dyn Fn(Claw10Event) -> Pin<Box<dyn Future<Output = ()> + Send>> + Send + Sync>;
 
-/// Trait utama event bus — implementasi oleh InMemory dan NATS.
+/// Trait utama event bus — implementasi oleh `InMemory` dan NATS.
 #[async_trait]
 pub trait EventBus: Send + Sync {
     /// Publish satu event ke bus.
@@ -48,7 +48,7 @@ pub trait EventBus: Send + Sync {
     }
 
     /// Subscribe ke event dengan subject pattern (e.g. `claw10.agent.*`).
-    /// Mengembalikan SubscriptionId untuk unsubscribe.
+    /// Mengembalikan `SubscriptionId` untuk unsubscribe.
     async fn subscribe(
         &self,
         subject_pattern: &str,

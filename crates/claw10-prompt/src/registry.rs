@@ -34,6 +34,7 @@ impl IcvsPromptRegistry {
         }
     }
 
+    #[must_use]
     pub fn get_kernel(&self) -> &[AgentPrompt] {
         &self.kernel_cache
     }

@@ -325,13 +325,11 @@ pub async fn approve_spawn(
                         .kv_store
                         .get::<SpawnRequest>(&spawn_key_clone)
                         .await
-                    {
-                        if !matches!(req.state, SpawnState::Completed) {
+                        && !matches!(req.state, SpawnState::Completed) {
                             req.state = SpawnState::Completed;
                             req.updated_at = chrono::Utc::now();
                             let _ = state_clone.kv_store.set(&spawn_key_clone, &req).await;
                         }
-                    }
                 }
                 Err(e) => {
                     tracing::warn!("Spawn: gagal eksekusi child {}: {e}", child_id.0);

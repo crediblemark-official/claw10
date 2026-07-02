@@ -651,7 +651,7 @@ async fn test_http_lifecycle_and_gateway() {
     assert_eq!(resp.status(), 200);
     let hibernate_resp: serde_json::Value = resp.json().await.unwrap();
     assert_eq!(hibernate_resp["reason"], "PreHibernation");
-    assert!(hibernate_resp["id"].as_str().unwrap().len() > 0);
+    assert!(!hibernate_resp["id"].as_str().unwrap().is_empty());
 
     // Verify agent state is now Hibernating
     let resp = client
@@ -709,7 +709,7 @@ async fn test_http_lifecycle_and_gateway() {
     assert_eq!(resp.status(), 200);
     let cp: serde_json::Value = resp.json().await.unwrap();
     assert_eq!(cp["reason"], "Periodic");
-    assert!(cp["id"].as_str().unwrap().len() > 0);
+    assert!(!cp["id"].as_str().unwrap().is_empty());
 
     // GET /v1/agents/{id}/checkpoints — should have at least 2 (hibernate + periodic)
     let resp = client

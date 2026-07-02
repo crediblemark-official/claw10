@@ -162,7 +162,7 @@ pub fn draw_home(frame: &mut Frame, area: Rect, app: &TuiApp) {
                     prefix_style,
                 );
                 let time_span = Span::styled(
-                    format!("  {}", last_used),
+                    format!("  {last_used}"),
                     if is_selected {
                         Style::default().fg(Color::Black).bg(bg)
                     } else {

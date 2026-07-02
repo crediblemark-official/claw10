@@ -78,21 +78,18 @@ impl AgentStore {
             .into_iter()
             .map(|(_, a)| a)
             .filter(|a| {
-                if let Some(ref mission_id) = query.mission_id {
-                    if a.mission_id != *mission_id {
+                if let Some(ref mission_id) = query.mission_id
+                    && a.mission_id != *mission_id {
                         return false;
                     }
-                }
-                if let Some(ref state) = query.state {
-                    if a.state != *state {
+                if let Some(ref state) = query.state
+                    && a.state != *state {
                         return false;
                     }
-                }
-                if let Some(ref mode) = query.lifecycle_mode {
-                    if a.lifecycle_mode != *mode {
+                if let Some(ref mode) = query.lifecycle_mode
+                    && a.lifecycle_mode != *mode {
                         return false;
                     }
-                }
                 if let Some(ref parent_id) = query.parent_agent_id {
                     match &a.parent_agent_id {
                         Some(pid) => {

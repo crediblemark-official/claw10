@@ -52,7 +52,7 @@ pub fn draw_apikey_input(frame: &mut Frame, area: Rect, app: &TuiApp) {
             .split(chunks[2]);
 
         let provider_tag = Paragraph::new(Line::from(vec![Span::styled(
-            format!(" {}:", provider_label),
+            format!(" {provider_label}:"),
             Style::default().fg(Color::Rgb(218, 165, 32)).add_modifier(Modifier::BOLD),
         )]))
         .style(Style::default().bg(Color::Rgb(25, 25, 25)));
@@ -78,7 +78,7 @@ pub fn draw_apikey_input(frame: &mut Frame, area: Rect, app: &TuiApp) {
 
         if !error_message.is_empty() {
             let err = Paragraph::new(Line::from(vec![Span::styled(
-                format!("  {}", error_message),
+                format!("  {error_message}"),
                 Style::default().fg(Color::Red),
             )]))
             .style(Style::default().bg(Color::Rgb(15, 15, 15)));
@@ -170,7 +170,7 @@ pub fn draw_command_palette(frame: &mut Frame, area: Rect, app: &TuiApp) {
                 current_category = category.clone();
                 list_lines.push(Line::from("")); // Spacer kategori
                 list_lines.push(Line::from(vec![Span::styled(
-                    format!(" {}", current_category),
+                    format!(" {current_category}"),
                     Style::default()
                         .fg(Color::Magenta)
                         .add_modifier(Modifier::BOLD),
@@ -184,7 +184,7 @@ pub fn draw_command_palette(frame: &mut Frame, area: Rect, app: &TuiApp) {
                 let padding = " ".repeat(spaces_needed);
                 Line::from(vec![
                     Span::styled(
-                        format!("  {}", name),
+                        format!("  {name}"),
                         Style::default()
                             .fg(Color::Black)
                             .bg(Color::Rgb(254, 192, 126))
@@ -197,7 +197,7 @@ pub fn draw_command_palette(frame: &mut Frame, area: Rect, app: &TuiApp) {
                             .bg(Color::Rgb(254, 192, 126)),
                     ),
                     Span::styled(
-                        format!("{}  ", shortcut),
+                        format!("{shortcut}  "),
                         Style::default()
                             .fg(Color::Black)
                             .bg(Color::Rgb(254, 192, 126)),
@@ -208,10 +208,10 @@ pub fn draw_command_palette(frame: &mut Frame, area: Rect, app: &TuiApp) {
                     (inner_area.width as usize).saturating_sub(name.len() + shortcut.len() + 6);
                 let padding = " ".repeat(spaces_needed);
                 Line::from(vec![
-                    Span::styled(format!("  {}", name), Style::default().fg(Color::White)),
+                    Span::styled(format!("  {name}"), Style::default().fg(Color::White)),
                     Span::raw(padding),
                     Span::styled(
-                        format!("{}  ", shortcut),
+                        format!("{shortcut}  "),
                         Style::default().fg(Color::Rgb(140, 140, 140)),
                     ),
                 ])
@@ -283,7 +283,7 @@ pub fn draw_model_selection(frame: &mut Frame, area: Rect, app: &TuiApp) {
                     .collect()
             };
         }
-    };
+    }
 
     let modal_area = get_fixed_centered_rect(70, 20, area);
 
@@ -291,7 +291,7 @@ pub fn draw_model_selection(frame: &mut Frame, area: Rect, app: &TuiApp) {
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::Rgb(120, 120, 120)))
         .style(Style::default().bg(Color::Rgb(15, 15, 15)))
-        .title(format!(" {} ", title))
+        .title(format!(" {title} "))
         .title_alignment(Alignment::Center);
 
     let inner_area = block.inner(modal_area);
@@ -338,7 +338,7 @@ pub fn draw_model_selection(frame: &mut Frame, area: Rect, app: &TuiApp) {
         let line = if is_selected {
             Line::from(vec![
                 Span::styled(
-                    format!("  {}", item),
+                    format!("  {item}"),
                     Style::default()
                         .fg(Color::Black)
                         .bg(Color::Rgb(254, 192, 126))
@@ -347,7 +347,7 @@ pub fn draw_model_selection(frame: &mut Frame, area: Rect, app: &TuiApp) {
             ])
         } else {
             Line::from(vec![
-                Span::styled(format!("  {}", item), Style::default().fg(Color::White)),
+                Span::styled(format!("  {item}"), Style::default().fg(Color::White)),
             ])
         };
         list_lines.push(line);
@@ -400,7 +400,7 @@ pub fn draw_manual_model_input(frame: &mut Frame, area: Rect, app: &TuiApp) {
             .split(chunks[2]);
 
         let provider_tag = Paragraph::new(Line::from(vec![Span::styled(
-            format!(" {}:", provider_label),
+            format!(" {provider_label}:"),
             Style::default().fg(Color::Rgb(218, 165, 32)).add_modifier(Modifier::BOLD),
         )]))
         .style(Style::default().bg(Color::Rgb(25, 25, 25)));
@@ -427,7 +427,7 @@ pub fn draw_manual_model_input(frame: &mut Frame, area: Rect, app: &TuiApp) {
 
         if !error_message.is_empty() {
             let err = Paragraph::new(Line::from(vec![Span::styled(
-                format!("  {}", error_message),
+                format!("  {error_message}"),
                 Style::default().fg(Color::Red),
             )]))
             .style(Style::default().bg(Color::Rgb(15, 15, 15)));

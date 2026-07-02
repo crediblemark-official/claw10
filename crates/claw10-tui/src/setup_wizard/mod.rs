@@ -65,6 +65,7 @@ pub(crate) enum Step {
 }
 
 impl SetupWizard {
+    #[must_use]
     pub fn new(config_path: PathBuf) -> Self {
         let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
         let env_path = std::path::PathBuf::from(&home).join(".claw10").join(".env");
@@ -146,9 +147,9 @@ impl SetupWizard {
             }
 
             // Check async binding events
-            if let Step::TelegramBindingWait = self.step {
-                if let Some(ref rx) = self.binding_rx {
-                    if let Ok(event) = rx.try_recv() {
+            if let Step::TelegramBindingWait = self.step
+                && let Some(ref rx) = self.binding_rx
+                    && let Ok(event) = rx.try_recv() {
                         match event {
                             BindingEvent::ChatDetected { username, chat_id } => {
                                 self.telegram_chat_id = chat_id;
@@ -169,14 +170,12 @@ impl SetupWizard {
                             }
                         }
                     }
-                }
-            }
 
             // Non-blocking keyboard event poll
             if crossterm::event::poll(std::time::Duration::from_millis(100))? {
                 let event = crossterm::event::read()?;
-                if let crossterm::event::Event::Key(key) = event {
-                    if key.kind == crossterm::event::KeyEventKind::Press {
+                if let crossterm::event::Event::Key(key) = event
+                    && key.kind == crossterm::event::KeyEventKind::Press {
                         match self.step {
                             Step::Welcome => self.handle_welcome(key),
                             Step::ProviderSelect => self.handle_provider_select(key),
@@ -199,7 +198,6 @@ impl SetupWizard {
                             Step::ModelFetch => {}
                         }
                     }
-                }
             }
         }
     }
@@ -216,12 +214,12 @@ impl SetupWizard {
         let api_key = self.api_key.clone();
 
         if base_url.is_empty() || api_key.is_empty() {
-            if !self.static_models.is_empty() {
-                self.fetched_models = self.static_models.clone();
-                self.error_msg = "Gunakan daftar model statis (API key tidak tersedia).".to_string();
-            } else {
+            if self.static_models.is_empty() {
                 self.error_msg = "Tidak ada daftar model. Input manual.".to_string();
                 self.fetch_failed = true;
+            } else {
+                self.fetched_models = self.static_models.clone();
+                self.error_msg = "Gunakan daftar model statis (API key tidak tersedia).".to_string();
             }
             return;
         }
@@ -248,24 +246,24 @@ impl SetupWizard {
     }
 
     pub(crate) fn fallback_to_static(&mut self) {
-        if !self.static_models.is_empty() {
-            self.fetched_models = self.static_models.clone();
-            self.error_msg.push_str(" Gunakan daftar statis.");
-        } else {
+        if self.static_models.is_empty() {
             self.fetch_failed = true;
             self.error_msg.push_str(" Input manual.");
+        } else {
+            self.fetched_models = self.static_models.clone();
+            self.error_msg.push_str(" Gunakan daftar statis.");
         }
     }
 
     pub(crate) fn filtered_models(&self) -> Vec<&str> {
         if self.model_search.is_empty() {
-            return self.fetched_models.iter().map(|s| s.as_str()).collect();
+            return self.fetched_models.iter().map(std::string::String::as_str).collect();
         }
         let q = self.model_search.to_lowercase();
         self.fetched_models
             .iter()
             .filter(|m| m.to_lowercase().contains(&q))
-            .map(|s| s.as_str())
+            .map(std::string::String::as_str)
             .collect()
     }
 
@@ -310,10 +308,10 @@ impl SetupWizard {
                 if self.current_provider().slot == "custom" { Step::BaseUrlInput } else { Step::ApiKeyInput }
             }
             Step::TelegramSetupPrompt => {
-                if !self.fetched_models.is_empty() {
-                    Step::ModelList
-                } else {
+                if self.fetched_models.is_empty() {
                     Step::ModelSelect
+                } else {
+                    Step::ModelList
                 }
             }
             Step::TelegramTokenInput => Step::TelegramSetupPrompt,
@@ -340,20 +338,17 @@ impl SetupWizard {
         let cache_file = std::path::PathBuf::from(&home).join(".claw10").join("models.json");
         let slot = self.current_provider().slot;
 
-        if cache_file.exists() {
-            if let Ok(content) = std::fs::read_to_string(&cache_file) {
-                if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
-                    if let Some(arr) = json.get(slot).and_then(|v| v.as_array()) {
+        if cache_file.exists()
+            && let Ok(content) = std::fs::read_to_string(&cache_file)
+                && let Ok(json) = serde_json::from_str::<serde_json::Value>(&content)
+                    && let Some(arr) = json.get(slot).and_then(|v| v.as_array()) {
                         let models: Vec<String> = arr.iter()
-                            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                            .filter_map(|v| v.as_str().map(std::string::ToString::to_string))
                             .collect();
                         if !models.is_empty() {
                             return models;
                         }
                     }
-                }
-            }
-        }
 
         Vec::new()
     }

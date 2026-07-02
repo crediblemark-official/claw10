@@ -40,7 +40,7 @@ impl SetupWizard {
                 self.next_step();
             }
             KeyCode::Esc => self.prev_step(),
-            KeyCode::Tab | KeyCode::Char('s') | KeyCode::Char('S') => {
+            KeyCode::Tab | KeyCode::Char('s' | 'S') => {
                 self.step = Step::Review;
             }
             _ => {}
@@ -157,11 +157,11 @@ impl SetupWizard {
 
     pub(crate) fn handle_telegram_setup_prompt(&mut self, key: KeyEvent) {
         match key.code {
-            KeyCode::Char('y') | KeyCode::Char('Y') => {
+            KeyCode::Char('y' | 'Y') => {
                 self.setup_telegram = true;
                 self.next_step();
             }
-            KeyCode::Char('n') | KeyCode::Char('N') => {
+            KeyCode::Char('n' | 'N') => {
                 self.setup_telegram = false;
                 self.next_step();
             }
@@ -201,13 +201,13 @@ impl SetupWizard {
         }
         let (tx, rx) = std::sync::mpsc::channel();
         self.binding_rx = Some(rx);
-        if !self.telegram_chat_id.is_empty() {
+        if self.telegram_chat_id.is_empty() {
+            self.binding_status = "Buka Telegram Anda, cari bot Anda, lalu kirim pesan /start...".to_string();
+        } else {
             self.binding_status = format!(
                 "Sudah terhubung (Chat ID: {}). Tekan Enter untuk lanjut, atau kirim /start untuk pairing ulang.",
                 self.telegram_chat_id
             );
-        } else {
-            self.binding_status = "Buka Telegram Anda, cari bot Anda, lalu kirim pesan /start...".to_string();
         }
 
         let token = self.telegram_token.clone();
