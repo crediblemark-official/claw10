@@ -239,3 +239,23 @@ impl PolicyService {
         sorted
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_policy_deactivate() {
+        let mut bundle = PolicyService::create_bundle(
+            "test_bundle".to_string(),
+            "1.0".to_string(),
+            vec![],
+        );
+
+        PolicyService::activate(&mut bundle);
+        assert!(bundle.is_active, "Bundle should be active after calling activate");
+
+        PolicyService::deactivate(&mut bundle);
+        assert!(!bundle.is_active, "Bundle should be inactive after calling deactivate");
+    }
+}
