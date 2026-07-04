@@ -138,3 +138,19 @@ fn test_encode_tools() {
     assert!(encoded.contains("http"));
     assert!(encoded.contains("shell"));
 }
+
+#[test]
+fn test_toon_context_add_section() {
+    let mut ctx = ToonContext::new();
+
+    ctx.add_section("test_section_1", "test_content_1".to_string());
+    assert_eq!(ctx.sections.len(), 1);
+    assert_eq!(ctx.sections[0], "\n[test_section_1]\ntest_content_1");
+
+    ctx.add_section("test_section_2", "test_content_2".to_string());
+    assert_eq!(ctx.sections.len(), 2);
+    assert_eq!(ctx.sections[1], "\n[test_section_2]\ntest_content_2");
+
+    let built = ctx.build();
+    assert_eq!(built, "[TOON v1]\n[test_section_1]\ntest_content_1\n[test_section_2]\ntest_content_2");
+}
