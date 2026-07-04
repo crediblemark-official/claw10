@@ -85,3 +85,64 @@ impl Default for ToolRegistry {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use claw10_domain::SideEffectClass;
+    use serde_json::json;
+
+    struct MockTool {
+        name: String,
+    }
+
+    #[async_trait]
+    impl Tool for MockTool {
+        fn name(&self) -> &str {
+            &self.name
+        }
+
+        fn description(&self) -> &str {
+            "A mock tool"
+        }
+
+        fn input_schema(&self) -> serde_json::Value {
+            json!({})
+        }
+
+        fn categories(&self) -> Vec<&str> {
+            vec!["mock"]
+        }
+
+        fn side_effect_class(&self) -> SideEffectClass {
+            SideEffectClass::ReadOnly
+        }
+
+        async fn execute(
+            &self,
+            _context: &ToolContext,
+            _args: serde_json::Value,
+        ) -> Result<ToolOutput, ToolError> {
+            Ok(ToolOutput::ok(json!("success")))
+        }
+    }
+
+    #[test]
+    fn test_has_tool() {
+        let mut registry = ToolRegistry::new();
+
+        // Initially, the registry should not have the tool
+        assert!(!registry.has_tool("mock_tool"));
+
+        // Register the tool
+        registry.register(Box::new(MockTool {
+            name: "mock_tool".to_string(),
+        }));
+
+        // Now, it should have the tool
+        assert!(registry.has_tool("mock_tool"));
+
+        // It should still not have other tools
+        assert!(!registry.has_tool("other_tool"));
+    }
+}
