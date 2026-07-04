@@ -249,7 +249,7 @@ pub async fn approve_spawn(
         LineageService::add_entry(
             &mut lineage,
             child.id.clone(),
-            Some(requested_by.clone()),
+            Some(&requested_by),
             child.role.clone(),
         );
     }

@@ -29,12 +29,12 @@ impl LineageService {
     pub fn add_entry(
         lineage: &mut Lineage,
         agent_id: AgentId,
-        parent_agent_id: Option<AgentId>,
+        parent_agent_id: Option<&AgentId>,
         role: String,
     ) {
         let entry = LineageEntry {
             agent_id,
-            parent_agent_id,
+            parent_agent_id: parent_agent_id.cloned(),
             role,
             state: "active".into(),
             created_at: Utc::now(),

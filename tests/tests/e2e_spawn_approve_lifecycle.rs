@@ -635,7 +635,7 @@ async fn test_e2e_spawn_with_lineage() {
         claw10_lineage::LineageService::add_entry(
             &mut lineage,
             child.id.clone(),
-            Some(root.id.clone()),
+            Some(&root.id),
             child.role.clone(),
         );
     }
