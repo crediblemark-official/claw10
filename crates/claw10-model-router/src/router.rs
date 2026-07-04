@@ -162,9 +162,10 @@ impl ModelRouter {
         }
 
         // Try each candidate
+        let suffix = format!("@{primary_profile}");
         for candidate in &candidates {
             // Extract the actual profile ID for fallback_models (prefixed with `model@profile`)
-            let actual = if let Some(stripped) = candidate.strip_suffix(&format!("@{primary_profile}"))
+            let actual = if let Some(stripped) = candidate.strip_suffix(&suffix)
             {
                 stripped
             } else {
