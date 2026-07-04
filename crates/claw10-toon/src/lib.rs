@@ -86,7 +86,8 @@ impl ToonEncoder {
             format!("state: {:?}", task.state),
             format!("risk: {:?}", task.risk),
             format!("deadline: {}", deadline),
-        ].join("\n")
+        ]
+        .join("\n")
     }
 
     // Mengkodekan objek tunggal Mission
@@ -95,7 +96,8 @@ impl ToonEncoder {
             format!("id: {}", fmt_id(&mission.id)),
             format!("objective: {}", encode_string(&mission.objective)),
             format!("mode: {:?}", mission.lifecycle_mode),
-        ].join("\n")
+        ]
+        .join("\n")
     }
 
     // Mengkodekan list Memory menjadi format Tabular Array TOON
@@ -111,7 +113,8 @@ impl ToonEncoder {
                 encode_string(&m.content),
                 m.memory_type,
                 m.confidence
-            ).unwrap();
+            )
+            .unwrap();
         }
         output
     }
@@ -122,7 +125,12 @@ impl ToonEncoder {
         for bundle in bundles {
             if bundle.is_active {
                 for rule in &bundle.rules {
-                    active_rules.push((bundle.id.clone(), rule.effect.clone(), rule.action.clone(), rule.resource.clone()));
+                    active_rules.push((
+                        bundle.id.clone(),
+                        rule.effect.clone(),
+                        rule.action.clone(),
+                        rule.resource.clone(),
+                    ));
                 }
             }
         }
@@ -131,7 +139,10 @@ impl ToonEncoder {
             return "policies: []".to_string();
         }
 
-        let mut output = format!("policies[{}]{{bundle_id,effect,action,resource}}:", active_rules.len());
+        let mut output = format!(
+            "policies[{}]{{bundle_id,effect,action,resource}}:",
+            active_rules.len()
+        );
         for (bundle_id, effect, action, resource) in active_rules {
             let effect_str = if matches!(effect, claw10_domain::policy::PolicyEffect::Allow) {
                 "ALLOW"
@@ -145,7 +156,8 @@ impl ToonEncoder {
                 effect_str,
                 encode_string(&action),
                 encode_string(&resource)
-            ).unwrap();
+            )
+            .unwrap();
         }
         output
     }
@@ -163,7 +175,8 @@ impl ToonEncoder {
                 fmt_id(&agent.id),
                 encode_string(&agent.role),
                 agent.state
-            ).unwrap();
+            )
+            .unwrap();
         }
         output
     }
@@ -174,16 +187,23 @@ impl ToonEncoder {
         let entries_str = if lineage.entries.is_empty() {
             "entries: []".to_string()
         } else {
-            let mut output = format!("entries[{}]{{agent_id,parent_agent_id,state}}:", lineage.entries.len());
+            let mut output = format!(
+                "entries[{}]{{agent_id,parent_agent_id,state}}:",
+                lineage.entries.len()
+            );
             for entry in &lineage.entries {
-                let parent = entry.parent_agent_id.as_ref().map_or("none".to_string(), fmt_id);
+                let parent = entry
+                    .parent_agent_id
+                    .as_ref()
+                    .map_or("none".to_string(), fmt_id);
                 write!(
                     output,
                     "\n  {},{},{:?}",
                     fmt_id(&entry.agent_id),
                     parent,
                     entry.state
-                ).unwrap();
+                )
+                .unwrap();
             }
             output
         };
@@ -203,7 +223,8 @@ impl ToonEncoder {
                 fmt_id(&ev.id),
                 ev.evidence_type,
                 ev.accepted
-            ).unwrap();
+            )
+            .unwrap();
         }
         output
     }
@@ -222,7 +243,8 @@ impl ToonEncoder {
                 encode_string(&skill.version),
                 skill.state,
                 skill.cost_profile.estimated_cost_usd
-            ).unwrap();
+            )
+            .unwrap();
         }
         output
     }
@@ -245,7 +267,8 @@ impl ToonEncoder {
                 encode_string(&w.name),
                 w.worker_type,
                 w.state
-            ).unwrap();
+            )
+            .unwrap();
         }
         output
     }
