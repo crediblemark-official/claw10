@@ -49,11 +49,12 @@ pub async fn list_approvals(
         .kv_store
         .scan_prefix::<claw10_domain::approval::ToolApprovalRequest>(TOOL_APPROVAL_PREFIX)
         .await?;
+    let target_type = format!("{:?}", ApprovalTargetType::ToolInvocation);
     for (_, t) in tool_approvals {
         responses.push(ApprovalResponse {
             id: t.id.clone(),
-            target_type: format!("{:?}", ApprovalTargetType::ToolInvocation),
-            target_id: t.id.clone(),
+            target_type: target_type.clone(),
+            target_id: t.id,
             state: format!("{:?}", t.state),
         });
     }
