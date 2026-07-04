@@ -110,8 +110,18 @@ impl ModelRouter {
                     preferred_profile,
                     e
                 );
-                for fallback in fallback_profiles {
-                    match self.route_chat(fallback, request.clone()).await {
+
+                let mut iter = fallback_profiles.iter().peekable();
+                let mut req_opt = Some(request);
+
+                while let Some(fallback) = iter.next() {
+                    let req = if iter.peek().is_some() {
+                        req_opt.as_ref().unwrap().clone()
+                    } else {
+                        req_opt.take().unwrap()
+                    };
+
+                    match self.route_chat(fallback, req).await {
                         Ok(response) => return Ok(response),
                         Err(e2) => {
                             tracing::warn!("fallback '{}' also failed: {}", fallback, e2);
@@ -162,7 +172,10 @@ impl ModelRouter {
         }
 
         // Try each candidate
-        for candidate in &candidates {
+        let mut iter = candidates.iter().peekable();
+        let mut req_opt = Some(request);
+
+        while let Some(candidate) = iter.next() {
             // Extract the actual profile ID for fallback_models (prefixed with `model@profile`)
             let actual = if let Some(stripped) = candidate.strip_suffix(&format!("@{primary_profile}"))
             {
@@ -171,7 +184,13 @@ impl ModelRouter {
                 candidate.as_str()
             };
 
-            match self.route_chat(actual, request.clone()).await {
+            let req = if iter.peek().is_some() {
+                req_opt.as_ref().unwrap().clone()
+            } else {
+                req_opt.take().unwrap()
+            };
+
+            match self.route_chat(actual, req).await {
                 Ok(resp) => return Ok(resp),
                 Err(e) => {
                     tracing::warn!("fallback candidate '{}' failed: {}", candidate, e);
@@ -215,8 +234,17 @@ impl ModelRouter {
             candidates.push(fb_alias.clone());
         }
 
-        for candidate in &candidates {
-            match self.route_chat_stream(candidate, request.clone()).await {
+        let mut iter = candidates.iter().peekable();
+        let mut req_opt = Some(request);
+
+        while let Some(candidate) = iter.next() {
+            let req = if iter.peek().is_some() {
+                req_opt.as_ref().unwrap().clone()
+            } else {
+                req_opt.take().unwrap()
+            };
+
+            match self.route_chat_stream(candidate, req).await {
                 Ok(handle) => return Ok(handle),
                 Err(e) => {
                     tracing::warn!("fallback stream candidate '{}' failed: {}", candidate, e);
