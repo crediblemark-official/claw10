@@ -12,7 +12,7 @@ use crate::mission::MissionId;
 use crate::permissions::Permission;
 use crate::policy::PolicyBundle;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct AgentId(pub Uuid);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

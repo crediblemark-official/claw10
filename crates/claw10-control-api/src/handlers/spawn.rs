@@ -178,7 +178,7 @@ pub async fn approve_spawn(
         .ok_or_else(|| ApiError::NotFound("mission not found".into()))?;
 
     // Calculate depth
-    let requested_by = request.requested_by.clone();
+    let requested_by = request.requested_by;
     let current_depth = calculate_depth(&requested_by, &all_agents);
 
     // Load parent agent
@@ -248,8 +248,8 @@ pub async fn approve_spawn(
     for child in &children {
         LineageService::add_entry(
             &mut lineage,
-            child.id.clone(),
-            Some(requested_by.clone()),
+            child.id,
+            Some(requested_by),
             child.role.clone(),
         );
     }
@@ -264,7 +264,7 @@ pub async fn approve_spawn(
 
     // ── Jalankan setiap child agent dalam background task ────────
     for child in &children {
-        let child_id = child.id.clone();
+        let child_id = child.id;
         // Ambil objective dari request.children jika ada
         let objective = request
             .children
@@ -388,12 +388,12 @@ pub async fn deny_spawn(
 
 fn calculate_depth(agent_id: &AgentId, agents: &[Agent]) -> u32 {
     let mut depth = 0;
-    let mut current = agent_id.clone();
+    let mut current = *agent_id;
     while let Some(agent) = agents.iter().find(|a: &&Agent| a.id == current) {
         match &agent.parent_agent_id {
             Some(pid) => {
                 depth += 1;
-                current = pid.clone();
+                current = *pid;
             }
             None => break,
         }

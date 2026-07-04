@@ -7,7 +7,7 @@ use crate::lifecycle::LifecycleMode;
 use crate::mission::MissionId;
 use crate::permissions::Permission;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct SpawnRequestId(pub Uuid);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
