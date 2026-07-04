@@ -85,3 +85,68 @@ impl Default for ToolRegistry {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use claw10_domain::SideEffectClass;
+
+    struct DummyTool {
+        name: String,
+    }
+
+    #[async_trait]
+    impl Tool for DummyTool {
+        fn name(&self) -> &str {
+            &self.name
+        }
+
+        fn description(&self) -> &str {
+            "A dummy tool for testing"
+        }
+
+        fn input_schema(&self) -> serde_json::Value {
+            serde_json::json!({})
+        }
+
+        fn categories(&self) -> Vec<&str> {
+            vec![]
+        }
+
+        fn side_effect_class(&self) -> SideEffectClass {
+            SideEffectClass::ReadOnly
+        }
+
+        async fn execute(
+            &self,
+            _context: &ToolContext,
+            _args: serde_json::Value,
+        ) -> Result<ToolOutput, ToolError> {
+            Ok(ToolOutput::ok(serde_json::json!("success")))
+        }
+    }
+
+    #[test]
+    fn test_registry_get_success() {
+        let mut registry = ToolRegistry::new();
+        let tool = Box::new(DummyTool {
+            name: "test_tool".to_string(),
+        });
+        registry.register(tool);
+
+        let retrieved = registry.get("test_tool");
+        assert!(retrieved.is_ok());
+        assert_eq!(retrieved.unwrap().name(), "test_tool");
+    }
+
+    #[test]
+    fn test_registry_get_not_found() {
+        let registry = ToolRegistry::new();
+        let retrieved = registry.get("non_existent_tool");
+        assert!(retrieved.is_err());
+        match retrieved {
+            Err(ToolError::ToolNotFound(name)) => assert_eq!(name, "non_existent_tool"),
+            _ => panic!("Expected ToolNotFound error"),
+        }
+    }
+}
