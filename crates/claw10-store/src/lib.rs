@@ -171,11 +171,17 @@ pub struct SledStore {
 }
 
 impl SledStore {
+    /// Opens or creates a sled database at the given path.
+    /// # Errors
+    /// Returns a `StoreError` if the database cannot be opened.
     pub fn new(path: impl AsRef<std::path::Path>) -> Result<Self, StoreError> {
         let db = sled::open(path).map_err(|e| StoreError::Database(e.to_string()))?;
         Ok(Self { db })
     }
 
+    /// Opens a temporary sled database.
+    /// # Errors
+    /// Returns a `StoreError` if the temporary database cannot be created.
     pub fn new_temporary() -> Result<Self, StoreError> {
         let db = sled::Config::new()
             .temporary(true)

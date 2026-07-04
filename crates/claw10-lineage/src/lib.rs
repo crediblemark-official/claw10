@@ -52,3 +52,22 @@ impl LineageService {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_create_lineage() {
+        let mission_id = MissionId(Uuid::now_v7());
+        let root_agent_id = AgentId(Uuid::now_v7());
+
+        let lineage = LineageService::create_lineage(mission_id.clone(), root_agent_id.clone());
+
+        assert_eq!(lineage.mission_id, mission_id);
+        assert_eq!(lineage.root_agent_id, root_agent_id);
+        assert!(lineage.entries.is_empty());
+        // Since `created_at` is generated inside `create_lineage`, we check if it is reasonably close to `Utc::now()`
+        assert!(Utc::now().signed_duration_since(lineage.created_at).num_seconds() < 5);
+    }
+}
