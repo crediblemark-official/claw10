@@ -13,3 +13,10 @@ icvs.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 uuid.workspace = true
+
+[dev-dependencies]
+criterion = "0.8.2"
+
+[[bench]]
+name = "compiler_bench"
+harness = false

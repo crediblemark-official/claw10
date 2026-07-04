@@ -60,6 +60,7 @@ pub struct IcvsEdge {
 pub struct IcvsCompiler;
 
 impl IcvsCompiler {
+    #[allow(clippy::missing_errors_doc, clippy::redundant_closure_for_method_calls)]
     pub fn parse(source: &str) -> Result<IcvsDocument, IcvsError> {
         let doc = icvs::parser::parse_document(source)
             .map_err(|e| IcvsError::Parse(e.to_string()))?;
@@ -81,18 +82,18 @@ impl IcvsCompiler {
         let mut edges = Vec::new();
         let mut targets: HashMap<String, Vec<String>> = HashMap::new();
 
-        for (id, node) in &doc.nodes {
+        for (id, node) in doc.nodes {
             let node_type_str = node.node_type.as_str().to_string();
-            let content = node.content.clone();
-            let severity = node.severity.map(|s| s.as_str().to_string());
-            let condition = node.condition.as_ref().map(|c| format!("{} {} {}", c.variable, c.operator, c.value));
+            let content = node.content;
+            let severity = node.severity.as_ref().map(|s| s.as_str().to_string());
+            let condition = node.condition.map(|c| format!("{} {} {}", c.variable, c.operator, c.value));
             let mut properties = HashMap::new();
             if let Some(ref sev) = node.severity {
                 properties.insert("severity".to_string(), sev.as_str().to_string());
             }
 
             nodes.push(IcvsNode {
-                id: id.clone(),
+                id,
                 node_type: node_type_str,
                 content,
                 severity,
@@ -101,17 +102,17 @@ impl IcvsCompiler {
             });
         }
 
-        for edge in &doc.edges {
+        for edge in doc.edges {
             edges.push(IcvsEdge {
-                source: edge.source.clone(),
-                target: edge.target.clone(),
-                label: edge.label.clone(),
+                source: edge.source,
+                target: edge.target,
+                label: edge.label,
             });
         }
 
-        for (name, target) in &doc.targets {
-            if let Some(ref resolve) = target.resolve {
-                targets.insert(name.clone(), resolve.clone());
+        for (name, target) in doc.targets {
+            if let Some(resolve) = target.resolve {
+                targets.insert(name, resolve);
             }
         }
 
@@ -122,6 +123,7 @@ impl IcvsCompiler {
         })
     }
 
+    #[allow(clippy::missing_errors_doc, clippy::match_same_arms)]
     pub fn compile_policy(source: &str) -> Result<Vec<PolicyRule>, IcvsError> {
         let doc = icvs::parser::parse_document(source)
             .map_err(|e| IcvsError::Parse(e.to_string()))?;
@@ -168,6 +170,7 @@ impl IcvsCompiler {
         Ok(rules)
     }
 
+    #[allow(clippy::missing_errors_doc)]
     pub fn compile_prompt(source: &str, target_name: &str) -> Result<Vec<AgentPrompt>, IcvsError> {
         let doc = icvs::parser::parse_document(source)
             .map_err(|e| IcvsError::Parse(e.to_string()))?;
@@ -216,6 +219,7 @@ impl IcvsCompiler {
         Ok(prompts)
     }
 
+    #[allow(clippy::missing_errors_doc, clippy::redundant_closure_for_method_calls)]
     pub fn validate(source: &str) -> Result<(), IcvsError> {
         let doc = icvs::parser::parse_document(source)
             .map_err(|e| IcvsError::Parse(e.to_string()))?;
