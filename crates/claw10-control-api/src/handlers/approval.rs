@@ -53,7 +53,7 @@ pub async fn list_approvals(
         responses.push(ApprovalResponse {
             id: t.id.clone(),
             target_type: format!("{:?}", ApprovalTargetType::ToolInvocation),
-            target_id: t.id.clone(),
+            target_id: t.id,
             state: format!("{:?}", t.state),
         });
     }
