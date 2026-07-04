@@ -1,0 +1,5 @@
+No changes needed for performance task.
+
+What: No optimization implemented.
+
+Why: The suggested optimization to avoid `.clone()` in a loop by borrowing `.as_str()` does not fundamentally improve performance because the string variable must still be passed to an `async move` tokio::spawn task downstream. Therefore, an owned String allocation is unavoidably required later on. Changing this would just shift the `.clone()` / `.to_string()` step downwards without eliminating the allocation, making the optimization mostly a placebo that provides no meaningful speedup.
