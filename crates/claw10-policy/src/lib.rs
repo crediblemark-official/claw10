@@ -239,3 +239,45 @@ impl PolicyService {
         sorted
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use claw10_domain::{PolicyEffect, PolicyRuleId, PolicySubject};
+
+    #[test]
+    fn test_create_bundle() {
+        let rule = PolicyRule {
+            id: PolicyRuleId(Uuid::now_v7()),
+            subject: PolicySubject::Role("admin".to_string()),
+            effect: PolicyEffect::Allow,
+            action: "read".to_string(),
+            resource: "document".to_string(),
+            condition: None,
+            priority: 10,
+        };
+        let rules = vec![rule.clone()];
+        let name = "Test Bundle".to_string();
+        let version = "1.0.0".to_string();
+
+        let bundle = PolicyService::create_bundle(name.clone(), version.clone(), rules.clone());
+
+        assert_eq!(bundle.name, name);
+        assert_eq!(bundle.version, version);
+        assert_eq!(bundle.rules.len(), 1);
+        assert_eq!(bundle.rules[0].action, "read");
+        assert_eq!(bundle.rules[0].resource, "document");
+        assert_eq!(bundle.rules[0].priority, 10);
+        assert!(!bundle.is_active);
+        assert!(bundle.signed_by.is_none());
+        assert!(bundle.signature.is_none());
+        assert!(bundle.activated_at.is_none());
+        // ID should not be nil
+        assert!(!bundle.id.0.is_nil());
+        // created_at should be reasonably close to now (within the last few seconds)
+        let now = chrono::Utc::now();
+        assert!(bundle.created_at <= now);
+        let duration = now.signed_duration_since(bundle.created_at);
+        assert!(duration.num_seconds() < 5);
+    }
+}
