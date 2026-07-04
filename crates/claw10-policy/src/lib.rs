@@ -239,3 +239,63 @@ impl PolicyService {
         sorted
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_pattern_matches() {
+        // Exact match
+        assert!(PolicyService::pattern_matches("foo", "foo"));
+        assert!(!PolicyService::pattern_matches("foo", "bar"));
+
+        // Wildcard
+        assert!(PolicyService::pattern_matches("*", "anything"));
+        assert!(PolicyService::pattern_matches("*", ""));
+
+        // Prefix match (pattern ends with *)
+        assert!(PolicyService::pattern_matches("user:*", "user:123"));
+        assert!(PolicyService::pattern_matches("user:*", "user:"));
+        assert!(!PolicyService::pattern_matches("user:*", "admin:123"));
+
+        // Suffix match (pattern starts with *)
+        assert!(PolicyService::pattern_matches("*:read", "document:read"));
+        assert!(PolicyService::pattern_matches("*:read", ":read"));
+        assert!(!PolicyService::pattern_matches("*:read", "document:write"));
+
+        // Edge cases
+        assert!(!PolicyService::pattern_matches("", "a"));
+        assert!(PolicyService::pattern_matches("", ""));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_pattern_matches() {
+        // Exact match
+        assert!(PolicyService::pattern_matches("foo", "foo"));
+        assert!(!PolicyService::pattern_matches("foo", "bar"));
+
+        // Wildcard
+        assert!(PolicyService::pattern_matches("*", "anything"));
+        assert!(PolicyService::pattern_matches("*", ""));
+
+        // Prefix match (pattern ends with *)
+        assert!(PolicyService::pattern_matches("user:*", "user:123"));
+        assert!(PolicyService::pattern_matches("user:*", "user:"));
+        assert!(!PolicyService::pattern_matches("user:*", "admin:123"));
+
+        // Suffix match (pattern starts with *)
+        assert!(PolicyService::pattern_matches("*:read", "document:read"));
+        assert!(PolicyService::pattern_matches("*:read", ":read"));
+        assert!(!PolicyService::pattern_matches("*:read", "document:write"));
+
+        // Edge cases
+        assert!(!PolicyService::pattern_matches("", "a"));
+        assert!(PolicyService::pattern_matches("", ""));
+    }
+}
