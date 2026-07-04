@@ -11,7 +11,7 @@ pub struct DescendantManager;
 impl DescendantManager {
     /// Handle parent termination by freezing all descendants.
     #[must_use]
-    pub fn freeze_descendants(parent_id: &str, all_agents: &[Agent]) -> Vec<Agent> {
+    pub fn freeze_descendants<'a>(parent_id: &str, all_agents: &'a [Agent]) -> Vec<&'a Agent> {
         let mut frozen = Vec::new();
 
         for agent in all_agents {
@@ -19,7 +19,7 @@ impl DescendantManager {
                 && pid.0.to_string() == parent_id
                 && agent.state != AgentState::Terminated
             {
-                frozen.push(agent.clone());
+                frozen.push(agent);
             }
         }
 
@@ -28,14 +28,14 @@ impl DescendantManager {
 
     /// Recursively collect all descendants of an agent.
     #[must_use]
-    pub fn collect_all_descendants(agent_id: &str, all_agents: &[Agent]) -> Vec<Agent> {
+    pub fn collect_all_descendants<'a>(agent_id: &str, all_agents: &'a [Agent]) -> Vec<&'a Agent> {
         let mut descendants = Vec::new();
 
         for agent in all_agents {
             if let Some(pid) = &agent.parent_agent_id
                 && pid.0.to_string() == agent_id
             {
-                descendants.push(agent.clone());
+                descendants.push(agent);
                 let sub = Self::collect_all_descendants(&agent.id.0.to_string(), all_agents);
                 descendants.extend(sub);
             }
@@ -45,13 +45,13 @@ impl DescendantManager {
     }
 
     /// Collect descendant agent IDs as strings for fast lookup.
-    fn descendant_ids(descendants: &[Agent]) -> Vec<String> {
+    fn descendant_ids(descendants: &[&Agent]) -> Vec<String> {
         descendants.iter().map(|a| a.id.0.to_string()).collect()
     }
 
     /// Handle descendant tasks - cancel active tasks, preserve completed ones.
     #[must_use]
-    pub fn handle_descendant_tasks(descendants: &[Agent], tasks: &[Task]) -> Vec<(String, String)> {
+    pub fn handle_descendant_tasks(descendants: &[&Agent], tasks: &[Task]) -> Vec<(String, String)> {
         let mut results = Vec::new();
         let ids = Self::descendant_ids(descendants);
 
@@ -73,7 +73,7 @@ impl DescendantManager {
 
     /// Revoke all credentials belonging to descendant agents.
     pub fn revoke_descendant_credentials(
-        descendants: &[Agent],
+        descendants: &[&Agent],
         credentials: &mut [Credential],
     ) -> Vec<String> {
         let ids: Vec<String> = descendants
@@ -95,7 +95,7 @@ impl DescendantManager {
     }
 
     /// Mark all descendant entries in the lineage as terminated.
-    pub fn cleanup_lineage_entries(descendants: &[Agent], lineage: &mut Lineage) -> Vec<String> {
+    pub fn cleanup_lineage_entries(descendants: &[&Agent], lineage: &mut Lineage) -> Vec<String> {
         let mut cleaned = Vec::new();
 
         for agent in descendants {
