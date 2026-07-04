@@ -85,3 +85,66 @@ impl Default for ToolRegistry {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use async_trait::async_trait;
+    use claw10_domain::SideEffectClass;
+    use serde_json::json;
+
+    struct MockTool {
+        name: String,
+    }
+
+    #[async_trait]
+    impl Tool for MockTool {
+        fn name(&self) -> &str {
+            &self.name
+        }
+
+        fn description(&self) -> &str {
+            "A mock tool for testing"
+        }
+
+        fn input_schema(&self) -> serde_json::Value {
+            json!({})
+        }
+
+        fn categories(&self) -> Vec<&str> {
+            vec![]
+        }
+
+        fn side_effect_class(&self) -> SideEffectClass {
+            SideEffectClass::ReadOnly
+        }
+
+        async fn execute(
+            &self,
+            _context: &ToolContext,
+            _args: serde_json::Value,
+        ) -> Result<ToolOutput, ToolError> {
+            Ok(ToolOutput::ok(json!("success")))
+        }
+    }
+
+    #[test]
+    fn test_registry_new_is_empty() {
+        let registry = ToolRegistry::new();
+        assert!(registry.list().is_empty());
+    }
+
+    #[test]
+    fn test_register_tool() {
+        let mut registry = ToolRegistry::new();
+        let tool = MockTool {
+            name: "test_tool".to_string(),
+        };
+
+        registry.register(Box::new(tool));
+
+        assert!(registry.has_tool("test_tool"));
+        let retrieved = registry.get("test_tool").unwrap();
+        assert_eq!(retrieved.name(), "test_tool");
+    }
+}
