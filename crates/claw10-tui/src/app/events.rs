@@ -5,7 +5,7 @@ use crossterm::event::{Event, KeyCode, KeyEventKind};
 use claw10_agent::events::AgentEvent;
 use claw10_model_router::types::{ChatRequest, MessageRole, ModelMessage, StreamEvent};
 use crate::app::{CommandMode, ModelSelectionStep, Screen, Tab, TuiApp};
-use crate::app::palette::{get_palette_items, provider_api_key_env};
+use crate::app::palette::get_palette_items;
 
 impl TuiApp {
     pub(crate) async fn handle_event(&mut self, event: Event) {
@@ -65,10 +65,8 @@ impl TuiApp {
                                         *key_input = key;
                                     } else {
                                         let actual_key = key.trim().to_string();
-                                        let env_var = provider_api_key_env(&provider);
-                                        unsafe { std::env::set_var(&env_var, &actual_key) };
-                                        self.register_all_providers().await;
                                         self.persist_api_key(&provider, &actual_key).await;
+                                        self.register_all_providers().await;
                                         let model_count = self.state.model_router.as_ref()
                                             .and_then(|r| Some(r.registry().list_profiles().len()))
                                             .unwrap_or(0);
@@ -106,10 +104,8 @@ impl TuiApp {
                                         *error_message = format!("API key for '{provider}' is empty.");
                                         *key_input = trimmed;
                                     } else {
-                                        let env_var = provider_api_key_env(&provider);
-                                        unsafe { std::env::set_var(&env_var, &actual_key) };
-                                        self.register_all_providers().await;
                                         self.persist_api_key(&provider, &actual_key).await;
+                                        self.register_all_providers().await;
                                         let model_count = self.state.model_router.as_ref()
                                             .and_then(|r| Some(r.registry().list_profiles().len()))
                                             .unwrap_or(0);

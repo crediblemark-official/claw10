@@ -55,20 +55,28 @@ fn test_resolve_api_key_inline() {
 
 #[test]
 fn test_resolve_api_key_env_ref() {
-    unsafe { std::env::set_var("TEST_OPENAI_KEY", "sk-test-env"); }
-    let kv = |_: &str| None;
+    let kv = |k: &str| {
+        if k == "config:test_openai_key_api_key" {
+            Some("sk-test-env".to_string())
+        } else {
+            None
+        }
+    };
     let key = resolve_api_key("$TEST_OPENAI_KEY", "", &kv);
     assert_eq!(key, Some("sk-test-env".to_string()));
-    unsafe { std::env::remove_var("TEST_OPENAI_KEY"); }
 }
 
 #[test]
 fn test_resolve_api_key_empty_ref_falls_to_slot_env() {
-    unsafe { std::env::set_var("TEST_SLOT_ENV", "sk-slot-fallback"); }
-    let kv = |_: &str| None;
+    let kv = |k: &str| {
+        if k == "config:test_slot_env_api_key" {
+            Some("sk-slot-fallback".to_string())
+        } else {
+            None
+        }
+    };
     let key = resolve_api_key("", "TEST_SLOT_ENV", &kv);
     assert_eq!(key, Some("sk-slot-fallback".to_string()));
-    unsafe { std::env::remove_var("TEST_SLOT_ENV"); }
 }
 
 #[test]
@@ -109,17 +117,22 @@ api_key = "sk-test-openai"
 fn test_resolve_providers_bare_slot() {
     use crate::providers;
     let builtin = providers::provider_configs();
-    unsafe { std::env::set_var("OPENAI_API_KEY", "sk-bare-test"); }
     let config: Option<Claw10Config> = None;
-    let kv = |_: &str| None;
+    let kv = |k: &str| {
+        if k == "config:openai_api_key_api_key" {
+            Some("sk-bare-test".to_string())
+        } else {
+            None
+        }
+    };
     let (resolved, errors) = resolve_providers(config.as_ref(), builtin, kv);
     assert!(errors.is_empty());
     let openai = resolved.iter().find(|r| r.name == "openai");
-    assert!(openai.is_some(), "openai should resolve from env var");
+    assert!(openai.is_some(), "openai should resolve from KV");
     if let Some(o) = openai {
         assert_eq!(o.base_url, "https://api.openai.com/v1");
+        assert_eq!(o.api_key, "sk-bare-test");
     }
-    unsafe { std::env::remove_var("OPENAI_API_KEY"); }
 }
 
 #[test]

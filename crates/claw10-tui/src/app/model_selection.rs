@@ -23,9 +23,6 @@ impl TuiApp {
             if let Ok(Some(val)) = self.global_store.get::<String>(&store_key).await {
                 let trimmed = val.trim().to_string();
                 if !trimmed.is_empty() {
-                    // Sinkronisasi dengan environment variable
-                    let env_var = crate::app::palette::provider_api_key_env(&slot.name);
-                    unsafe { std::env::set_var(&env_var, &trimmed) };
                     kv_map.insert(store_key, trimmed);
                 }
             }
@@ -52,25 +49,10 @@ impl TuiApp {
                     continue;
                 }
 
+                let store_key = format!("config:{}_api_key", config.name);
                 let key = match std::env::var(config.api_key_env) {
                     Ok(k) if !k.is_empty() => Some(k),
-                    _ => {
-                        let store_key = format!("config:{}_api_key", config.name);
-                        if let Some(k) = self.global_store
-                            .get::<String>(&store_key)
-                            .await
-                            .ok()
-                            .flatten()
-                            .filter(|k| !k.trim().is_empty())
-                            .map(|k| k.trim().to_string())
-                        {
-                            // Sinkronisasi dengan environment variable
-                            unsafe { std::env::set_var(config.api_key_env, &k) };
-                            Some(k)
-                        } else {
-                            None
-                        }
-                    }
+                    _ => kv_map.get(&store_key).cloned()
                 };
                 if let Some(key) = key {
                     registry.register(Box::new(
