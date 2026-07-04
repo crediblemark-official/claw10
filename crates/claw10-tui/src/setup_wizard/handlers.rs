@@ -196,9 +196,6 @@ impl SetupWizard {
     }
 
     pub(crate) fn start_telegram_binding_poll(&mut self) {
-        unsafe {
-            std::env::set_var("TELEGRAM_CHAT_ID", "");
-        }
         let (tx, rx) = std::sync::mpsc::channel();
         self.binding_rx = Some(rx);
         if !self.telegram_chat_id.is_empty() {

@@ -1,3 +1,4 @@
+#![allow(clippy::pedantic)]
 use std::fmt::Write;
 
 use claw10_domain::agent::Agent;
