@@ -164,7 +164,10 @@ fn load_priority_models(provider: &str) -> Vec<String> {
 pub fn group_models_by_family(models: Vec<ModelProfile>) -> Vec<ModelFamily> {
     use std::collections::HashMap;
 
-    let provider_name = models.first().map(|m| m.provider.clone()).unwrap_or_else(|| "nvidia".to_string());
+    let provider_name = models
+        .first()
+        .map(|m| m.provider.clone())
+        .unwrap_or_else(|| "nvidia".to_string());
     let priority_list = load_priority_models(&provider_name);
 
     let mut families: HashMap<String, Vec<ModelProfile>> = HashMap::new();
@@ -179,7 +182,9 @@ pub fn group_models_by_family(models: Vec<ModelProfile>) -> Vec<ModelFamily> {
             .split_whitespace()
             .map(|w| {
                 let mut c = w.chars();
-                c.next().map(|f| f.to_uppercase().to_string() + c.as_str()).unwrap_or_default()
+                c.next()
+                    .map(|f| f.to_uppercase().to_string() + c.as_str())
+                    .unwrap_or_default()
             })
             .collect::<Vec<_>>()
             .join(" ");
@@ -195,7 +200,7 @@ pub fn group_models_by_family(models: Vec<ModelProfile>) -> Vec<ModelFamily> {
     // Sort: Berdasarkan skor prioritas dari berkas JSON (descending), lalu alfabetis jika skor sama
     let get_priority_score = |name: &str| -> i32 {
         let name_lower = name.to_lowercase();
-        
+
         // Cari posisi model dari priority list dinamis
         if let Some(pos) = priority_list.iter().position(|m| name_lower.contains(m)) {
             // Score tertinggi didapatkan oleh index terawal:
@@ -204,13 +209,27 @@ pub fn group_models_by_family(models: Vec<ModelProfile>) -> Vec<ModelFamily> {
         }
 
         // Keyword umum jika tidak cocok spesifik
-        if name_lower.contains("deepseek") { return 100; }
-        if name_lower.contains("kimi") { return 90; }
-        if name_lower.contains("llama") || name_lower.contains("nemotron") { return 80; }
-        if name_lower.contains("mistral") || name_lower.contains("codestral") { return 70; }
-        if name_lower.contains("qwen") { return 60; }
-        if name_lower.contains("gemma") { return 50; }
-        if name_lower.contains("phi") { return 20; }
+        if name_lower.contains("deepseek") {
+            return 100;
+        }
+        if name_lower.contains("kimi") {
+            return 90;
+        }
+        if name_lower.contains("llama") || name_lower.contains("nemotron") {
+            return 80;
+        }
+        if name_lower.contains("mistral") || name_lower.contains("codestral") {
+            return 70;
+        }
+        if name_lower.contains("qwen") {
+            return 60;
+        }
+        if name_lower.contains("gemma") {
+            return 50;
+        }
+        if name_lower.contains("phi") {
+            return 20;
+        }
         0
     };
 
@@ -237,12 +256,35 @@ fn extract_model_stem(model_id: &str) -> String {
     let id = model_id.split('/').last().unwrap_or(model_id);
 
     let variant_suffixes = [
-        "mini", "micro", "nano", "small", "medium", "large",
-        "flash", "pro", "turbo", "lite", "ultra", "max", "plus",
-        "sonnet", "haiku", "opus",
-        "instruct", "chat", "code", "reasoning", "thinking",
-        "preview", "exp", "experimental", "latest", "stable",
-        "vision", "audio", "realtime",
+        "mini",
+        "micro",
+        "nano",
+        "small",
+        "medium",
+        "large",
+        "flash",
+        "pro",
+        "turbo",
+        "lite",
+        "ultra",
+        "max",
+        "plus",
+        "sonnet",
+        "haiku",
+        "opus",
+        "instruct",
+        "chat",
+        "code",
+        "reasoning",
+        "thinking",
+        "preview",
+        "exp",
+        "experimental",
+        "latest",
+        "stable",
+        "vision",
+        "audio",
+        "realtime",
     ];
 
     let parts: Vec<&str> = id.split('-').collect();

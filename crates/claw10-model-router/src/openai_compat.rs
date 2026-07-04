@@ -319,10 +319,7 @@ impl OpenAiCompatibleProvider {
     }
 
     /// Common HTTP POST for chat completions (used by both streaming and non-streaming).
-    async fn post_chat(
-        &self,
-        compat_req: &CompatRequest,
-    ) -> Result<reqwest::Response, ModelError> {
+    async fn post_chat(&self, compat_req: &CompatRequest) -> Result<reqwest::Response, ModelError> {
         let url = self.chat_url();
         let response = self
             .client
@@ -403,11 +400,8 @@ impl ModelProvider for OpenAiCompatibleProvider {
             .map_err(|e| ModelError::ApiError(format!("failed to parse model list: {e}")))?;
 
         // Merge with known profiles so we keep metadata (context window, cost, etc.)
-        let known: std::collections::HashMap<&str, &ModelProfile> = self
-            .models
-            .iter()
-            .map(|m| (m.id.as_str(), m))
-            .collect();
+        let known: std::collections::HashMap<&str, &ModelProfile> =
+            self.models.iter().map(|m| (m.id.as_str(), m)).collect();
 
         let fetched: Vec<ModelProfile> = list
             .data
@@ -470,15 +464,21 @@ impl ModelProvider for OpenAiCompatibleProvider {
             .unwrap_or(MessageRole::Assistant);
 
         let tool_calls = msg.tool_calls.as_ref().map(|calls| {
-            calls.iter().map(|tc| {
-                let args_parsed = serde_json::from_str::<serde_json::Value>(&tc.function.arguments)
-                    .unwrap_or_else(|_| serde_json::Value::String(tc.function.arguments.clone()));
-                crate::types::ToolCall {
-                    id: tc.id.clone(),
-                    name: tc.function.name.clone(),
-                    arguments: args_parsed,
-                }
-            }).collect()
+            calls
+                .iter()
+                .map(|tc| {
+                    let args_parsed =
+                        serde_json::from_str::<serde_json::Value>(&tc.function.arguments)
+                            .unwrap_or_else(|_| {
+                                serde_json::Value::String(tc.function.arguments.clone())
+                            });
+                    crate::types::ToolCall {
+                        id: tc.id.clone(),
+                        name: tc.function.name.clone(),
+                        arguments: args_parsed,
+                    }
+                })
+                .collect()
         });
 
         let finish_reason = choice
@@ -509,17 +509,16 @@ impl ModelProvider for OpenAiCompatibleProvider {
             usage: UsageInfo {
                 prompt_tokens,
                 completion_tokens,
-                total_tokens: usage.total_tokens.unwrap_or(prompt_tokens + completion_tokens),
+                total_tokens: usage
+                    .total_tokens
+                    .unwrap_or(prompt_tokens + completion_tokens),
                 cost_usd: cost,
             },
             model_used: compat_resp.model.unwrap_or(request.model),
         })
     }
 
-    async fn chat_stream(
-        &self,
-        request: ChatRequest,
-    ) -> Result<StreamHandle, ModelError> {
+    async fn chat_stream(&self, request: ChatRequest) -> Result<StreamHandle, ModelError> {
         if self.api_key.is_empty() {
             return Err(ModelError::ApiError(format!(
                 "API key not set for provider '{}'",
@@ -539,10 +538,9 @@ impl ModelProvider for OpenAiCompatibleProvider {
             use tokio::io::AsyncBufReadExt;
 
             let body = response.bytes_stream();
-            let mut reader =
-                tokio_util::io::StreamReader::new(body.map(|r| {
-                    r.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
-                }));
+            let mut reader = tokio_util::io::StreamReader::new(
+                body.map(|r| r.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))),
+            );
             let mut line_buf = String::new();
 
             loop {
@@ -572,9 +570,8 @@ impl ModelProvider for OpenAiCompatibleProvider {
                                     for choice in &chunk.choices {
                                         if let Some(ref content) = choice.delta.content {
                                             if !content.is_empty() {
-                                                let _ = tx.send(StreamEvent::TextDelta(
-                                                    content.clone(),
-                                                ));
+                                                let _ = tx
+                                                    .send(StreamEvent::TextDelta(content.clone()));
                                             }
                                         }
                                         if let Some(ref tcs) = choice.delta.tool_calls {
@@ -588,7 +585,8 @@ impl ModelProvider for OpenAiCompatibleProvider {
                                                 let _ = tx.send(StreamEvent::ToolCallDelta {
                                                     index: idx,
                                                     id: tc.id.clone(),
-                                                    name: tc.function
+                                                    name: tc
+                                                        .function
                                                         .as_ref()
                                                         .and_then(|f| f.name.clone()),
                                                     arguments: args,
@@ -631,9 +629,8 @@ impl ModelProvider for OpenAiCompatibleProvider {
                         {
                             let _ = tx.send(StreamEvent::Done);
                         } else {
-                            let _ = tx.send(StreamEvent::Error(format!(
-                                "stream read error: {err_msg}"
-                            )));
+                            let _ = tx
+                                .send(StreamEvent::Error(format!("stream read error: {err_msg}")));
                         }
                         break;
                     }

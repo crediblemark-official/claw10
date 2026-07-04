@@ -21,15 +21,14 @@ pub trait ModelProvider: Send + Sync {
     /// Fetch available models from the provider's API.
     /// Default implementation returns an error (not supported).
     async fn fetch_models(&self) -> Result<Vec<ModelProfile>, ModelError> {
-        Err(ModelError::Other("model listing not supported by this provider".to_string()))
+        Err(ModelError::Other(
+            "model listing not supported by this provider".to_string(),
+        ))
     }
 
     /// Stream a chat response via SSE. Returns a handle to consume events incrementally.
     /// Default implementation falls back to non-streaming `chat()`.
-    async fn chat_stream(
-        &self,
-        request: ChatRequest,
-    ) -> Result<StreamHandle, ModelError> {
+    async fn chat_stream(&self, request: ChatRequest) -> Result<StreamHandle, ModelError> {
         // Default: collect full response and emit it as a single event
         let response = self.chat(request).await?;
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
@@ -54,10 +53,12 @@ impl ModelRegistry {
     #[must_use]
     pub fn new() -> Self {
         let mut profiles = Vec::new();
-        
+
         let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
-        let cache_file = std::path::PathBuf::from(&home).join(".claw10").join("models.json");
-        
+        let cache_file = std::path::PathBuf::from(&home)
+            .join(".claw10")
+            .join("models.json");
+
         if cache_file.exists() {
             if let Ok(content) = std::fs::read_to_string(&cache_file) {
                 if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
@@ -84,7 +85,7 @@ impl ModelRegistry {
                 }
             }
         }
-        
+
         Self {
             providers: HashMap::new(),
             profiles: RwLock::new(profiles),
@@ -107,7 +108,10 @@ impl ModelRegistry {
     /// Idempoten — tidak menambah duplikat berdasarkan `id`.
     pub fn inject_profile(&self, profile: ModelProfile) {
         let mut profiles = self.profiles.write().expect("profiles RwLock poisoned");
-        if !profiles.iter().any(|p| p.id == profile.id && p.provider == profile.provider) {
+        if !profiles
+            .iter()
+            .any(|p| p.id == profile.id && p.provider == profile.provider)
+        {
             profiles.push(profile);
         }
     }
@@ -116,7 +120,10 @@ impl ModelRegistry {
     pub fn inject_profiles(&self, new_profiles: Vec<ModelProfile>) {
         let mut profiles = self.profiles.write().expect("profiles RwLock poisoned");
         for profile in new_profiles {
-            if !profiles.iter().any(|p| p.id == profile.id && p.provider == profile.provider) {
+            if !profiles
+                .iter()
+                .any(|p| p.id == profile.id && p.provider == profile.provider)
+            {
                 profiles.push(profile);
             }
         }

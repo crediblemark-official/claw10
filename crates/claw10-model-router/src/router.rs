@@ -102,6 +102,21 @@ impl ModelRouter {
         fallback_profiles: &[String],
         request: ChatRequest,
     ) -> Result<ChatResponse, ModelError> {
+        // If there are no fallbacks, we don't need to clone the request for the preferred profile.
+        if fallback_profiles.is_empty() {
+            match self.route_chat(preferred_profile, request).await {
+                Ok(response) => return Ok(response),
+                Err(e) => {
+                    tracing::warn!(
+                        "preferred profile '{}' failed: {}, no fallbacks available",
+                        preferred_profile,
+                        e
+                    );
+                    return Err(ModelError::AllFallbacksExhausted);
+                }
+            }
+        }
+
         match self.route_chat(preferred_profile, request.clone()).await {
             Ok(response) => Ok(response),
             Err(e) => {
@@ -110,11 +125,21 @@ impl ModelRouter {
                     preferred_profile,
                     e
                 );
-                for fallback in fallback_profiles {
-                    match self.route_chat(fallback, request.clone()).await {
+                if let Some((last_fallback, rest_fallbacks)) = fallback_profiles.split_last() {
+                    for fallback in rest_fallbacks {
+                        match self.route_chat(fallback, request.clone()).await {
+                            Ok(response) => return Ok(response),
+                            Err(e2) => {
+                                tracing::warn!("fallback '{}' also failed: {}", fallback, e2);
+                            }
+                        }
+                    }
+
+                    // Consume the request on the final fallback
+                    match self.route_chat(last_fallback, request).await {
                         Ok(response) => return Ok(response),
                         Err(e2) => {
-                            tracing::warn!("fallback '{}' also failed: {}", fallback, e2);
+                            tracing::warn!("fallback '{}' also failed: {}", last_fallback, e2);
                         }
                     }
                 }
@@ -164,12 +189,12 @@ impl ModelRouter {
         // Try each candidate
         for candidate in &candidates {
             // Extract the actual profile ID for fallback_models (prefixed with `model@profile`)
-            let actual = if let Some(stripped) = candidate.strip_suffix(&format!("@{primary_profile}"))
-            {
-                stripped
-            } else {
-                candidate.as_str()
-            };
+            let actual =
+                if let Some(stripped) = candidate.strip_suffix(&format!("@{primary_profile}")) {
+                    stripped
+                } else {
+                    candidate.as_str()
+                };
 
             match self.route_chat(actual, request.clone()).await {
                 Ok(resp) => return Ok(resp),

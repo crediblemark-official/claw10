@@ -40,7 +40,6 @@ pub struct Claw10Config {
     /// Fully custom OpenAI-compatible providers not in the built-in catalog.
     #[serde(default)]
     pub custom: HashMap<String, CustomProvider>,
-
 }
 
 /// An alias referencing a built-in provider slot with a specific model.
@@ -199,10 +198,7 @@ pub fn resolve_providers(
     let mut errors = Vec::new();
 
     // Build a slot lookup from built-in catalog
-    let slot_map: HashMap<&str, &ProviderConfig> = builtin
-        .iter()
-        .map(|c| (c.name, c))
-        .collect();
+    let slot_map: HashMap<&str, &ProviderConfig> = builtin.iter().map(|c| (c.name, c)).collect();
 
     let mut accounted_slots: std::collections::BTreeSet<&str> = std::collections::BTreeSet::new();
 
@@ -238,21 +234,24 @@ pub fn resolve_providers(
             };
 
             // Find the model profile from the slot's built-in models
-            let profile = slot.models.iter().find(|m| {
-                m.id == alias.model || m.model_name == alias.model
-            }).cloned().unwrap_or_else(|| {
-                // Create a minimal profile if the model isn't in the catalog
-                ModelProfile {
-                    id: alias.model.clone(),
-                    provider: registry_name.clone(),
-                    model_name: alias.model.clone(),
-                    context_window: 128_000,
-                    max_output_tokens: alias.max_tokens.unwrap_or(8_192),
-                    cost_per_1m_input: 0.0,
-                    cost_per_1m_output: 0.0,
-                    suitable_for: vec!["general".to_string()],
-                }
-            });
+            let profile = slot
+                .models
+                .iter()
+                .find(|m| m.id == alias.model || m.model_name == alias.model)
+                .cloned()
+                .unwrap_or_else(|| {
+                    // Create a minimal profile if the model isn't in the catalog
+                    ModelProfile {
+                        id: alias.model.clone(),
+                        provider: registry_name.clone(),
+                        model_name: alias.model.clone(),
+                        context_window: 128_000,
+                        max_output_tokens: alias.max_tokens.unwrap_or(8_192),
+                        cost_per_1m_input: 0.0,
+                        cost_per_1m_output: 0.0,
+                        suitable_for: vec!["general".to_string()],
+                    }
+                });
 
             resolved.push(ResolvedProvider {
                 name: registry_name,
@@ -372,7 +371,10 @@ fn resolve_api_key(
             }
         }
         // 3. Try KV store with slot name
-        let store_key = format!("config:{}_api_key", slot_env.to_lowercase().trim_end_matches("_API_KEY"));
+        let store_key = format!(
+            "config:{}_api_key",
+            slot_env.to_lowercase().trim_end_matches("_API_KEY")
+        );
         if let Some(val) = kv_get(&store_key) {
             if !val.is_empty() {
                 return Some(val);

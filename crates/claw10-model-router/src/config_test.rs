@@ -55,20 +55,28 @@ fn test_resolve_api_key_inline() {
 
 #[test]
 fn test_resolve_api_key_env_ref() {
-    unsafe { std::env::set_var("TEST_OPENAI_KEY", "sk-test-env"); }
+    unsafe {
+        std::env::set_var("TEST_OPENAI_KEY", "sk-test-env");
+    }
     let kv = |_: &str| None;
     let key = resolve_api_key("$TEST_OPENAI_KEY", "", &kv);
     assert_eq!(key, Some("sk-test-env".to_string()));
-    unsafe { std::env::remove_var("TEST_OPENAI_KEY"); }
+    unsafe {
+        std::env::remove_var("TEST_OPENAI_KEY");
+    }
 }
 
 #[test]
 fn test_resolve_api_key_empty_ref_falls_to_slot_env() {
-    unsafe { std::env::set_var("TEST_SLOT_ENV", "sk-slot-fallback"); }
+    unsafe {
+        std::env::set_var("TEST_SLOT_ENV", "sk-slot-fallback");
+    }
     let kv = |_: &str| None;
     let key = resolve_api_key("", "TEST_SLOT_ENV", &kv);
     assert_eq!(key, Some("sk-slot-fallback".to_string()));
-    unsafe { std::env::remove_var("TEST_SLOT_ENV"); }
+    unsafe {
+        std::env::remove_var("TEST_SLOT_ENV");
+    }
 }
 
 #[test]
@@ -109,7 +117,9 @@ api_key = "sk-test-openai"
 fn test_resolve_providers_bare_slot() {
     use crate::providers;
     let builtin = providers::provider_configs();
-    unsafe { std::env::set_var("OPENAI_API_KEY", "sk-bare-test"); }
+    unsafe {
+        std::env::set_var("OPENAI_API_KEY", "sk-bare-test");
+    }
     let config: Option<Claw10Config> = None;
     let kv = |_: &str| None;
     let (resolved, errors) = resolve_providers(config.as_ref(), builtin, kv);
@@ -119,7 +129,9 @@ fn test_resolve_providers_bare_slot() {
     if let Some(o) = openai {
         assert_eq!(o.base_url, "https://api.openai.com/v1");
     }
-    unsafe { std::env::remove_var("OPENAI_API_KEY"); }
+    unsafe {
+        std::env::remove_var("OPENAI_API_KEY");
+    }
 }
 
 #[test]
