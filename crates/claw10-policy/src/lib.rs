@@ -239,3 +239,21 @@ impl PolicyService {
         sorted
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_policy_activate() {
+        let mut bundle = PolicyService::create_bundle("test_bundle".into(), "1.0.0".into(), vec![]);
+
+        assert!(!bundle.is_active);
+        assert!(bundle.activated_at.is_none());
+
+        PolicyService::activate(&mut bundle);
+
+        assert!(bundle.is_active);
+        assert!(bundle.activated_at.is_some());
+    }
+}
