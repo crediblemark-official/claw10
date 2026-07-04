@@ -21,6 +21,42 @@ fn test_rbac_assign_and_get_permissions() {
 }
 
 #[test]
+fn test_rbac_assign_permissions_overwrite() {
+    let mut rbac = RbacService::new();
+    let role_id = RoleId(Uuid::now_v7());
+
+    // Initial assignment
+    rbac.assign_permissions(role_id.clone(), vec![Permission("read:file".to_string())]);
+
+    // Overwrite assignment
+    rbac.assign_permissions(role_id.clone(), vec![Permission("write:file".to_string())]);
+
+    let retrieved = rbac.get_role_permissions(&role_id);
+    assert_eq!(retrieved.len(), 1);
+    assert_eq!(retrieved[0], Permission("write:file".to_string()));
+}
+
+#[test]
+fn test_rbac_assign_empty_permissions() {
+    let mut rbac = RbacService::new();
+    let role_id = RoleId(Uuid::now_v7());
+
+    rbac.assign_permissions(role_id.clone(), vec![]);
+
+    let retrieved = rbac.get_role_permissions(&role_id);
+    assert_eq!(retrieved.len(), 0);
+}
+
+#[test]
+fn test_rbac_unassigned_role_permissions() {
+    let rbac = RbacService::new();
+    let role_id = RoleId(Uuid::now_v7());
+
+    let retrieved = rbac.get_role_permissions(&role_id);
+    assert_eq!(retrieved.len(), 0);
+}
+
+#[test]
 fn test_rbac_get_roles_permissions_deduplication() {
     let mut rbac = RbacService::new();
     let role_a = RoleId(Uuid::now_v7());
