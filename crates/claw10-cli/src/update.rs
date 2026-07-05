@@ -60,8 +60,15 @@ pub async fn check_and_perform_update(is_auto: bool) -> Result<(), Box<dyn std::
         }
 
         let script_content = script_res.text().await?;
-        let tmp_script_path = std::env::temp_dir().join("claw10_install.sh");
-        std::fs::write(&tmp_script_path, script_content)?;
+        let mut tmp_file = tempfile::Builder::new()
+            .prefix("claw10_install_")
+            .suffix(".sh")
+            .tempfile()?;
+
+        use std::io::Write;
+        tmp_file.write_all(script_content.as_bytes())?;
+
+        let tmp_script_path = tmp_file.into_temp_path();
 
         // Set permission execute
         #[cfg(unix)]
