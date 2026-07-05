@@ -550,7 +550,7 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
             Style::default().fg(Color::White)
         };
         for line in &input_lines {
-            chat_input_lines.push(Line::from(Span::styled(line.clone(), text_style)));
+            chat_input_lines.push(Line::from(Span::styled(line.as_str(), text_style)));
         }
     }
     chat_input_lines.push(Line::from("")); // Spacer
