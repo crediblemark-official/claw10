@@ -569,28 +569,25 @@ impl ModelProvider for OpenAiCompatibleProvider {
                                             .as_deref()
                                             .is_some_and(|fr| !fr.is_empty() && fr != "null")
                                     });
-                                    for choice in &chunk.choices {
-                                        if let Some(ref content) = choice.delta.content {
+                                    for choice in chunk.choices {
+                                        if let Some(content) = choice.delta.content {
                                             if !content.is_empty() {
                                                 let _ = tx.send(StreamEvent::TextDelta(
-                                                    content.clone(),
+                                                    content,
                                                 ));
                                             }
                                         }
-                                        if let Some(ref tcs) = choice.delta.tool_calls {
+                                        if let Some(tcs) = choice.delta.tool_calls {
                                             for tc in tcs {
                                                 let idx = tc.index.unwrap_or(0);
-                                                let args = tc
-                                                    .function
-                                                    .as_ref()
-                                                    .and_then(|f| f.arguments.clone())
-                                                    .unwrap_or_default();
+                                                let (name, args) = match tc.function {
+                                                    Some(f) => (f.name, f.arguments.unwrap_or_default()),
+                                                    None => (None, String::new()),
+                                                };
                                                 let _ = tx.send(StreamEvent::ToolCallDelta {
                                                     index: idx,
-                                                    id: tc.id.clone(),
-                                                    name: tc.function
-                                                        .as_ref()
-                                                        .and_then(|f| f.name.clone()),
+                                                    id: tc.id,
+                                                    name,
                                                     arguments: args,
                                                 });
                                             }
