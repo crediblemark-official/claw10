@@ -245,11 +245,12 @@ pub async fn approve_spawn(
         }
     };
 
+    let parent_id = Some(requested_by.clone());
     for child in &children {
         LineageService::add_entry(
             &mut lineage,
             child.id.clone(),
-            Some(requested_by.clone()),
+            parent_id.clone(),
             child.role.clone(),
         );
     }
