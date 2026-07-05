@@ -1,3 +1,4 @@
+#![allow(clippy::pedantic)]
 use std::sync::Arc;
 
 use chrono::Utc;

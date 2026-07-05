@@ -6,7 +6,6 @@ use claw10_domain::{
 use claw10_store::StoreExt;
 
 use crate::app::{Tab, TuiApp};
-use crate::app::palette::provider_api_key_env;
 
 impl TuiApp {
     pub(crate) async fn execute_command(&mut self, cmd: &str) {
@@ -60,10 +59,8 @@ Type any message to start a chat with the active model.",
                 } else {
                     let provider_type = parts[1].to_lowercase();
                     let api_key = parts[2..].join(" ");
-                    let env_var = provider_api_key_env(&provider_type);
-                    unsafe { std::env::set_var(&env_var, &api_key) };
-                    self.register_all_providers().await;
                     self.persist_api_key(&provider_type, &api_key).await;
+                    self.register_all_providers().await;
                     format!("{} API key set & saved.", provider_type)
                 }
             }

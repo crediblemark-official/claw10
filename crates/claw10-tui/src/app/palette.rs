@@ -1,14 +1,3 @@
-/// Resolve API key env var name for a provider.
-/// First checks the built-in catalog, falls back to `{NAME}_API_KEY` convention.
-pub(crate) fn provider_api_key_env(provider: &str) -> String {
-    // Check built-in catalog
-    if let Some(slot) = claw10_model_router::providers::get_provider_slot(provider) {
-        return slot.api_key_env.to_string();
-    }
-    // Fallback to conventional naming
-    format!("{}_API_KEY", provider.to_uppercase())
-}
-
 pub fn get_palette_items() -> Vec<(String, String, String, String)> {
     let mut items: Vec<(String, String, String, String)> = vec![
         ("Suggested".into(), "Switch session".into(), "ctrl+x l".into(), "/session_switch".into()),

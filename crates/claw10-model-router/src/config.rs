@@ -372,7 +372,7 @@ fn resolve_api_key(
             }
         }
         // 3. Try KV store with slot name
-        let store_key = format!("config:{}_api_key", slot_env.to_lowercase().trim_end_matches("_API_KEY"));
+        let store_key = format!("config:{}_api_key", slot_env.to_lowercase().trim_end_matches("_api_key"));
         if let Some(val) = kv_get(&store_key) {
             if !val.is_empty() {
                 return Some(val);
