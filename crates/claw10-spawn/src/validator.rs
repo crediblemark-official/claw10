@@ -117,10 +117,12 @@ impl SpawnValidator {
                 let child_perms =
                     RbacService::child_permissions(&parent.delegable_permissions, custom_perms);
                 if child_perms.len() != custom_perms.len() {
-                    for cp in custom_perms {
-                        if !parent.delegable_permissions.contains(cp) {
-                            return Err(SpawnError::PermissionNotDelegable(cp.0.clone()));
-                        }
+                    if let Some(missing) = custom_perms
+                        .iter()
+                        .find(|cp| !parent.delegable_permissions.contains(cp))
+                    {
+                        let missing_perm = missing.0.clone();
+                        return Err(SpawnError::PermissionNotDelegable(missing_perm));
                     }
                 }
             }
