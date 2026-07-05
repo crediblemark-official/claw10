@@ -817,8 +817,7 @@ impl TuiApp {
             }
 
             // Resolve model profile sebelum passing ke broker
-            let mut resolved_req = req.clone();
-            for child in &mut resolved_req.children {
+            for child in &mut req.children {
                 if child.model_profile == "default" {
                     child.model_profile = self.active_model.clone();
                 }
@@ -862,7 +861,7 @@ impl TuiApp {
             match self
                 .state
                 .spawn_broker
-                .process_spawn_request(&mut parent, &mission, &resolved_req, &all_agents, current_depth)
+                .process_spawn_request(&mut parent, &mission, &req, &all_agents, current_depth)
                 .await
             {
                 Ok(children) => {
