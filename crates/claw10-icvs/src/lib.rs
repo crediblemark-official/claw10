@@ -77,13 +77,13 @@ impl IcvsCompiler {
             ));
         }
 
-        let mut nodes = Vec::new();
-        let mut edges = Vec::new();
-        let mut targets: HashMap<String, Vec<String>> = HashMap::new();
+        let mut nodes = Vec::with_capacity(doc.nodes.len());
+        let mut edges = Vec::with_capacity(doc.edges.len());
+        let mut targets: HashMap<String, Vec<String>> = HashMap::with_capacity(doc.targets.len());
 
-        for (id, node) in &doc.nodes {
+        for (id, node) in doc.nodes.into_iter() {
             let node_type_str = node.node_type.as_str().to_string();
-            let content = node.content.clone();
+            let content = node.content;
             let severity = node.severity.map(|s| s.as_str().to_string());
             let condition = node.condition.as_ref().map(|c| format!("{} {} {}", c.variable, c.operator, c.value));
             let mut properties = HashMap::new();
@@ -92,7 +92,7 @@ impl IcvsCompiler {
             }
 
             nodes.push(IcvsNode {
-                id: id.clone(),
+                id,
                 node_type: node_type_str,
                 content,
                 severity,
@@ -101,17 +101,17 @@ impl IcvsCompiler {
             });
         }
 
-        for edge in &doc.edges {
+        for edge in doc.edges.into_iter() {
             edges.push(IcvsEdge {
-                source: edge.source.clone(),
-                target: edge.target.clone(),
-                label: edge.label.clone(),
+                source: edge.source,
+                target: edge.target,
+                label: edge.label,
             });
         }
 
-        for (name, target) in &doc.targets {
-            if let Some(ref resolve) = target.resolve {
-                targets.insert(name.clone(), resolve.clone());
+        for (name, target) in doc.targets.into_iter() {
+            if let Some(resolve) = target.resolve {
+                targets.insert(name, resolve);
             }
         }
 
@@ -126,8 +126,8 @@ impl IcvsCompiler {
         let doc = icvs::parser::parse_document(source)
             .map_err(|e| IcvsError::Parse(e.to_string()))?;
 
-        let mut rules = Vec::new();
-        for (id, node) in &doc.nodes {
+        let mut rules = Vec::with_capacity(doc.nodes.len());
+        for (id, node) in doc.nodes.into_iter() {
             let is_policy_node = matches!(
                 node.node_type,
                 NodeType::Rule | NodeType::Blocklist | NodeType::Allowlist
@@ -139,8 +139,7 @@ impl IcvsCompiler {
 
             let content = node
                 .content
-                .as_ref()
-                .ok_or_else(|| IcvsError::MissingContent(id.clone()))?;
+                .ok_or_else(|| IcvsError::MissingContent(id))?;
 
             let effect = match node.node_type {
                 NodeType::Blocklist => PolicyEffect::ExplicitDeny,
@@ -157,7 +156,7 @@ impl IcvsCompiler {
                 subject: claw10_domain::policy::PolicySubject::Agent("*".to_string()),
                 effect,
                 action: "*".to_string(),
-                resource: content.clone(),
+                resource: content,
                 condition: None,
                 priority: 100,
             };
