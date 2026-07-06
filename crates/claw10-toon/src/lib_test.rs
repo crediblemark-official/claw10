@@ -138,3 +138,9 @@ fn test_encode_tools() {
     assert!(encoded.contains("http"));
     assert!(encoded.contains("shell"));
 }
+
+#[test]
+fn test_toon_context_new() {
+    let ctx = ToonContext::new();
+    assert_eq!(ctx.build(), "[TOON v1]");
+}
