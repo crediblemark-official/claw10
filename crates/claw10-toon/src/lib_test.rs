@@ -77,6 +77,22 @@ fn test_encode_memories() {
 }
 
 #[test]
+fn test_toon_context_build_empty() {
+    let ctx = ToonContext::new();
+    assert_eq!(ctx.build(), "[TOON v1]");
+}
+
+#[test]
+fn test_toon_context_build_with_sections() {
+    let mut ctx = ToonContext::new();
+    ctx.add_section("header", "Content of header".to_string());
+    ctx.add_section("body", "Content of body".to_string());
+
+    let expected = "[TOON v1]\n[header]\nContent of header\n[body]\nContent of body";
+    assert_eq!(ctx.build(), expected);
+}
+
+#[test]
 fn test_build_context_empty() {
     let ctx = ToonEncoder::build_context(None, None, &[], &[], &[], None, &[]);
     assert!(ctx.starts_with("[TOON v1]"));
@@ -137,4 +153,10 @@ fn test_encode_tools() {
     let encoded = ToonEncoder::encode_tools(&tools);
     assert!(encoded.contains("http"));
     assert!(encoded.contains("shell"));
+}
+
+#[test]
+fn test_toon_context_new() {
+    let ctx = ToonContext::new();
+    assert_eq!(ctx.build(), "[TOON v1]");
 }
