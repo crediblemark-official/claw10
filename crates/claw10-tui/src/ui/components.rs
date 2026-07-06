@@ -163,11 +163,11 @@ pub fn draw_command_palette(frame: &mut Frame, area: Rect, app: &TuiApp) {
 
         // --- 4. Render List ---
         let mut list_lines = Vec::new();
-        let mut current_category = String::new();
+        let mut current_category = "";
 
         for (flat_idx, (category, name, shortcut, _)) in filtered_items.iter().enumerate() {
-            if category != &current_category {
-                current_category = category.clone();
+            if category != current_category {
+                current_category = category;
                 list_lines.push(Line::from("")); // Spacer kategori
                 list_lines.push(Line::from(vec![Span::styled(
                     format!(" {}", current_category),
