@@ -148,10 +148,11 @@ pub struct ModelFamily {
 
 fn load_priority_models(provider: &str) -> Vec<String> {
     let path = format!("models/{}.json", provider.to_lowercase());
-    if let Ok(content) = std::fs::read_to_string(&path) {
-        if let Ok(list) = serde_json::from_str::<Vec<String>>(&content) {
-            return list.into_iter().map(|s| s.to_lowercase()).collect();
-        }
+    if let Some(list) = std::fs::read_to_string(&path)
+        .ok()
+        .and_then(|content| serde_json::from_str::<Vec<String>>(&content).ok())
+    {
+        return list.into_iter().map(|s| s.to_lowercase()).collect();
     }
     Vec::new()
 }
@@ -173,7 +174,7 @@ pub fn group_models_by_family(models: Vec<ModelProfile>) -> Vec<ModelFamily> {
         let stem = extract_model_stem(&model.id);
         let label = stem
             .split('/')
-            .last()
+            .next_back()
             .unwrap_or(&stem)
             .replace('-', " ")
             .split_whitespace()
@@ -234,7 +235,7 @@ pub fn group_models_by_family(models: Vec<ModelProfile>) -> Vec<ModelFamily> {
 /// - `gpt-4o-mini`            → `gpt-4o`
 /// - `claude-sonnet-4-20250514` → `claude-sonnet-4`
 fn extract_model_stem(model_id: &str) -> String {
-    let id = model_id.split('/').last().unwrap_or(model_id);
+    let id = model_id.split('/').next_back().unwrap_or(model_id);
 
     let variant_suffixes = [
         "mini", "micro", "nano", "small", "medium", "large",

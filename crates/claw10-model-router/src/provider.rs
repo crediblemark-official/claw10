@@ -58,27 +58,28 @@ impl ModelRegistry {
         let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
         let cache_file = std::path::PathBuf::from(&home).join(".claw10").join("models.json");
         
-        if cache_file.exists() {
-            if let Ok(content) = std::fs::read_to_string(&cache_file) {
-                if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
-                    if let Some(obj) = json.as_object() {
-                        for (provider_name, models_arr) in obj {
-                            if let Some(arr) = models_arr.as_array() {
-                                for val in arr {
-                                    if let Some(model_id) = val.as_str() {
-                                        profiles.push(ModelProfile {
-                                            id: model_id.to_string(),
-                                            provider: provider_name.clone(),
-                                            model_name: model_id.to_string(),
-                                            context_window: 128_000,
-                                            max_output_tokens: 8_192,
-                                            cost_per_1m_input: 0.0,
-                                            cost_per_1m_output: 0.0,
-                                            suitable_for: vec!["general".to_string()],
-                                        });
-                                    }
-                                }
-                            }
+        if let Some(obj) = std::fs::read_to_string(&cache_file)
+            .ok()
+            .and_then(|content| serde_json::from_str::<serde_json::Value>(&content).ok())
+            .and_then(|json| match json {
+                serde_json::Value::Object(obj) => Some(obj),
+                _ => None,
+            })
+        {
+            for (provider_name, models_arr) in obj {
+                if let Some(arr) = models_arr.as_array() {
+                    for val in arr {
+                        if let Some(model_id) = val.as_str() {
+                            profiles.push(ModelProfile {
+                                id: model_id.to_string(),
+                                provider: provider_name.clone(),
+                                model_name: model_id.to_string(),
+                                context_window: 128_000,
+                                max_output_tokens: 8_192,
+                                cost_per_1m_input: 0.0,
+                                cost_per_1m_output: 0.0,
+                                suitable_for: vec!["general".to_string()],
+                            });
                         }
                     }
                 }

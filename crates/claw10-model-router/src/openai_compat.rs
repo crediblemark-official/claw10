@@ -541,7 +541,7 @@ impl ModelProvider for OpenAiCompatibleProvider {
             let body = response.bytes_stream();
             let mut reader =
                 tokio_util::io::StreamReader::new(body.map(|r| {
-                    r.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+                    r.map_err(std::io::Error::other)
                 }));
             let mut line_buf = String::new();
 
@@ -570,12 +570,10 @@ impl ModelProvider for OpenAiCompatibleProvider {
                                             .is_some_and(|fr| !fr.is_empty() && fr != "null")
                                     });
                                     for choice in chunk.choices {
-                                        if let Some(content) = choice.delta.content {
-                                            if !content.is_empty() {
-                                                let _ = tx.send(StreamEvent::TextDelta(
-                                                    content,
-                                                ));
-                                            }
+                                        if let Some(content) = choice.delta.content.filter(|c| !c.is_empty()) {
+                                            let _ = tx.send(StreamEvent::TextDelta(
+                                                content,
+                                            ));
                                         }
                                         if let Some(tcs) = choice.delta.tool_calls {
                                             for tc in tcs {

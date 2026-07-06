@@ -228,7 +228,7 @@ pub fn resolve_providers(
 
             // Resolve API key: try alias.api_key first (with $ENV expansion),
             // then fall through to slot's env var / KV
-            let api_key = resolve_api_key(&alias.api_key, &slot.api_key_env, &kv_get);
+            let api_key = resolve_api_key(&alias.api_key, slot.api_key_env, &kv_get);
             let api_key = match api_key {
                 Some(k) => k,
                 None => {
@@ -343,40 +343,32 @@ fn resolve_api_key(
     slot_env: &str,
     kv_get: &impl Fn(&str) -> Option<String>,
 ) -> Option<String> {
-    // 1. Try inline value or $ENV_VAR reference
+    // 1. Coba nilai inline atau referensi $ENV_VAR
     if !inline_or_ref.is_empty() {
         if let Some(env_name) = inline_or_ref.strip_prefix('$') {
-            if let Ok(val) = std::env::var(env_name) {
-                if !val.is_empty() {
-                    return Some(val);
-                }
+            if let Some(val) = std::env::var(env_name).ok().filter(|v| !v.is_empty()) {
+                return Some(val);
             }
-            // Fall through: check KV store with this env name as key
+            // Cek KV store dengan nama env ini sebagai key jika env var kosong
             let store_key = format!("config:{}_api_key", env_name.to_lowercase());
-            if let Some(val) = kv_get(&store_key) {
-                if !val.is_empty() {
-                    return Some(val);
-                }
+            if let Some(val) = kv_get(&store_key).filter(|v| !v.is_empty()) {
+                return Some(val);
             }
         } else {
-            // Literal inline key
+            // Key inline literal
             return Some(inline_or_ref.to_string());
         }
     }
 
-    // 2. Try slot's default env var
+    // 2. Coba default env var milik slot
     if !slot_env.is_empty() {
-        if let Ok(val) = std::env::var(slot_env) {
-            if !val.is_empty() {
-                return Some(val);
-            }
+        if let Some(val) = std::env::var(slot_env).ok().filter(|v| !v.is_empty()) {
+            return Some(val);
         }
-        // 3. Try KV store with slot name
+        // 3. Coba KV store dengan nama slot
         let store_key = format!("config:{}_api_key", slot_env.to_lowercase().trim_end_matches("_api_key"));
-        if let Some(val) = kv_get(&store_key) {
-            if !val.is_empty() {
-                return Some(val);
-            }
+        if let Some(val) = kv_get(&store_key).filter(|v| !v.is_empty()) {
+            return Some(val);
         }
     }
 
