@@ -349,6 +349,35 @@ impl TuiApp {
                         }
 
                         // Standard Input / Navigation handling
+                        if self.pending_tool_approval.is_some() {
+                            match key.code {
+                                KeyCode::Left => {
+                                    if self.tool_approval_index > 0 {
+                                        self.tool_approval_index -= 1;
+                                    } else {
+                                        self.tool_approval_index = 2;
+                                    }
+                                }
+                                KeyCode::Right => {
+                                    if self.tool_approval_index < 2 {
+                                        self.tool_approval_index += 1;
+                                    } else {
+                                        self.tool_approval_index = 0;
+                                    }
+                                }
+                                KeyCode::Enter => {
+                                    let state = match self.tool_approval_index {
+                                        0 => claw10_domain::approval::ToolApprovalState::Approved,
+                                        1 => claw10_domain::approval::ToolApprovalState::AlwaysApproved,
+                                        _ => claw10_domain::approval::ToolApprovalState::Denied,
+                                    };
+                                    self.handle_tool_approval(state).await;
+                                }
+                                _ => {}
+                            }
+                            return;
+                        }
+
                         match key.code {
                             KeyCode::Enter => {
                                 if !self.active_suggestions.is_empty() {

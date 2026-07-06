@@ -152,6 +152,8 @@ pub struct TuiApp {
     pub workspace_selected_index: usize,
     /// Menentukan apakah proses internal agent di-expand atau di-collapse.
     pub show_internal_process: bool,
+    /// Indeks pilihan tindakan tool approval (0 = Approve, 1 = Always Approve, 2 = Deny)
+    pub tool_approval_index: usize,
 }
 
 impl TuiApp {
@@ -209,6 +211,7 @@ impl TuiApp {
             workspace_input: String::new(),
             workspace_selected_index: 0,
             show_internal_process: false,
+            tool_approval_index: 0,
         }
     }
 
@@ -449,12 +452,17 @@ impl TuiApp {
             .map(|(_, i)| i)
             .collect();
 
+        let prev_pending = self.pending_tool_approval.is_some();
         // Deteksi pending tool approval
         self.pending_tool_approval = self
             .approvals
             .iter()
             .find(|r| r.state == claw10_domain::approval::ToolApprovalState::Pending)
             .cloned();
+
+        if self.pending_tool_approval.is_some() && !prev_pending {
+            self.tool_approval_index = 0;
+        }
 
         if self.selected_index >= self.current_list_len() {
             self.selected_index = self.current_list_len().saturating_sub(1);

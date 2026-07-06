@@ -414,13 +414,33 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
             Span::styled(&req.command, Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
         ]));
         chat_input_lines.push(Line::from(""));
+        let btn_style_approve = if app.tool_approval_index == 0 {
+            Style::default().fg(Color::Rgb(0, 0, 0)).bg(Color::Green).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::Green)
+        };
+        let btn_style_always = if app.tool_approval_index == 1 {
+            Style::default().fg(Color::Rgb(0, 0, 0)).bg(Color::LightGreen).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::LightGreen)
+        };
+        let btn_style_deny = if app.tool_approval_index == 2 {
+            Style::default().fg(Color::Rgb(0, 0, 0)).bg(Color::Red).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::Red)
+        };
+
+        let label_approve = if app.tool_approval_index == 0 { " ◄ [ Setujui ] ► " } else { "   [ Setujui ]   " };
+        let label_always = if app.tool_approval_index == 1 { " ◄ [ Setujui Selalu ] ► " } else { "   [ Setujui Selalu ]   " };
+        let label_deny = if app.tool_approval_index == 2 { " ◄ [ Tolak ] ► " } else { "   [ Tolak ]   " };
+
         chat_input_lines.push(Line::from(vec![
-            Span::styled("     Ketik di form input: ", Style::default().fg(Color::White)),
-            Span::styled(":approve", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
-            Span::styled(" / ", Style::default().fg(Color::Gray)),
-            Span::styled(":approve always", Style::default().fg(Color::LightGreen).add_modifier(Modifier::BOLD)),
-            Span::styled(" / ", Style::default().fg(Color::Gray)),
-            Span::styled(":deny", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
+            Span::styled("     Pilih tindakan: ", Style::default().fg(Color::White)),
+            Span::styled(label_approve, btn_style_approve),
+            Span::raw("   "),
+            Span::styled(label_always, btn_style_always),
+            Span::raw("   "),
+            Span::styled(label_deny, btn_style_deny),
         ]));
     } else {
         // Tambahkan suggestions jika input diawali dengan '/'
@@ -590,16 +610,18 @@ pub fn draw_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
         .block(input_block);
     frame.render_widget(input_widget, active_input_area);
 
-    let cursor_pos = if app.input_buffer.is_empty() {
-        (input_inner.x + 2, input_inner.y + suggestion_height as u16)
-    } else {
-        let last_line = input_lines.last().cloned().unwrap_or_default();
-        (
-            input_inner.x + last_line.len() as u16,
-            input_inner.y + (input_lines.len() - 1 + suggestion_height) as u16,
-        )
-    };
-    frame.set_cursor_position(cursor_pos);
+    if app.pending_tool_approval.is_none() {
+        let cursor_pos = if app.input_buffer.is_empty() {
+            (input_inner.x + 2, input_inner.y + suggestion_height as u16)
+        } else {
+            let last_line = input_lines.last().cloned().unwrap_or_default();
+            (
+                input_inner.x + last_line.len() as u16,
+                input_inner.y + (input_lines.len() - 1 + suggestion_height) as u16,
+            )
+        };
+        frame.set_cursor_position(cursor_pos);
+    }
 
     if show_sidebar {
         // --- KOLOM KANAN (SIDEBAR) ---
