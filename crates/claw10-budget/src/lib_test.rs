@@ -54,16 +54,26 @@ fn test_reserve_hard_limit() {
 fn test_can_allocate() {
     let budget_no_limit = make_test_budget(10.0, 5.0, None);
     let budget_with_limit = make_test_budget(10.0, 5.0, Some(8.0));
+    let overspent_budget = make_test_budget(10.0, 12.0, None);
     
     // Uji dengan alokasi yang valid
     assert!(BudgetService::can_allocate(&budget_no_limit, 4.0));
     assert!(BudgetService::can_allocate(&budget_with_limit, 2.0));
     
+    // Uji alokasi pas (exact) sisa anggaran
+    assert!(BudgetService::can_allocate(&budget_no_limit, 5.0));
+
+    // Uji alokasi pas (exact) hard limit
+    assert!(BudgetService::can_allocate(&budget_with_limit, 3.0));
+
     // Uji alokasi yang melampaui total anggaran
     assert!(!BudgetService::can_allocate(&budget_no_limit, 6.0));
     
     // Uji alokasi yang melampaui hard limit
     assert!(!BudgetService::can_allocate(&budget_with_limit, 4.0));
+
+    // Uji pada kondisi overspent (sudah melebihi alokasi)
+    assert!(!BudgetService::can_allocate(&overspent_budget, 1.0));
 }
 
 #[test]
