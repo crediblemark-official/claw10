@@ -413,7 +413,7 @@ checksum = "c8d4a3bb8b1e0c1050499d1815f5ab16d04f0959b233085fb31653fbfc9d98f9"
 
 [[package]]
 name = "claw10"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "axum",
  "chrono",
@@ -448,7 +448,7 @@ dependencies = [
 
 [[package]]
 name = "claw10-agent"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "async-trait",
  "chrono",
@@ -473,7 +473,7 @@ dependencies = [
 
 [[package]]
 name = "claw10-artifact"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "async-trait",
  "chrono",
@@ -489,7 +489,7 @@ dependencies = [
 
 [[package]]
 name = "claw10-auth"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "chrono",
  "claw10-domain",
@@ -502,7 +502,7 @@ dependencies = [
 
 [[package]]
 name = "claw10-budget"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "chrono",
  "claw10-domain",
@@ -512,7 +512,7 @@ dependencies = [
 
 [[package]]
 name = "claw10-context"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "chrono",
  "claw10-domain",
@@ -527,7 +527,7 @@ dependencies = [
 
 [[package]]
 name = "claw10-control-api"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "axum",
  "base64 0.22.1",
@@ -568,7 +568,7 @@ dependencies = [
 
 [[package]]
 name = "claw10-domain"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "chrono",
  "derivative",
@@ -582,7 +582,7 @@ dependencies = [
 
 [[package]]
 name = "claw10-event"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "async-trait",
  "chrono",
@@ -598,7 +598,7 @@ dependencies = [
 
 [[package]]
 name = "claw10-gateway"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "async-trait",
  "chrono",
@@ -618,7 +618,7 @@ dependencies = [
 
 [[package]]
 name = "claw10-icvs"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "claw10-domain",
  "icvs",
@@ -629,7 +629,7 @@ dependencies = [
 
 [[package]]
 name = "claw10-lifecycle"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "chrono",
  "claw10-domain",
@@ -640,7 +640,7 @@ dependencies = [
 
 [[package]]
 name = "claw10-lineage"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "chrono",
  "claw10-domain",
@@ -651,7 +651,7 @@ dependencies = [
 
 [[package]]
 name = "claw10-memory"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "async-trait",
  "chrono",
@@ -664,7 +664,7 @@ dependencies = [
 
 [[package]]
 name = "claw10-mission"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "chrono",
  "claw10-domain",
@@ -675,7 +675,7 @@ dependencies = [
 
 [[package]]
 name = "claw10-model-router"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "async-trait",
  "claw10-domain",
@@ -694,7 +694,7 @@ dependencies = [
 
 [[package]]
 name = "claw10-policy"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "chrono",
  "claw10-domain",
@@ -706,7 +706,7 @@ dependencies = [
 
 [[package]]
 name = "claw10-prompt"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "async-trait",
  "chrono",
@@ -725,7 +725,7 @@ dependencies = [
 
 [[package]]
 name = "claw10-scheduler"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "async-trait",
  "chrono",
@@ -739,7 +739,7 @@ dependencies = [
 
 [[package]]
 name = "claw10-skill"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "async-trait",
  "chrono",
@@ -754,7 +754,7 @@ dependencies = [
 
 [[package]]
 name = "claw10-spawn"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "async-trait",
  "chrono",
@@ -775,7 +775,7 @@ dependencies = [
 
 [[package]]
 name = "claw10-store"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "async-trait",
  "claw10-domain",
@@ -788,7 +788,7 @@ dependencies = [
 
 [[package]]
 name = "claw10-task"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "chrono",
  "claw10-domain",
@@ -800,7 +800,7 @@ dependencies = [
 
 [[package]]
 name = "claw10-telemetry"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "chrono",
  "claw10-domain",
@@ -813,7 +813,7 @@ dependencies = [
 
 [[package]]
 name = "claw10-tests"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "async-trait",
  "axum",
@@ -846,7 +846,7 @@ dependencies = [
 
 [[package]]
 name = "claw10-tool"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "async-trait",
  "claw10-artifact",
@@ -864,7 +864,7 @@ dependencies = [
 
 [[package]]
 name = "claw10-toon"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "chrono",
  "claw10-domain",
@@ -876,7 +876,7 @@ dependencies = [
 
 [[package]]
 name = "claw10-tui"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "async-trait",
  "chrono",
@@ -901,7 +901,7 @@ dependencies = [
 
 [[package]]
 name = "claw10-worker"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "async-trait",
  "chrono",
