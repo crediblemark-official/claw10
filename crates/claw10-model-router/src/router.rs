@@ -123,10 +123,32 @@ impl ModelRouter {
                             }
                         }
                     }
-                    match self.route_chat(last_fallback, request).await {
+                    match self.route_chat(last_fallback, request.clone()).await {
                         Ok(response) => return Ok(response),
                         Err(e2) => {
                             tracing::warn!("fallback '{}' also failed: {}", last_fallback, e2);
+                        }
+                    }
+                }
+
+                // Coba dynamic fallbacks jika ada
+                let dynamic_fallbacks = self.get_dynamic_fallbacks(preferred_profile, fallback_profiles);
+                if !dynamic_fallbacks.is_empty() {
+                    tracing::info!("mencoba dynamic fallback karena preferred dan manual fallbacks gagal/kosong");
+                    if let Some((last_dyn, rest_dyn)) = dynamic_fallbacks.split_last() {
+                        for fallback in rest_dyn {
+                            match self.route_chat(fallback, request.clone()).await {
+                                Ok(response) => return Ok(response),
+                                Err(e2) => {
+                                    tracing::warn!("dynamic fallback '{}' also failed: {}", fallback, e2);
+                                }
+                            }
+                        }
+                        match self.route_chat(last_dyn, request).await {
+                            Ok(response) => return Ok(response),
+                            Err(e2) => {
+                                tracing::warn!("dynamic fallback '{}' also failed: {}", last_dyn, e2);
+                            }
                         }
                     }
                 }
@@ -281,6 +303,65 @@ impl ModelRouter {
                     .unwrap_or(std::cmp::Ordering::Equal)
             })
     }
+
+    /// Dapatkan daftar model fallback dinamis secara cerdas dari model registry
+    /// jika list fallback eksplisit kosong atau semuanya gagal.
+    fn get_dynamic_fallbacks(&self, preferred_profile: &str, fallback_profiles: &[String]) -> Vec<String> {
+        let mut candidates = Vec::new();
+        let preferred_provider = self.registry.get_profile(preferred_profile).map(|p| p.provider.clone());
+        let all_profiles = self.registry.list_profiles();
+
+        // Kumpulkan semua profil yang unik dan bukan preferred atau fallback yang sudah ada
+        let mut available_profiles = Vec::new();
+        for p in all_profiles {
+            if p.id != preferred_profile && !fallback_profiles.contains(&p.id) {
+                available_profiles.push(p);
+            }
+        }
+
+        // Bagi menjadi kategori same provider dan other providers
+        let mut same_provider = Vec::new();
+        let mut other_providers = Vec::new();
+
+        for p in available_profiles {
+            if preferred_provider.as_ref() == Some(&p.provider) {
+                same_provider.push(p);
+            } else {
+                other_providers.push(p);
+            }
+        }
+
+        // Fungsi scoring sederhana untuk memprioritaskan model chat/instruct/popular
+        let score_model = |id: &str| -> i32 {
+            let id_lower = id.to_lowercase();
+            let mut score = 0;
+            if id_lower.contains("instruct") || id_lower.contains("chat") || id_lower.contains("it") {
+                score += 10;
+            }
+            if id_lower.contains("nemotron") || id_lower.contains("llama") || id_lower.contains("qwen") || id_lower.contains("gpt") || id_lower.contains("gemma") {
+                score += 5;
+            }
+            if id_lower.contains("free") {
+                // Model free mungkin rate-limited, tapi masih sangat bagus dicoba
+                score += 1;
+            }
+            score
+        };
+
+        same_provider.sort_by_key(|p| -score_model(&p.id));
+        other_providers.sort_by_key(|p| -score_model(&p.id));
+
+        // Ambil maksimal 3 model dari provider yang sama
+        for p in same_provider.iter().take(3) {
+            candidates.push(p.id.clone());
+        }
+        // Ambil maksimal 3 model dari provider berbeda
+        for p in other_providers.iter().take(3) {
+            candidates.push(p.id.clone());
+        }
+
+        candidates
+    }
 }
 
 fn save_models_to_cache(provider_name: &str, models: &[ModelProfile]) {
@@ -311,3 +392,7 @@ fn save_models_to_cache(provider_name: &str, models: &[ModelProfile]) {
         let _ = std::fs::write(&cache_file, serialized);
     }
 }
+
+#[cfg(test)]
+#[path = "router_test.rs"]
+mod tests;

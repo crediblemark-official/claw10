@@ -30,6 +30,13 @@ fn load_claw10_env() {
     }
 }
 
+fn get_default_db_path() -> std::path::PathBuf {
+    dirs::home_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join(".claw10")
+        .join("db")
+}
+
 #[derive(Parser)]
 #[command(
     name = "claw10",
@@ -234,22 +241,24 @@ async fn main() {
         Commands::Serve { bind, db, tui } => {
             let addr: SocketAddr = bind.parse().expect("invalid bind address");
 
-            let kv_store: Arc<dyn claw10_store::Store> = match db {
-                Some(path) => {
-                    tracing::info!("using sled database at {path}");
-                    match claw10_store::SledStore::new(&path) {
-                        Ok(store) => Arc::new(store),
-                        Err(e) => {
-                            eprintln!("Error: Gagal membuka database sled di '{path}'.");
-                            eprintln!("Detail: {e}");
-                            eprintln!("Pastikan tidak ada proses Claw10 server atau TUI lain yang sedang berjalan menggunakan database ini.");
-                            std::process::exit(1);
-                        }
-                    }
+            let db_path = match db {
+                Some(path) => std::path::PathBuf::from(path),
+                None => get_default_db_path(),
+            };
+
+            let kv_store: Arc<dyn claw10_store::Store> = {
+                if let Some(parent) = db_path.parent() {
+                    let _ = std::fs::create_dir_all(parent);
                 }
-                None => {
-                    tracing::info!("using in-memory store");
-                    Arc::new(claw10_store::InMemoryStore::new())
+                tracing::info!("using sled database at {}", db_path.display());
+                match claw10_store::SledStore::new(&db_path) {
+                    Ok(store) => Arc::new(store),
+                    Err(e) => {
+                        eprintln!("Warning: Gagal membuka database sled di '{}'.", db_path.display());
+                        eprintln!("Detail: {e}");
+                        eprintln!("Menggunakan in-memory store sebagai fallback. Data tidak akan disimpan secara persisten.");
+                        Arc::new(claw10_store::InMemoryStore::new())
+                    }
                 }
             };
 
@@ -391,21 +400,26 @@ async fn main() {
             }
         }
         Commands::Tui { db } => {
-            let result = match db {
-                Some(path) => {
-                    match claw10_store::SledStore::new(&path) {
-                        Ok(store) => {
-                            claw10_tui::run_with_store(Arc::new(store)).await
-                        }
-                        Err(e) => {
-                            eprintln!("Error: Gagal membuka database sled di '{path}'.");
-                            eprintln!("Detail: {e}");
-                            eprintln!("Pastikan tidak ada proses Claw10 server atau TUI lain yang sedang berjalan menggunakan database ini.");
-                            std::process::exit(1);
-                        }
+            let db_path = match db {
+                Some(path) => std::path::PathBuf::from(path),
+                None => get_default_db_path(),
+            };
+
+            let result = {
+                if let Some(parent) = db_path.parent() {
+                    let _ = std::fs::create_dir_all(parent);
+                }
+                match claw10_store::SledStore::new(&db_path) {
+                    Ok(store) => {
+                        claw10_tui::run_with_store(Arc::new(store)).await
+                    }
+                    Err(e) => {
+                        eprintln!("Warning: Gagal membuka database sled di '{}'.", db_path.display());
+                        eprintln!("Detail: {e}");
+                        eprintln!("Menggunakan in-memory store sebagai fallback. Data tidak akan disimpan secara persisten.");
+                        claw10_tui::run().await
                     }
                 }
-                None => claw10_tui::run().await,
             };
             if let Err(e) = result {
                 tracing::error!("TUI error: {e}");
@@ -415,21 +429,24 @@ async fn main() {
             println!("Claw10 OS v{}", env!("CARGO_PKG_VERSION"));
         }
         Commands::RunAgent { db, objective, model } => {
-            let kv_store: Arc<dyn claw10_store::Store> = match db {
-                Some(path) => {
-                    tracing::info!("using sled database at {path}");
-                    match claw10_store::SledStore::new(&path) {
-                        Ok(store) => Arc::new(store),
-                        Err(e) => {
-                            eprintln!("Error: Gagal membuka database sled di '{path}'.");
-                            eprintln!("Detail: {e}");
-                            std::process::exit(1);
-                        }
-                    }
+            let db_path = match db {
+                Some(path) => std::path::PathBuf::from(path),
+                None => get_default_db_path(),
+            };
+
+            let kv_store: Arc<dyn claw10_store::Store> = {
+                if let Some(parent) = db_path.parent() {
+                    let _ = std::fs::create_dir_all(parent);
                 }
-                None => {
-                    tracing::info!("using in-memory store");
-                    Arc::new(claw10_store::InMemoryStore::new())
+                tracing::info!("using sled database at {}", db_path.display());
+                match claw10_store::SledStore::new(&db_path) {
+                    Ok(store) => Arc::new(store),
+                    Err(e) => {
+                        eprintln!("Warning: Gagal membuka database sled di '{}'.", db_path.display());
+                        eprintln!("Detail: {e}");
+                        eprintln!("Menggunakan in-memory store sebagai fallback. Data tidak akan disimpan secara persisten.");
+                        Arc::new(claw10_store::InMemoryStore::new())
+                    }
                 }
             };
 
