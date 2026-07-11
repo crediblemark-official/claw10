@@ -7,6 +7,9 @@ on:
   schedule:
     - cron: '0 0 * * *' # Berjalan otomatis 1 kali per hari (1x sehari)
 
+permissions:
+  contents: write
+
 jobs:
   publish:
     name: Publish Crates
