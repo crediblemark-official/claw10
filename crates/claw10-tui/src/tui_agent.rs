@@ -81,11 +81,11 @@ pub fn make_default_agent(agent_id: AgentId, model_id: &str, mission_id: Mission
         parent_agent_id: None,
         lineage_id: LineageId(uuid::Uuid::now_v7()),
         name: "TUI Root Agent".to_string(),
-        role: "assistant".to_string(),
+        role: "root".to_string(),
         genome: AgentGenome {
             id: "tui-default".to_string(),
             version: "1.0".to_string(),
-            role: "assistant".to_string(),
+            role: "root".to_string(),
             lifecycle_modes: vec![LifecycleMode::Ephemeral],
             model_policy: ModelPolicy {
                 preferred_profile: model_id.to_string(),
