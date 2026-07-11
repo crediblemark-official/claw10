@@ -11,6 +11,10 @@ fi
 
 TOKEN=$1
 
+# Ambil versi lokal saat ini dari file VERSION
+VERSION=$(cat VERSION 2>/dev/null || echo "0.2.4")
+echo "Versi target rilis: v$VERSION"
+
 echo "Melakukan login ke crates.io..."
 cargo login "$TOKEN"
 
@@ -51,6 +55,14 @@ for crate in "${CRATES[@]}"; do
     echo "========================================"
     echo "Mempublikasikan: $crate"
     echo "========================================"
+
+    # Cek apakah versi ini sudah terbit di crates.io via CDN sparse index (mengurangi rate limit)
+    PREFIX1="${crate:0:2}"
+    PREFIX2="${crate:2:2}"
+    if curl -s -f "https://index.crates.io/${PREFIX1}/${PREFIX2}/${crate}" | grep -q "\"vers\":\"${VERSION}\""; then
+        echo ">> Crate $crate v$VERSION sudah terbit di crates.io (dideteksi via sparse index). Lewati."
+        continue
+    fi
     
     # Menjalankan publish dengan penanganan error crate sudah ada (already exists)
     if ! out=$(cargo publish -p "$crate" --allow-dirty 2>&1); then
