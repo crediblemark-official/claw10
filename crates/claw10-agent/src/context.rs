@@ -119,6 +119,11 @@ impl ContextBuilder {
                     system_messages.insert(0, op_str);
                 }
 
+                // Integrasikan system_context (memories, policies, skills, agents roster, lineage, history)
+                if let Some(sys_ctx) = additional_context.get("system_context") {
+                    system_messages.push(sys_ctx.clone());
+                }
+
                 let system_prompt = system_messages.join("\n\n");
                 (system_prompt, bundle.context_message)
             }

@@ -415,6 +415,17 @@ impl TuiApp {
                                             let model_label = self.active_model.clone();
 
                                             if let Some(agent_id) = self.ensure_agent().await {
+                                                let history_entries: Vec<String> = self.chat_history.iter()
+                                                    .map(|(sender, model, msg)| {
+                                                        if model.is_empty() {
+                                                            format!("{sender}: {msg}")
+                                                        } else {
+                                                            format!("{sender} ({model}): {msg}")
+                                                        }
+                                                    })
+                                                    .collect();
+                                                let history_json = serde_json::to_string(&history_entries).unwrap_or_default();
+
                                                 self.chat_history.push((
                                                     "Agent".to_string(),
                                                     model_label.clone(),
@@ -429,7 +440,8 @@ impl TuiApp {
                                                 self.agent_rx = Some(agent_rx);
 
                                                 let task_handle = tokio::spawn(async move {
-                                                    let ctx = std::collections::HashMap::new();
+                                                    let mut ctx = std::collections::HashMap::new();
+                                                    ctx.insert("chat_history".to_string(), history_json);
                                                     match runtime.execute_agent_streaming(
                                                         &agent_id,
                                                         objective,
@@ -462,15 +474,30 @@ impl TuiApp {
                                             match router_opt {
                                                 Some(router) => {
                                                     let model_id = self.active_model.clone();
-                                                    let request = ChatRequest {
-                                                        model: model_id.clone(),
-                                                        messages: vec![ModelMessage {
-                                                            role: MessageRole::User,
-                                                            content: trimmed.to_string(),
+                                                    let mut messages = Vec::new();
+                                                    for (sender, model, msg) in &self.chat_history {
+                                                        let role = match sender.as_str() {
+                                                            "User" => MessageRole::User,
+                                                            "Agent" => MessageRole::Assistant,
+                                                            "Tool" => MessageRole::Tool,
+                                                            "System" => MessageRole::System,
+                                                            _ => MessageRole::User,
+                                                        };
+                                                        if msg.is_empty() {
+                                                            continue;
+                                                        }
+                                                        messages.push(ModelMessage {
+                                                            role,
+                                                            content: msg.clone(),
                                                             tool_calls: None,
                                                             tool_call_id: None,
-                                                            name: None,
-                                                        }],
+                                                            name: if !model.is_empty() { Some(model.clone()) } else { None },
+                                                        });
+                                                    }
+
+                                                    let request = ChatRequest {
+                                                        model: model_id.clone(),
+                                                        messages,
                                                         max_tokens: Some(4096),
                                                         temperature: Some(0.7),
                                                         tools: None,

@@ -166,7 +166,13 @@ impl AgentRuntime {
 
         // ── Build and inject system context ──────────────────────
         let mut context = context;
-        if let Some(system_context) = self.build_context_for_agent(&agent).await {
+        let chat_history_raw = context.get("chat_history").cloned().unwrap_or_default();
+        let chat_history: Vec<String> = if !chat_history_raw.is_empty() {
+            serde_json::from_str(&chat_history_raw).unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+        if let Some(system_context) = self.build_context_for_agent(&agent, &chat_history).await {
             context.insert("system_context".to_string(), system_context);
         }
 
@@ -306,7 +312,13 @@ impl AgentRuntime {
 
         // ── Build and inject system context ──────────────────────
         let mut context = context;
-        if let Some(system_context) = self.build_context_for_agent(&agent).await {
+        let chat_history_raw = context.get("chat_history").cloned().unwrap_or_default();
+        let chat_history: Vec<String> = if !chat_history_raw.is_empty() {
+            serde_json::from_str(&chat_history_raw).unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+        if let Some(system_context) = self.build_context_for_agent(&agent, &chat_history).await {
             context.insert("system_context".to_string(), system_context);
         }
 
@@ -445,7 +457,13 @@ impl AgentRuntime {
         max_turns: u32,
     ) -> Result<(AgentSession, Vec<AgentEvent>), AgentError> {
         let mut context = context;
-        if let Some(system_context) = self.build_context_for_agent(agent).await {
+        let chat_history_raw = context.get("chat_history").cloned().unwrap_or_default();
+        let chat_history: Vec<String> = if !chat_history_raw.is_empty() {
+            serde_json::from_str(&chat_history_raw).unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+        if let Some(system_context) = self.build_context_for_agent(agent, &chat_history).await {
             context.insert("system_context".to_string(), system_context);
         }
 
@@ -525,7 +543,7 @@ impl AgentRuntime {
 
     /// Build a system context string for an agent using the context pipeline.
     /// Menggunakan MemoryService::query() untuk mengambil memori active.
-    async fn build_context_for_agent(&self, agent: &Agent) -> Option<String> {
+    async fn build_context_for_agent(&self, agent: &Agent, chat_history: &[String]) -> Option<String> {
         let store = Arc::clone(self.agent_store.store());
 
         let mission: Option<claw10_domain::Mission> = store
@@ -574,7 +592,7 @@ impl AgentRuntime {
             memories: &memories,
             policies: &[agent.policy_bundle.clone()],
             skills: &skills,
-            history: &[],
+            history: chat_history,
             tools: &[],
             agents: &agents,
             lineage: lineage.as_ref(),
