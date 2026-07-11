@@ -50,6 +50,38 @@ CRATES=(
     "claw10" # Binary utama
 )
 
+cleanup_cron() {
+    if grep -q "schedule:" .github/workflows/publish.yml; then
+        echo "Seluruh crate v$VERSION telah terbit. Menghapus scheduler cron dari workflow..."
+        sed -i '/schedule:/d' .github/workflows/publish.yml
+        sed -i '/- cron:/d' .github/workflows/publish.yml
+        
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        git add .github/workflows/publish.yml
+        if git commit -m "ci: hapus scheduler cron karena seluruh crate telah dipublikasikan"; then
+            BRANCH=$(git branch --show-current 2>/dev/null || echo "master")
+            git push origin "$BRANCH" || echo "Warning: Gagal push (mungkin branch diproteksi atau kredensial CI terbatas)"
+        fi
+    fi
+}
+
+# Cek berapa banyak crate yang belum terbit
+PENDING_CRATES=0
+for crate in "${CRATES[@]}"; do
+    PREFIX1="${crate:0:2}"
+    PREFIX2="${crate:2:2}"
+    if ! curl -s -f "https://index.crates.io/${PREFIX1}/${PREFIX2}/${crate}" | grep -q "\"vers\":\"${VERSION}\""; then
+        PENDING_CRATES=$((PENDING_CRATES + 1))
+    fi
+done
+
+if [ "$PENDING_CRATES" -eq 0 ]; then
+    echo "Semua crate v$VERSION sudah terbit di crates.io."
+    cleanup_cron
+    exit 0
+fi
+
 echo "Memulai publikasi ke crates.io..."
 for crate in "${CRATES[@]}"; do
     echo "========================================"
@@ -82,3 +114,4 @@ for crate in "${CRATES[@]}"; do
 done
 
 echo "Seluruh crate berhasil dipublikasikan!"
+cleanup_cron
