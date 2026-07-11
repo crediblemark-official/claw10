@@ -4,6 +4,8 @@ on:
   release:
     types: [published]
   workflow_dispatch: # Memungkinkan eksekusi manual via UI GitHub
+  schedule:
+    - cron: '0 0 * * *' # Berjalan otomatis 1 kali per hari (1x sehari)
 
 jobs:
   publish:
