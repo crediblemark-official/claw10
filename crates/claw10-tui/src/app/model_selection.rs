@@ -40,16 +40,7 @@ impl TuiApp {
         } else {
             // No config file — fallback: env var → KV store (global_store) for each built-in provider
             for config in claw10_model_router::providers::provider_configs() {
-                // Native providers (e.g. Bedrock) are registered via their factory.
-                if let Some(factory) = config.factory {
-                    let name = config.name.to_string();
-                    if !registry.list_providers().contains(&name) {
-                        registry.register(factory());
-                    }
-                    continue;
-                }
-
-                let key = match std::env::var(config.api_key_env) {
+                let key = match std::env::var(&config.api_key_env) {
                     Ok(k) if !k.is_empty() => Some(k),
                     _ => {
                         let store_key = format!("config:{}_api_key", config.name);
@@ -65,8 +56,8 @@ impl TuiApp {
                 if let Some(key) = key {
                     registry.register(Box::new(
                         claw10_model_router::openai_compat::OpenAiCompatibleProvider::with_config(
-                            config.name,
-                            config.base_url,
+                            &config.name,
+                            &config.base_url,
                             key,
                             config.models.clone(),
                         ),
@@ -386,7 +377,7 @@ impl TuiApp {
         catalog
             .into_iter()
             .map(|c| {
-                let is_cfg = configured.contains(c.name);
+                let is_cfg = configured.contains(&c.name);
                 (c.name.to_string(), is_cfg)
             })
             .collect()

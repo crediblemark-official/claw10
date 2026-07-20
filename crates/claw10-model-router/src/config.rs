@@ -213,7 +213,7 @@ pub fn resolve_providers(
     // Build a slot lookup from built-in catalog
     let slot_map: HashMap<&str, &ProviderConfig> = builtin
         .iter()
-        .map(|c| (c.name, c))
+        .map(|c| (c.name.as_str(), c))
         .collect();
 
     let mut accounted_slots: std::collections::BTreeSet<&str> = std::collections::BTreeSet::new();
@@ -231,16 +231,9 @@ pub fn resolve_providers(
                 }
             };
 
-            // Native providers (e.g. Bedrock) are registered directly by the runtime
-            // and do not resolve to an OpenAI-compatible descriptor.
-            if slot.factory.is_some() {
-                accounted_slots.insert(alias.slot.as_str());
-                continue;
-            }
-
             // Resolve API key: try alias.api_key first (with $ENV expansion),
             // then fall through to slot's env var / KV
-            let api_key = resolve_api_key(&alias.api_key, slot.api_key_env, &kv_get);
+            let api_key = resolve_api_key(&alias.api_key, &slot.api_key_env, &kv_get);
             let api_key = match api_key {
                 Some(k) => k,
                 None => {
@@ -329,16 +322,15 @@ pub fn resolve_providers(
     }
 
     // 3. Register bare slots (no alias defined) if they have API keys.
-    // Native providers are skipped here; they register themselves outside config resolution.
     for slot in &builtin {
-        if accounted_slots.contains(slot.name) || slot.factory.is_some() {
+        if accounted_slots.contains(slot.name.as_str()) {
             continue;
         }
-        let api_key = resolve_api_key("", slot.api_key_env, &kv_get);
+        let api_key = resolve_api_key("", &slot.api_key_env, &kv_get);
         if let Some(key) = api_key {
             resolved.push(ResolvedProvider {
-                name: slot.name.to_string(),
-                base_url: slot.base_url.to_string(),
+                name: slot.name.clone(),
+                base_url: slot.base_url.clone(),
                 api_key: key,
                 models: slot.models.clone(),
             });

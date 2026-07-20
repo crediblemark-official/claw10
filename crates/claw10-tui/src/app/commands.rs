@@ -20,7 +20,7 @@ impl TuiApp {
         let result = match command.as_str() {
             "help" => {
                 let providers_list = claw10_model_router::providers::provider_configs();
-                let names: Vec<&str> = providers_list.iter().map(|c| c.name).collect();
+                let names: Vec<String> = providers_list.iter().map(|c| c.name.clone()).collect();
                 let help = format!(
 "\
 Commands:
