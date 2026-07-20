@@ -24,21 +24,12 @@ async fn test_real_llm_api_call() {
 
     // Registrasi provider dari env vars
     for config in claw10_model_router::providers::provider_configs() {
-        // Native providers (e.g. Bedrock) are registered via their factory.
-        if let Some(factory) = config.factory {
-            let name = config.name.to_string();
-            if !registry.list_providers().contains(&name) {
-                registry.register(factory());
-            }
-            continue;
-        }
-
-        if let Ok(key) = std::env::var(config.api_key_env) {
+        if let Ok(key) = std::env::var(&config.api_key_env) {
             if !key.trim().is_empty() {
                 registry.register(Box::new(
                     claw10_model_router::openai_compat::OpenAiCompatibleProvider::with_config(
-                        config.name,
-                        config.base_url,
+                        &config.name,
+                        &config.base_url,
                         key,
                         config.models.clone(),
                     )

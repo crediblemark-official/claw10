@@ -53,6 +53,7 @@ impl claw10_model_router::provider::ModelProvider for MockProvider {
             message: ModelMessage {
                 role: MessageRole::Assistant,
                 content: "Hello from agent via gateway".into(),
+                content_parts: None,
                 tool_calls: None,
                 tool_call_id: None,
                 name: None,

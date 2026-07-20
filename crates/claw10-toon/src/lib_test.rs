@@ -41,13 +41,13 @@ fn make_test_task() -> Task {
 #[test]
 fn test_encode_task() {
     let task = make_test_task();
-    let encoded = ToonEncoder::encode_task(&task);
+    let encoded = ToonEncoder::encode_task(&task).unwrap();
     assert!(encoded.contains("Test payment flow"));
 }
 
 #[test]
 fn test_encode_memories_empty() {
-    let encoded = ToonEncoder::encode_memories(&[]);
+    let encoded = ToonEncoder::encode_memories(&[]).unwrap();
     assert_eq!(encoded, "memories: []");
 }
 
@@ -71,7 +71,7 @@ fn test_encode_memories() {
         created_at: chrono::Utc::now(),
         updated_at: chrono::Utc::now(),
     }];
-    let encoded = ToonEncoder::encode_memories(&memories);
+    let encoded = ToonEncoder::encode_memories(&memories).unwrap();
     assert!(encoded.contains("Use transactions"));
     assert!(encoded.contains("0.95"));
 }
@@ -79,7 +79,7 @@ fn test_encode_memories() {
 #[test]
 fn test_toon_context_build_empty() {
     let ctx = ToonContext::new();
-    assert_eq!(ctx.build(), "[TOON v1]");
+    assert_eq!(ctx.build().unwrap(), "[TOON v1]");
 }
 
 #[test]
@@ -89,12 +89,12 @@ fn test_toon_context_build_with_sections() {
     ctx.add_section("body", "Content of body".to_string());
 
     let expected = "[TOON v1]\n[header]\nContent of header\n[body]\nContent of body";
-    assert_eq!(ctx.build(), expected);
+    assert_eq!(ctx.build().unwrap(), expected);
 }
 
 #[test]
 fn test_build_context_empty() {
-    let ctx = ToonEncoder::build_context(None, None, &[], &[], &[], None, &[]);
+    let ctx = ToonEncoder::build_context(None, None, &[], &[], &[], None, &[]).unwrap();
     assert!(ctx.starts_with("[TOON v1]"));
 }
 
@@ -109,7 +109,7 @@ fn test_build_context_with_data() {
         &[],
         None,
         &[],
-    );
+    ).unwrap();
     assert!(ctx.contains("[task]"));
 }
 
@@ -134,7 +134,7 @@ fn test_encode_skills() {
         created_at: chrono::Utc::now(),
         updated_at: chrono::Utc::now(),
     }];
-    let encoded = ToonEncoder::encode_skills(&skills);
+    let encoded = ToonEncoder::encode_skills(&skills).unwrap();
     assert!(encoded.contains("web-search"));
     assert!(encoded.contains("0.01"));
 }
@@ -142,7 +142,7 @@ fn test_encode_skills() {
 #[test]
 fn test_encode_history() {
     let history = vec!["user: hello".into(), "assistant: hi".into()];
-    let encoded = ToonEncoder::encode_history(&history);
+    let encoded = ToonEncoder::encode_history(&history).unwrap();
     assert!(encoded.contains("hello"));
     assert!(encoded.contains("hi"));
 }
@@ -150,7 +150,7 @@ fn test_encode_history() {
 #[test]
 fn test_encode_tools() {
     let tools = vec!["http".into(), "shell".into()];
-    let encoded = ToonEncoder::encode_tools(&tools);
+    let encoded = ToonEncoder::encode_tools(&tools).unwrap();
     assert!(encoded.contains("http"));
     assert!(encoded.contains("shell"));
 }
@@ -158,7 +158,7 @@ fn test_encode_tools() {
 #[test]
 fn test_toon_context_new() {
     let ctx = ToonContext::new();
-    assert_eq!(ctx.build(), "[TOON v1]");
+    assert_eq!(ctx.build().unwrap(), "[TOON v1]");
 }
 
 #[test]
