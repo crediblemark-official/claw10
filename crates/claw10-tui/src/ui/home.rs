@@ -9,7 +9,7 @@ use ratatui::{
 use crate::app::TuiApp;
 
 pub fn draw_home(frame: &mut Frame, area: Rect, app: &TuiApp) {
-    let banner_content = include_str!("../../../../assets/claw10.txt");
+    let banner_content = include_str!("../../assets/claw10.txt");
     let banner_lines_count = banner_content.lines().count();
 
     // Tinggi komponen

@@ -35,7 +35,7 @@ impl SetupWizard {
     }
 
     fn draw_logo(&self, frame: &mut Frame, area: Rect) {
-        let banner_content = include_str!("../../../../assets/claw10.txt");
+        let banner_content = include_str!("../../assets/claw10.txt");
         let mut lines = vec![Line::from("")];
 
         let mut banner_lines: Vec<Line> = banner_content
