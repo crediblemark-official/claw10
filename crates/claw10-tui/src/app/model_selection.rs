@@ -294,7 +294,10 @@ impl TuiApp {
                 }
 
                 let family_name = selected_item;
-                let family = self.model_sel_families.iter().find(|f| f.name == family_name).unwrap();
+                let Some(family) = self.model_sel_families.iter().find(|f| f.name == family_name) else {
+                    self.status_message = format!("Family '{family_name}' not found");
+                    return;
+                };
                 let variants = family.variants.clone();
                 self.model_sel_search.clear();
                 self.model_sel_index = 0;

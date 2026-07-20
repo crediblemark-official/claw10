@@ -1,10 +1,36 @@
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+/// A content part within a multi-part message (used for vision/image inputs).
+/// Mirrors the OpenAI chat completions content part format.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum ContentPart {
+    #[serde(rename = "text")]
+    Text { text: String },
+    #[serde(rename = "image_url")]
+    ImageUrl { image_url: ImageUrlContent },
+}
+
+/// URL content for an image in a vision request.
+/// The `url` field accepts either a standard HTTPS URL or a data URI
+/// (e.g. `data:image/png;base64,iVBORw0KGgo…`).
+/// `detail` controls how the model processes the image (`"high"`, `"low"`, `"auto"`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImageUrlContent {
+    pub url: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelMessage {
     pub role: MessageRole,
     pub content: String,
+    /// Optional multi-part content (text + images) for vision requests.
+    /// When present, `content` is used as the text part description
+    /// and this field provides the full multi-part payload.
+    pub content_parts: Option<Vec<ContentPart>>,
     pub tool_calls: Option<Vec<ToolCall>>,
     pub tool_call_id: Option<String>,
     pub name: Option<String>,
@@ -148,13 +174,20 @@ pub struct ModelFamily {
 
 fn load_priority_models(provider: &str) -> Vec<String> {
     let path = format!("models/{}.json", provider.to_lowercase());
-    if let Some(list) = std::fs::read_to_string(&path)
-        .ok()
-        .and_then(|content| serde_json::from_str::<Vec<String>>(&content).ok())
-    {
-        return list.into_iter().map(|s| s.to_lowercase()).collect();
+    let content = match std::fs::read_to_string(&path) {
+        Ok(s) => s,
+        Err(e) => {
+            tracing::debug!("No priority model file at {path}: {e}");
+            return Vec::new();
+        }
+    };
+    match serde_json::from_str::<Vec<String>>(&content) {
+        Ok(list) => list.into_iter().map(|s| s.to_lowercase()).collect(),
+        Err(e) => {
+            tracing::warn!("Failed to parse priority models from {path}: {e}");
+            Vec::new()
+        }
     }
-    Vec::new()
 }
 
 /// Group models into families using a heuristic that strips trailing variant/version

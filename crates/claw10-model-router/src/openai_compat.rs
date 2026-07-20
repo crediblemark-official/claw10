@@ -84,8 +84,10 @@ struct CompatRequest {
 #[derive(Serialize)]
 struct CompatMessage {
     role: String,
+    /// Content as either a plain string or an array of multi-part content parts
+    /// (for vision/image requests).
     #[serde(skip_serializing_if = "Option::is_none")]
-    content: Option<String>,
+    content: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     tool_calls: Option<Vec<CompatToolCallReq>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -262,6 +264,33 @@ impl OpenAiCompatibleProvider {
                         .collect()
                 });
 
+                // Build content: multi-part (vision) or plain text
+                let content = if let Some(parts) = &m.content_parts {
+                    // Vision request: send as array of content parts
+                    let json_parts: Vec<serde_json::Value> = parts
+                        .iter()
+                        .map(|part| match part {
+                            crate::types::ContentPart::Text { text } => {
+                                serde_json::json!({"type": "text", "text": text})
+                            }
+                            crate::types::ContentPart::ImageUrl { image_url } => {
+                                serde_json::json!({
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": image_url.url,
+                                        "detail": image_url.detail,
+                                    }
+                                })
+                            }
+                        })
+                        .collect();
+                    Some(serde_json::Value::Array(json_parts))
+                } else if m.content.is_empty() && tool_calls.is_some() {
+                    None
+                } else {
+                    Some(serde_json::Value::String(m.content.clone()))
+                };
+
                 CompatMessage {
                     role: match m.role {
                         MessageRole::System => "system",
@@ -270,11 +299,7 @@ impl OpenAiCompatibleProvider {
                         MessageRole::Tool => "tool",
                     }
                     .to_string(),
-                    content: if m.content.is_empty() && tool_calls.is_some() {
-                        None
-                    } else {
-                        Some(m.content.clone())
-                    },
+                    content,
                     tool_calls,
                     tool_call_id: m.tool_call_id.clone(),
                     name: m.name.clone(),
@@ -501,6 +526,7 @@ impl ModelProvider for OpenAiCompatibleProvider {
             message: ModelMessage {
                 role,
                 content,
+                content_parts: None,
                 tool_calls,
                 tool_call_id: None,
                 name: None,

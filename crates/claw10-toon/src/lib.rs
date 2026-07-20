@@ -40,6 +40,20 @@ pub enum ToonError {
     Encoding(String),
 }
 
+pub enum ContextOutput {
+    Toon(String),
+    Json(String),
+}
+
+impl ContextOutput {
+    #[must_use]
+    pub fn to_string(&self) -> &str {
+        match self {
+            ContextOutput::Toon(s) | ContextOutput::Json(s) => s,
+        }
+    }
+}
+
 pub struct ToonContext {
     sections: Vec<String>,
 }
@@ -56,12 +70,13 @@ impl ToonContext {
         self.sections.push(format!("\n[{}]\n{}", name, content));
     }
 
-    pub fn build(&self) -> String {
+    pub fn build(&self) -> Result<String, ToonError> {
         let mut output = String::from("[TOON v1]");
         for section in &self.sections {
-            write!(output, "{}", section).unwrap();
+            write!(output, "{}", section)
+                .map_err(|e| ToonError::Encoding(e.to_string()))?;
         }
-        output
+        Ok(output)
     }
 }
 
@@ -75,53 +90,53 @@ pub struct ToonEncoder;
 
 impl ToonEncoder {
     // Mengkodekan objek tunggal Task
-    pub fn encode_task(task: &Task) -> String {
+    pub fn encode_task(task: &Task) -> Result<String, ToonError> {
         let deadline = task
             .deadline
             .map(|d| d.format("%Y-%m-%dT%H:%M:%SZ").to_string())
             .unwrap_or_else(|| "none".to_string());
 
-        vec![
+        Ok(vec![
             format!("id: {}", fmt_id(&task.id)),
             format!("objective: {}", encode_string(&task.objective)),
             format!("state: {:?}", task.state),
             format!("risk: {:?}", task.risk),
             format!("deadline: {}", deadline),
         ]
-        .join("\n")
+        .join("\n"))
     }
 
     // Mengkodekan objek tunggal Mission
-    pub fn encode_mission(mission: &Mission) -> String {
-        vec![
+    pub fn encode_mission(mission: &Mission) -> Result<String, ToonError> {
+        Ok(vec![
             format!("id: {}", fmt_id(&mission.id)),
             format!("objective: {}", encode_string(&mission.objective)),
             format!("mode: {:?}", mission.lifecycle_mode),
         ]
-        .join("\n")
+        .join("\n"))
     }
 
     // Mengkodekan list Memory menjadi format Tabular Array TOON
-    pub fn encode_memories(memories: &[Memory]) -> String {
+    pub fn encode_memories(memories: &[Memory]) -> Result<String, ToonError> {
         if memories.is_empty() {
-            return "memories: []".to_string();
+            return Ok("memories: []".to_string());
         }
         let mut output = format!("memories[{}]{{content,type,confidence}}:", memories.len());
         for m in memories {
             write!(
                 output,
-                "\n  {},{:?},{:.2}",
+                "\n  {},{},{:.2}",
                 encode_string(&m.content),
                 m.memory_type,
                 m.confidence
             )
-            .unwrap();
+            .map_err(|e| ToonError::Encoding(e.to_string()))?;
         }
-        output
+        Ok(output)
     }
 
     // Mengkodekan summary Policy menjadi format Tabular Array TOON
-    pub fn encode_policy_summary(bundles: &[PolicyBundle]) -> String {
+    pub fn encode_policy_summary(bundles: &[PolicyBundle]) -> Result<String, ToonError> {
         let mut active_rules = Vec::new();
         for bundle in bundles {
             if bundle.is_active {
@@ -137,7 +152,7 @@ impl ToonEncoder {
         }
 
         if active_rules.is_empty() {
-            return "policies: []".to_string();
+            return Ok("policies: []".to_string());
         }
 
         let mut output = format!(
@@ -158,15 +173,15 @@ impl ToonEncoder {
                 encode_string(&action),
                 encode_string(&resource)
             )
-            .unwrap();
+            .map_err(|e| ToonError::Encoding(e.to_string()))?;
         }
-        output
+        Ok(output)
     }
 
     // Mengkodekan daftar agen menjadi format Tabular Array TOON
-    pub fn encode_agent_roster(agents: &[Agent]) -> String {
+    pub fn encode_agent_roster(agents: &[Agent]) -> Result<String, ToonError> {
         if agents.is_empty() {
-            return "agents: []".to_string();
+            return Ok("agents: []".to_string());
         }
         let mut output = format!("agents[{}]{{id,role,state}}:", agents.len());
         for agent in agents {
@@ -177,13 +192,13 @@ impl ToonEncoder {
                 encode_string(&agent.role),
                 agent.state
             )
-            .unwrap();
+            .map_err(|e| ToonError::Encoding(e.to_string()))?;
         }
-        output
+        Ok(output)
     }
 
     // Mengkodekan data silsilah keturunan Lineage beserta entri hierarkinya
-    pub fn encode_lineage(lineage: &Lineage) -> String {
+    pub fn encode_lineage(lineage: &Lineage) -> Result<String, ToonError> {
         let root = format!("root_agent_id: {}", fmt_id(&lineage.root_agent_id));
         let entries_str = if lineage.entries.is_empty() {
             "entries: []".to_string()
@@ -204,17 +219,17 @@ impl ToonEncoder {
                     parent,
                     entry.state
                 )
-                .unwrap();
+                .map_err(|e| ToonError::Encoding(e.to_string()))?;
             }
             output
         };
-        format!("{}\n{}", root, entries_str)
+        Ok(format!("{}\n{}", root, entries_str))
     }
 
     // Mengkodekan bukti hasil kerja menjadi format Tabular Array TOON
-    pub fn encode_evidence(evidence: &[Evidence]) -> String {
+    pub fn encode_evidence(evidence: &[Evidence]) -> Result<String, ToonError> {
         if evidence.is_empty() {
-            return "evidence: []".to_string();
+            return Ok("evidence: []".to_string());
         }
         let mut output = format!("evidence[{}]{{id,type,accepted}}:", evidence.len());
         for ev in evidence {
@@ -225,15 +240,15 @@ impl ToonEncoder {
                 ev.evidence_type,
                 ev.accepted
             )
-            .unwrap();
+            .map_err(|e| ToonError::Encoding(e.to_string()))?;
         }
-        output
+        Ok(output)
     }
 
     // Mengkodekan skill terdaftar menjadi format Tabular Array TOON
-    pub fn encode_skills(skills: &[Skill]) -> String {
+    pub fn encode_skills(skills: &[Skill]) -> Result<String, ToonError> {
         if skills.is_empty() {
-            return "skills: []".to_string();
+            return Ok("skills: []".to_string());
         }
         let mut output = format!("skills[{}]{{name,version,state,cost}}:", skills.len());
         for skill in skills {
@@ -245,20 +260,20 @@ impl ToonEncoder {
                 skill.state,
                 skill.cost_profile.estimated_cost_usd
             )
-            .unwrap();
+            .map_err(|e| ToonError::Encoding(e.to_string()))?;
         }
-        output
+        Ok(output)
     }
 
     // Mengkodekan riwayat pesan obrolan (Primitive Array)
-    pub fn encode_history(history: &[String]) -> String {
-        encode_primitive_array("history", history)
+    pub fn encode_history(history: &[String]) -> Result<String, ToonError> {
+        Ok(encode_primitive_array("history", history))
     }
 
     // Mengkodekan daftar worker terdaftar menjadi format Tabular Array TOON
-    pub fn encode_workers(workers: &[Worker]) -> String {
+    pub fn encode_workers(workers: &[Worker]) -> Result<String, ToonError> {
         if workers.is_empty() {
-            return "workers: []".to_string();
+            return Ok("workers: []".to_string());
         }
         let mut output = format!("workers[{}]{{name,type,state}}:", workers.len());
         for w in workers {
@@ -269,14 +284,14 @@ impl ToonEncoder {
                 w.worker_type,
                 w.state
             )
-            .unwrap();
+            .map_err(|e| ToonError::Encoding(e.to_string()))?;
         }
-        output
+        Ok(output)
     }
 
     // Mengkodekan daftar tool terdaftar (Primitive Array)
-    pub fn encode_tools(tools: &[String]) -> String {
-        encode_primitive_array("tools", tools)
+    pub fn encode_tools(tools: &[String]) -> Result<String, ToonError> {
+        Ok(encode_primitive_array("tools", tools))
     }
 
     pub fn build_context(
@@ -287,38 +302,162 @@ impl ToonEncoder {
         agents: &[Agent],
         lineage: Option<&Lineage>,
         evidence: &[Evidence],
-    ) -> String {
+    ) -> Result<String, ToonError> {
         let mut ctx = ToonContext::new();
 
         if let Some(task) = task {
-            ctx.add_section("task", Self::encode_task(task));
+            ctx.add_section("task", Self::encode_task(task)?);
         }
 
         if let Some(mission) = mission {
-            ctx.add_section("mission", Self::encode_mission(mission));
+            ctx.add_section("mission", Self::encode_mission(mission)?);
         }
 
         if !memories.is_empty() {
-            ctx.add_section("memory", Self::encode_memories(memories));
+            ctx.add_section("memory", Self::encode_memories(memories)?);
         }
 
         if !policies.is_empty() {
-            ctx.add_section("policy", Self::encode_policy_summary(policies));
+            ctx.add_section("policy", Self::encode_policy_summary(policies)?);
         }
 
         if !agents.is_empty() {
-            ctx.add_section("agents", Self::encode_agent_roster(agents));
+            ctx.add_section("agents", Self::encode_agent_roster(agents)?);
         }
 
         if let Some(lineage) = lineage {
-            ctx.add_section("lineage", Self::encode_lineage(lineage));
+            ctx.add_section("lineage", Self::encode_lineage(lineage)?);
         }
 
         if !evidence.is_empty() {
-            ctx.add_section("evidence", Self::encode_evidence(evidence));
+            ctx.add_section("evidence", Self::encode_evidence(evidence)?);
         }
 
         ctx.build()
+    }
+
+    pub fn suitability_score(
+        task: Option<&Task>,
+        mission: Option<&Mission>,
+        memories: &[Memory],
+        policies: &[PolicyBundle],
+        agents: &[Agent],
+        lineage: Option<&Lineage>,
+        evidence: &[Evidence],
+    ) -> f64 {
+        let mut score: f64 = 0.0;
+
+        let is_tabular_only = task.is_none()
+            && mission.is_none()
+            && lineage.is_none()
+            && evidence.is_empty()
+            && policies.is_empty();
+        if is_tabular_only {
+            score += 0.3;
+        }
+
+        let mut ctx = ToonContext::new();
+        if let Some(task) = task {
+            if let Ok(s) = Self::encode_task(task) {
+                ctx.add_section("task", s);
+            }
+        }
+        if let Some(mission) = mission {
+            if let Ok(s) = Self::encode_mission(mission) {
+                ctx.add_section("mission", s);
+            }
+        }
+        if !memories.is_empty() {
+            if let Ok(s) = Self::encode_memories(memories) {
+                ctx.add_section("memory", s);
+            }
+        }
+        if !policies.is_empty() {
+            if let Ok(s) = Self::encode_policy_summary(policies) {
+                ctx.add_section("policy", s);
+            }
+        }
+        if !agents.is_empty() {
+            if let Ok(s) = Self::encode_agent_roster(agents) {
+                ctx.add_section("agents", s);
+            }
+        }
+        if let Some(lineage) = lineage {
+            if let Ok(s) = Self::encode_lineage(lineage) {
+                ctx.add_section("lineage", s);
+            }
+        }
+        if !evidence.is_empty() {
+            if let Ok(s) = Self::encode_evidence(evidence) {
+                ctx.add_section("evidence", s);
+            }
+        }
+
+        let toon_str = ctx.build().unwrap_or_default();
+
+        if toon_str.len() < 4096 {
+            score += 0.2;
+        }
+
+        let brace_count = toon_str.matches('{').count() + toon_str.matches('}').count();
+        let bracket_count = toon_str.matches('[').count() + toon_str.matches(']').count();
+        if brace_count > 10 || bracket_count > 10 {
+            score -= 0.3;
+        }
+
+        let special_chars = toon_str
+            .chars()
+            .filter(|c| !c.is_alphanumeric() && !c.is_whitespace() && *c != '_' && *c != '-' && *c != '.')
+            .count();
+        let total_chars = toon_str.len();
+        if total_chars > 0 {
+            let special_ratio = special_chars as f64 / total_chars as f64;
+            if special_ratio > 0.3 {
+                score -= 0.2;
+            }
+        }
+
+        score.clamp(0.0, 1.0)
+    }
+
+    pub fn build_context_with_fallback(
+        task: Option<&Task>,
+        mission: Option<&Mission>,
+        memories: &[Memory],
+        policies: &[PolicyBundle],
+        agents: &[Agent],
+        lineage: Option<&Lineage>,
+        evidence: &[Evidence],
+    ) -> Result<ContextOutput, ToonError> {
+        let score = Self::suitability_score(
+            task,
+            mission,
+            memories,
+            policies,
+            agents,
+            lineage,
+            evidence,
+        );
+
+        if score < 0.5 {
+            let fallback_data = serde_json::json!({
+                "task": task.and_then(|t| serde_json::to_value(t).ok()),
+                "mission": mission.and_then(|m| serde_json::to_value(m).ok()),
+                "memories": serde_json::to_value(memories).ok(),
+                "policies": serde_json::to_value(policies).ok(),
+                "agents": serde_json::to_value(agents).ok(),
+                "lineage": lineage.and_then(|l| serde_json::to_value(l).ok()),
+                "evidence": serde_json::to_value(evidence).ok(),
+            });
+
+            match serde_json::to_string_pretty(&fallback_data) {
+                Ok(json) => Ok(ContextOutput::Json(json)),
+                Err(e) => Err(ToonError::Encoding(e.to_string())),
+            }
+        } else {
+            let toon = Self::build_context(task, mission, memories, policies, agents, lineage, evidence)?;
+            Ok(ContextOutput::Toon(toon))
+        }
     }
 }
 

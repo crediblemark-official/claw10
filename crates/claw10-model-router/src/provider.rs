@@ -58,13 +58,28 @@ impl ModelRegistry {
         let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
         let cache_file = std::path::PathBuf::from(&home).join(".claw10").join("models.json");
         
-        if let Some(obj) = std::fs::read_to_string(&cache_file)
-            .ok()
-            .and_then(|content| serde_json::from_str::<serde_json::Value>(&content).ok())
-            .and_then(|json| match json {
+        let cached_models = (|| -> Option<serde_json::Map<String, serde_json::Value>> {
+            let content = match std::fs::read_to_string(&cache_file) {
+                Ok(s) => s,
+                Err(e) => {
+                    tracing::debug!("No model cache file at {:?}: {e}", cache_file);
+                    return None;
+                }
+            };
+            let json: serde_json::Value = match serde_json::from_str(&content) {
+                Ok(v) => v,
+                Err(e) => {
+                    tracing::warn!("Failed to parse model cache JSON: {e}");
+                    return None;
+                }
+            };
+            match json {
                 serde_json::Value::Object(obj) => Some(obj),
                 _ => None,
-            })
+            }
+        })();
+        
+        if let Some(obj) = cached_models
         {
             for (provider_name, models_arr) in obj {
                 if let Some(arr) = models_arr.as_array() {

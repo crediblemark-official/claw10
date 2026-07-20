@@ -53,7 +53,9 @@ where
         event.record(&mut visitor);
 
         if let Some(msg) = visitor.message {
-            let _ = writeln!(self.writer.lock().unwrap(), "{msg}");
+            if let Ok(mut writer) = self.writer.lock() {
+                let _ = writeln!(writer, "{msg}");
+            }
         }
     }
 }

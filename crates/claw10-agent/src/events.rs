@@ -42,4 +42,22 @@ pub enum AgentEvent {
     BudgetWarning {
         remaining: f64,
     },
+    /// Budget hard limit has been reached — execution is being stopped.
+    BudgetExceeded {
+        spent: f64,
+        hard_limit: f64,
+    },
+    /// A tool call failed verification and is being retried.
+    ToolRetry {
+        tool: String,
+        attempt: u32,
+        max_retries: u32,
+        reason: String,
+    },
+    /// A tool call failed all verification retries.
+    VerificationFailed {
+        tool: String,
+        reason: String,
+        suggestion: Option<String>,
+    },
 }

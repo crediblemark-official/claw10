@@ -399,42 +399,60 @@ async fn test_spawn_validation_fails_when_duplicate_objective() {
     let broker = make_broker();
     let root_clone = root.clone();
 
-    // Skenario 1: Duplikasi role dengan yang sudah ada (root)
-    let request_dup_role = SpawnBroker::create_request(
+    // Skenario 1: Objective child exact-match dengan nama agen yang sudah ada -> harus gagal
+    let mut spec_exact = make_child_spec("scout", 50.0);
+    spec_exact.objective = "root-agent".into(); // exact match with root agent's name
+    let request_dup = SpawnBroker::create_request(
         mission.id.clone(),
         root.id.clone(),
-        "test dup role".into(),
-        vec![make_child_spec("root", 50.0)],
+        "test exact dup".into(),
+        vec![spec_exact],
     );
 
-    let result_dup_role = broker
-        .process_spawn_request(&mut root, &mission, &request_dup_role, &[root_clone.clone()], 0)
+    let result_dup = broker
+        .process_spawn_request(&mut root, &mission, &request_dup, &[root_clone.clone()], 0)
         .await;
 
-    assert!(result_dup_role.is_err());
+    assert!(result_dup.is_err());
     assert!(
-        matches!(result_dup_role.unwrap_err(), claw10_spawn::SpawnError::DuplicateObjective(_)),
-        "Harus gagal karena role bertabrakan"
+        matches!(result_dup.unwrap_err(), claw10_spawn::SpawnError::DuplicateObjective(_)),
+        "Harus gagal karena objective sama persis dengan nama agen yang sudah ada"
     );
 
-    // Skenario 2: Objective child adalah substring dari nama agen yang sudah ada ("root")
-    let mut spec_dup_obj = make_child_spec("scout", 50.0);
-    spec_dup_obj.objective = "root".into(); // "root-agent" contains "root"
-    let request_dup_obj = SpawnBroker::create_request(
+    // Skenario 2: Role sama tetapi objective berbeda -> HARUS sukses (tidak dicek berdasarkan role)
+    let mut spec_diff_role = make_child_spec("root", 50.0); // role = "root"
+    spec_diff_role.objective = "different objective".into();
+    let request_diff = SpawnBroker::create_request(
         mission.id.clone(),
         root.id.clone(),
-        "test dup obj".into(),
-        vec![spec_dup_obj],
+        "test diff role".into(),
+        vec![spec_diff_role],
     );
 
-    let result_dup_obj = broker
-        .process_spawn_request(&mut root, &mission, &request_dup_obj, &[root_clone], 0)
+    let result_diff = broker
+        .process_spawn_request(&mut root, &mission, &request_diff, &[root_clone.clone()], 0)
         .await;
 
-    assert!(result_dup_obj.is_err());
-    assert!(
-        matches!(result_dup_obj.unwrap_err(), claw10_spawn::SpawnError::DuplicateObjective(_)),
-        "Harus gagal karena objective terkandung dalam nama agen yang sudah ada"
+    assert!(result_diff.is_ok(),
+        "Role yang sama seharusnya tidak dicek lagi. Yang dicek hanya exact-match objective"
+    );
+
+    // Skenario 3: Objective substring dari nama agen -> HARUS sukses (tidak dicek substring)
+    let mut spec_substr = make_child_spec("scout", 50.0);
+    spec_substr.objective = "root".into(); // "root-agent" contains "root" as substring
+    let request_substr = SpawnBroker::create_request(
+        mission.id.clone(),
+        root.id.clone(),
+        "test substr".into(),
+        vec![spec_substr],
+    );
+
+    let result_substr = broker
+        .process_spawn_request(&mut root, &mission, &request_substr, &[root_clone], 0)
+        .await;
+
+    assert!(result_substr.is_ok(),
+        "Substring match seharusnya tidak dicek lagi. Yang dicek hanya exact-match objective"
     );
 }
 

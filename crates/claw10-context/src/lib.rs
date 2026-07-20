@@ -3,7 +3,7 @@ use tracing::warn;
 use claw10_domain::{
     Agent, Evidence, Lineage, Memory, Mission, PolicyBundle, Skill, Task, Worker,
 };
-use claw10_toon::{ToonContext, ToonEncoder};
+use claw10_toon::{ToonContext, ToonEncoder, ToonError};
 
 #[derive(Debug, thiserror::Error)]
 pub enum ContextError {
@@ -11,6 +11,8 @@ pub enum ContextError {
     TokenBudgetExhausted { needed: usize, available: usize },
     #[error("No suitable context sources available")]
     NoSources,
+    #[error("TOON encoding error: {0}")]
+    ToonEncoding(#[from] ToonError),
 }
 
 /// Defines what context sources are available for building.
@@ -81,58 +83,58 @@ impl ContextPipeline {
 
         if self.config.include_task {
             if let Some(task) = sources.task {
-                ctx.add_section("task", ToonEncoder::encode_task(task));
+                ctx.add_section("task", ToonEncoder::encode_task(task)?);
             }
         }
 
         if self.config.include_mission {
             if let Some(mission) = sources.mission {
-                ctx.add_section("mission", ToonEncoder::encode_mission(mission));
+                ctx.add_section("mission", ToonEncoder::encode_mission(mission)?);
             }
         }
 
         if self.config.include_memories && !sources.memories.is_empty() {
-            ctx.add_section("memory", ToonEncoder::encode_memories(sources.memories));
+            ctx.add_section("memory", ToonEncoder::encode_memories(sources.memories)?);
         }
 
         if self.config.include_policy && !sources.policies.is_empty() {
             ctx.add_section(
                 "policy",
-                ToonEncoder::encode_policy_summary(sources.policies),
+                ToonEncoder::encode_policy_summary(sources.policies)?,
             );
         }
 
         if self.config.include_skills && !sources.skills.is_empty() {
-            ctx.add_section("skills", ToonEncoder::encode_skills(sources.skills));
+            ctx.add_section("skills", ToonEncoder::encode_skills(sources.skills)?);
         }
 
         if self.config.include_history && !sources.history.is_empty() {
-            ctx.add_section("history", ToonEncoder::encode_history(sources.history));
+            ctx.add_section("history", ToonEncoder::encode_history(sources.history)?);
         }
 
         if self.config.include_tools && !sources.tools.is_empty() {
-            ctx.add_section("tools", ToonEncoder::encode_tools(sources.tools));
+            ctx.add_section("tools", ToonEncoder::encode_tools(sources.tools)?);
         }
 
         if self.config.include_agent && !sources.agents.is_empty() {
-            ctx.add_section("agents", ToonEncoder::encode_agent_roster(sources.agents));
+            ctx.add_section("agents", ToonEncoder::encode_agent_roster(sources.agents)?);
         }
 
         if self.config.include_lineage {
             if let Some(lineage) = sources.lineage {
-                ctx.add_section("lineage", ToonEncoder::encode_lineage(lineage));
+                ctx.add_section("lineage", ToonEncoder::encode_lineage(lineage)?);
             }
         }
 
         if self.config.include_workers && !sources.workers.is_empty() {
-            ctx.add_section("workers", ToonEncoder::encode_workers(sources.workers));
+            ctx.add_section("workers", ToonEncoder::encode_workers(sources.workers)?);
         }
 
         if self.config.include_evidence && !sources.evidence.is_empty() {
-            ctx.add_section("evidence", ToonEncoder::encode_evidence(sources.evidence));
+            ctx.add_section("evidence", ToonEncoder::encode_evidence(sources.evidence)?);
         }
 
-        let context = ctx.build();
+        let context = ctx.build()?;
         let estimated_tokens = estimate_tokens(&context);
 
         if estimated_tokens > self.config.max_token_budget {

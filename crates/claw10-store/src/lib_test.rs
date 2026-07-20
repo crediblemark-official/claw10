@@ -55,16 +55,16 @@ async fn test_in_memory_store_clear() {
 }
 
 #[tokio::test]
-async fn test_sled_store_roundtrip() {
-    let store = SledStore::new_temporary().unwrap();
+async fn test_json_store_roundtrip() {
+    let store = JsonFileStore::new_temporary();
     store.set("test:key", &42u32).await.unwrap();
     let val: Option<u32> = store.get("test:key").await.unwrap();
     assert_eq!(val, Some(42));
 }
 
 #[tokio::test]
-async fn test_sled_store_scan_prefix() {
-    let store = SledStore::new_temporary().unwrap();
+async fn test_json_store_scan_prefix() {
+    let store = JsonFileStore::new_temporary();
     store.set("agent:a1", &"agent-one").await.unwrap();
     store.set("agent:a2", &"agent-two").await.unwrap();
     store.set("task:t1", &"task-one").await.unwrap();

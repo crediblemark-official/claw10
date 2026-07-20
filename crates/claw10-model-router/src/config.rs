@@ -140,8 +140,20 @@ pub fn discover_config() -> Option<Claw10Config> {
     let paths = config_file_candidates();
     for path in &paths {
         if path.exists() {
-            let content = std::fs::read_to_string(path).ok()?;
-            return toml::from_str(&content).ok();
+            let content = match std::fs::read_to_string(path) {
+                Ok(s) => s,
+                Err(e) => {
+                    tracing::debug!("Config file {:?} exists but unreadable: {e}", path);
+                    continue;
+                }
+            };
+            match toml::from_str(&content) {
+                Ok(config) => return Some(config),
+                Err(e) => {
+                    tracing::warn!("Config file {:?} has invalid TOML: {e}", path);
+                    continue;
+                }
+            }
         }
     }
     None

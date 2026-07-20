@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use claw10_agent::{AgentRuntime, AgentStore};
 use claw10_budget::BudgetService;
@@ -7,6 +8,20 @@ use claw10_domain::{AgentId, WorkerId};
 use claw10_store::StoreExt;
 
 use crate::state::AppState;
+
+/// Shared shutdown flag for the Telegram poller and heartbeat loop.
+static TELEGRAM_SHUTDOWN: std::sync::OnceLock<Arc<AtomicBool>> = std::sync::OnceLock::new();
+
+fn shutdown_flag() -> Arc<AtomicBool> {
+    TELEGRAM_SHUTDOWN
+        .get_or_init(|| Arc::new(AtomicBool::new(false)))
+        .clone()
+}
+
+/// Signal the Telegram poller to shut down gracefully.
+pub fn signal_telegram_shutdown() {
+    shutdown_flag().store(true, Ordering::SeqCst);
+}
 
 /// Mulai background task polling getUpdates Telegram jika TELEGRAM_BOT_TOKEN di-set di env.
 /// Pesan masuk yang dideteksi akan diteruskan ke gateway_service lalu dieksekusi oleh agen.
@@ -23,6 +38,8 @@ pub fn start_telegram_poller(state: AppState) {
         tracing::info!("[Telegram Poller] TELEGRAM_CHAT_ID belum dikonfigurasi. Poller backend dinonaktifkan.");
         return;
     }
+
+    let shutdown = shutdown_flag();
 
     tokio::spawn(async move {
         // Beri jeda kecil agar state dan DB sudah siap
@@ -118,6 +135,7 @@ pub fn start_telegram_poller(state: AppState) {
         let agent_id_heartbeat = AgentId(agent_uuid);
         let channel_id_heartbeat = channel.id.clone();
         let recipient_heartbeat = chat_id.clone();
+        let heartbeat_shutdown = shutdown.clone();
 
         tokio::spawn(async move {
             // Jeda awal agar inisialisasi server selesai
@@ -125,7 +143,8 @@ pub fn start_telegram_poller(state: AppState) {
 
             loop {
                 // Periksa apakah service di-shutdown
-                if std::env::var("TELEGRAM_CHAT_ID").unwrap_or_default().trim().is_empty() {
+                if heartbeat_shutdown.load(Ordering::SeqCst) {
+                    tracing::info!("[Heartbeat] Shutdown signal diterima. Menghentikan heartbeat loop.");
                     break;
                 }
 
@@ -180,8 +199,8 @@ pub fn start_telegram_poller(state: AppState) {
         let mut offset = 0i64;
 
         loop {
-            if std::env::var("TELEGRAM_CHAT_ID").unwrap_or_default().trim().is_empty() {
-                tracing::info!("[Telegram Poller] TELEGRAM_CHAT_ID dikosongkan. Menghentikan loop poller.");
+            if shutdown.load(Ordering::SeqCst) {
+                tracing::info!("[Telegram Poller] Shutdown signal diterima. Menghentikan loop poller.");
                 break;
             }
 
@@ -449,6 +468,7 @@ async fn perform_memory_distillation(
             claw10_model_router::types::ModelMessage {
                 role: claw10_model_router::types::MessageRole::System,
                 content: system_content,
+                content_parts: None,
                 tool_calls: None,
                 tool_call_id: None,
                 name: None,
@@ -456,6 +476,7 @@ async fn perform_memory_distillation(
             claw10_model_router::types::ModelMessage {
                 role: claw10_model_router::types::MessageRole::User,
                 content: formatted_user_content,
+                content_parts: None,
                 tool_calls: None,
                 tool_call_id: None,
                 name: None,
@@ -584,6 +605,7 @@ async fn run_bootstrap_interview(
         claw10_model_router::types::ModelMessage {
             role: claw10_model_router::types::MessageRole::System,
             content: system_prompt,
+            content_parts: None,
             tool_calls: None,
             tool_call_id: None,
             name: None,
@@ -596,6 +618,7 @@ async fn run_bootstrap_interview(
             messages.push(claw10_model_router::types::ModelMessage {
                 role: claw10_model_router::types::MessageRole::User,
                 content: line["Operator: ".len()..].to_string(),
+                content_parts: None,
                 tool_calls: None,
                 tool_call_id: None,
                 name: None,
@@ -604,6 +627,7 @@ async fn run_bootstrap_interview(
             messages.push(claw10_model_router::types::ModelMessage {
                 role: claw10_model_router::types::MessageRole::Assistant,
                 content: line["Asisten: ".len()..].to_string(),
+                content_parts: None,
                 tool_calls: None,
                 tool_call_id: None,
                 name: None,
@@ -667,6 +691,7 @@ async fn run_bootstrap_interview(
                 claw10_model_router::types::ModelMessage {
                     role: claw10_model_router::types::MessageRole::System,
                     content: "Anda adalah asisten data ekstraksi JSON.".to_string(),
+                    content_parts: None,
                     tool_calls: None,
                     tool_call_id: None,
                     name: None,
@@ -674,6 +699,7 @@ async fn run_bootstrap_interview(
                 claw10_model_router::types::ModelMessage {
                     role: claw10_model_router::types::MessageRole::User,
                     content: dist_prompt,
+                    content_parts: None,
                     tool_calls: None,
                     tool_call_id: None,
                     name: None,

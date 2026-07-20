@@ -295,15 +295,28 @@ impl GatewayService {
                         ))
                     })?;
 
-                self.http
+                let resp = self.http
                     .post(url)
                     .json(&payload)
+                    .timeout(std::time::Duration::from_secs(30))
                     .send()
                     .await
-                    .map_err(|e| GatewayError::Other(format!("webhook request failed: {e}")))?
-                    .text()
-                    .await
-                    .map_err(|e| GatewayError::Other(format!("webhook read body failed: {e}")))?
+                    .map_err(|e| GatewayError::Other(format!("webhook request failed for channel {}: {e}", channel_id)))?;
+
+                if !resp.status().is_success() {
+                    let status = resp.status();
+                    let body = resp.text().await.unwrap_or_default();
+                    tracing::warn!("Webhook dispatch failed for channel {}: HTTP {} - {}", channel_id, status, body);
+                    return Err(GatewayError::Other(format!(
+                        "Webhook dispatch failed for channel {}: HTTP {} - {}",
+                        channel_id, status, body
+                    )));
+                }
+
+                let body = resp.text().await
+                    .map_err(|e| GatewayError::Other(format!("webhook read body failed for channel {}: {e}", channel_id)))?;
+                tracing::info!("Webhook dispatch succeeded for channel {}", channel_id);
+                body
             }
             ChannelType::Telegram => {
                 let bot_token = channel
@@ -346,15 +359,37 @@ impl GatewayService {
                 });
 
                 let url = format!("https://api.telegram.org/bot{bot_token}/sendMessage");
-                self.http
+                let resp = self.http
                     .post(&url)
                     .json(&tg_payload)
+                    .timeout(std::time::Duration::from_secs(30))
                     .send()
                     .await
-                    .map_err(|e| GatewayError::Other(format!("telegram request failed: {e}")))?
-                    .text()
-                    .await
-                    .map_err(|e| GatewayError::Other(format!("telegram read body failed: {e}")))?
+                    .map_err(|e| GatewayError::Other(format!(
+                        "Telegram dispatch failed for channel {} (chat_id={}): {e}",
+                        channel_id, chat_id
+                    )))?;
+
+                if !resp.status().is_success() {
+                    let status = resp.status();
+                    let body = resp.text().await.unwrap_or_default();
+                    tracing::warn!(
+                        "Telegram dispatch failed for channel {} (chat_id={}): HTTP {} - {}",
+                        channel_id, chat_id, status, body
+                    );
+                    return Err(GatewayError::Other(format!(
+                        "Telegram dispatch failed for channel {} (chat_id={}): HTTP {} - {}",
+                        channel_id, chat_id, status, body
+                    )));
+                }
+
+                let body = resp.text().await
+                    .map_err(|e| GatewayError::Other(format!(
+                        "Telegram read body failed for channel {} (chat_id={}): {e}",
+                        channel_id, chat_id
+                    )))?;
+                tracing::info!("Telegram dispatch succeeded for channel {} (chat_id={})", channel_id, chat_id);
+                body
             }
             ChannelType::Discord => {
                 let webhook_url = channel
@@ -376,15 +411,45 @@ impl GatewayService {
                     }),
                 });
 
-                self.http
+                let url_domain = webhook_url
+                    .split("://")
+                    .nth(1)
+                    .unwrap_or("unknown")
+                    .split('/')
+                    .next()
+                    .unwrap_or("unknown");
+
+                let resp = self.http
                     .post(webhook_url)
                     .json(&discord_payload)
+                    .timeout(std::time::Duration::from_secs(30))
                     .send()
                     .await
-                    .map_err(|e| GatewayError::Other(format!("discord request failed: {e}")))?
-                    .text()
-                    .await
-                    .map_err(|e| GatewayError::Other(format!("discord read body failed: {e}")))?
+                    .map_err(|e| GatewayError::Other(format!(
+                        "Discord dispatch failed for channel {} (webhook_domain={}): {e}",
+                        channel_id, url_domain
+                    )))?;
+
+                if !resp.status().is_success() {
+                    let status = resp.status();
+                    let body = resp.text().await.unwrap_or_default();
+                    tracing::warn!(
+                        "Discord dispatch failed for channel {} (webhook_domain={}): HTTP {} - {}",
+                        channel_id, url_domain, status, body
+                    );
+                    return Err(GatewayError::Other(format!(
+                        "Discord dispatch failed for channel {} (webhook_domain={}): HTTP {} - {}",
+                        channel_id, url_domain, status, body
+                    )));
+                }
+
+                let body = resp.text().await
+                    .map_err(|e| GatewayError::Other(format!(
+                        "Discord read body failed for channel {} (webhook_domain={}): {e}",
+                        channel_id, url_domain
+                    )))?;
+                tracing::info!("Discord dispatch succeeded for channel {} (webhook_domain={})", channel_id, url_domain);
+                body
             }
             ChannelType::InternalBus => {
                 tracing::debug!("internal bus dispatch: {payload}");
@@ -402,15 +467,28 @@ impl GatewayService {
                         ))
                     })?;
 
-                self.http
+                let resp = self.http
                     .post(url)
                     .json(&payload)
+                    .timeout(std::time::Duration::from_secs(30))
                     .send()
                     .await
-                    .map_err(|e| GatewayError::Other(format!("rest request failed: {e}")))?
-                    .text()
-                    .await
-                    .map_err(|e| GatewayError::Other(format!("rest read body failed: {e}")))?
+                    .map_err(|e| GatewayError::Other(format!("rest request failed for channel {}: {e}", channel_id)))?;
+
+                if !resp.status().is_success() {
+                    let status = resp.status();
+                    let body = resp.text().await.unwrap_or_default();
+                    tracing::warn!("REST dispatch failed for channel {}: HTTP {} - {}", channel_id, status, body);
+                    return Err(GatewayError::Other(format!(
+                        "REST dispatch failed for channel {}: HTTP {} - {}",
+                        channel_id, status, body
+                    )));
+                }
+
+                let body = resp.text().await
+                    .map_err(|e| GatewayError::Other(format!("rest read body failed for channel {}: {e}", channel_id)))?;
+                tracing::info!("REST dispatch succeeded for channel {}", channel_id);
+                body
             }
             ChannelType::Terminal => {
                 tracing::info!("terminal dispatch: {payload}");
@@ -677,6 +755,10 @@ impl GatewayService {
 // ── Webhook Payload Parsers ─────────────────────────────────
 
 fn parse_telegram_update(body: &serde_json::Value) -> Result<(String, String), GatewayError> {
+    if body.get("message").is_none() {
+        return Err(GatewayError::Other("telegram: missing 'message' field in update payload".into()));
+    }
+
     let sender_id = body
         .pointer("/message/from/id")
         .and_then(|v| v.as_i64())
@@ -697,6 +779,10 @@ fn parse_telegram_update(body: &serde_json::Value) -> Result<(String, String), G
 }
 
 fn parse_discord_interaction(body: &serde_json::Value) -> Result<(String, String), GatewayError> {
+    if body.get("type").is_none() {
+        return Err(GatewayError::Other("discord: missing 'type' field in interaction payload".into()));
+    }
+
     // Discord sends a PING (type 1) on webhook setup
     if body.get("type").and_then(|v| v.as_i64()) == Some(1) {
         return Ok(("discord".into(), "ping".into()));
@@ -726,6 +812,10 @@ fn parse_discord_interaction(body: &serde_json::Value) -> Result<(String, String
 }
 
 fn parse_whatsapp_webhook(body: &serde_json::Value) -> Result<(String, String), GatewayError> {
+    if body.get("entry").is_none() {
+        return Err(GatewayError::Other("whatsapp: missing 'entry' field in webhook payload".into()));
+    }
+
     // WhatsApp verification challenge is handled at the HTTP handler level
     let sender_id = body
         .pointer("/entry/0/changes/0/value/messages/0/from")
@@ -741,6 +831,10 @@ fn parse_whatsapp_webhook(body: &serde_json::Value) -> Result<(String, String), 
 }
 
 fn parse_slack_event(body: &serde_json::Value) -> Result<(String, String), GatewayError> {
+    if body.get("event").is_none() {
+        return Err(GatewayError::Other("slack: missing 'event' field in event payload".into()));
+    }
+
     // Slack URL verification challenge is handled in `receive`
     let sender_id = body
         .pointer("/event/user")

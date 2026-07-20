@@ -45,10 +45,12 @@ pub async fn build_tui_runtime(
 
     // Daftarkan semua builtin tools agar agent dapat berinteraksi dengan sistem nyata
     let mut tool_registry = ToolRegistry::new();
-    tool_registry.register(Box::new(claw10_tool::builtin::ShellTool));
-    tool_registry.register(Box::new(claw10_tool::builtin::ReadFileTool));
-    tool_registry.register(Box::new(claw10_tool::builtin::WriteFileTool));
-    tool_registry.register(Box::new(claw10_tool::builtin::HttpTool));
+    tool_registry.register(Box::new(claw10_tool::builtin::ShellTool::new()));
+    tool_registry.register(Box::new(claw10_tool::builtin::BrowserTool::new()));
+    tool_registry.register(Box::new(claw10_tool::builtin::WindowTool::new()));
+    tool_registry.register(Box::new(claw10_tool::builtin::ProcessTool::new()));
+    tool_registry.register(Box::new(claw10_tool::builtin::ScreenshotTool::new()));
+    tool_registry.register(Box::new(claw10_tool::builtin::InputTool::new()));
     tool_registry.register(Box::new(claw10_tool::builtin::DeclareArtifactTool::new(Arc::clone(&kv_store))));
     tool_registry.register(Box::new(crate::spawn_tool::SpawnTool::new(Arc::clone(&kv_store))));
     let tool_registry_arc = Arc::new(tool_registry);

@@ -12,12 +12,22 @@ use uuid::Uuid;
 use crate::bus::{EventBus, EventBusError, EventHandler, SubscriptionId};
 use crate::events::Claw10Event;
 
+/// Menyimpan semua handle yang diperlukan untuk mengelola satu NATS subscription.
+struct SubscriptionEntry {
+    /// Handle ke OS thread yang mem-polling blocking iterator NATS message.
+    poll_handle: thread::JoinHandle<()>,
+    /// Handle ke tokio async task yang memproses data dari channel.
+    join_handle: tokio::task::JoinHandle<()>,
+    /// Subscription NATS (untuk unsubscribe server-side).
+    subscription: nats::Subscription,
+}
+
 /// Implementasi EventBus berbasis NATS (JetStream-ready / PubSub).
 /// Terintegrasi dengan runtime Tokio async menggunakan OS thread untuk sinkronisasi NATS client.
 pub struct NatsEventBus {
     client: nats::Connection,
     /// Menyimpan token pembatalan (JoinHandle tokio async loop) untuk setiap subscription.
-    subscriptions: Arc<Mutex<HashMap<SubscriptionId, (tokio::task::JoinHandle<()>, nats::Subscription)>>>,
+    subscriptions: Arc<Mutex<HashMap<SubscriptionId, SubscriptionEntry>>>,
 }
 
 impl NatsEventBus {
@@ -76,7 +86,7 @@ impl EventBus for NatsEventBus {
 
         // 1. Spawn OS Thread untuk mem-polling blocking iterator NATS message
         let sub_clone = sub.clone();
-        thread::spawn(move || {
+        let poll_handle = thread::spawn(move || {
             for msg in sub_clone.messages() {
                 if tx.send(msg).is_err() {
                     break; // Receiver di-drop, matikan loop thread
@@ -104,22 +114,32 @@ impl EventBus for NatsEventBus {
         });
 
         // Simpan handle agar bisa di-unsubscribe/abort nanti
-        self.subscriptions.lock().await.insert(id.clone(), (join_handle, sub));
+        self.subscriptions.lock().await.insert(id.clone(), SubscriptionEntry {
+            poll_handle,
+            join_handle,
+            subscription: sub,
+        });
 
         Ok(id)
     }
 
     async fn unsubscribe(&self, id: &SubscriptionId) -> Result<(), EventBusError> {
         let mut subs = self.subscriptions.lock().await;
-        if let Some((join_handle, sub)) = subs.remove(id) {
-            // Abort tokio loop task
-            join_handle.abort();
+        if let Some(entry) = subs.remove(id) {
+            // 1. Abort tokio async processing task
+            entry.join_handle.abort();
 
-            // Panggil unsubscribe sinkron dari NATS client untuk melepas interest di server-side
+            // 2. Panggil unsubscribe sinkron dari NATS client untuk melepas interest di server-side.
+            //    Ini akan menyebabkan blocking iterator di OS thread berhenti (return).
             let _ = tokio::task::spawn_blocking(move || {
-                sub.unsubscribe()
+                entry.subscription.unsubscribe()
             })
             .await;
+
+            // 3. Join OS thread untuk memastikan benar-benar berhenti.
+            //    Setelah sub.unsubscribe() server-side, messages() iterator akan
+            //    segera return (error atau kosong), menyebabkan loop break.
+            let _ = entry.poll_handle.join();
         }
 
         Ok(())

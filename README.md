@@ -1,13 +1,15 @@
 # Claw10 OS
 
-**Recursive, Persistent, and Ephemeral Agent Swarm Operating System**
+**AI Agent yang Mengoperasikan Komputer Seperti Manusia**
 
-Claw10 OS adalah sistem operasi untuk kawanan agen AI yang dapat merekrut agen baru secara rekursif, memiliki siklus hidup persisten maupun ephemeral, serta dikontrol melalui API HTTP, TUI (Terminal User Interface), dan CLI.
+Claw10 OS adalah AI agent yang berjalan di terminal Linux, mampu melihat layar, menggerakkan mouse, mengetik keyboard, menjalankan aplikasi, mengelola jendela, dan menyelesaikan tugas apapun yang bisa dilakukan manusia di depan komputer.
 
 ![Claw10 Workspace Selector](doc/tui_workspace.png)
 ![Claw10 TUI Chat Interface](doc/tui_chat.png)
 
-**Status:** Core runtime, TUI, API, model router, dan control-plane sudah berfungsi. Proyek ini dioptimalkan untuk **single-user, local-first** deployment.
+**Status:** Core runtime, TUI, API, model router, dan control-plane sudah berfungsi. Menuju arsitektur "screen-first" dengan mouse/keyboard simulation.
+
+**Big Plan:** [doc/BIG_PLAN.md](doc/BIG_PLAN.md)
 
 ---
 
@@ -206,6 +208,7 @@ Untuk detail arsitektur produk dan panduan teknis yang lebih mendalam, silakan b
 *   [Fitur & Sub-system](doc/features.md) — Detail Mission, Task, Scheduler, TOON, ICVS, human approval, dan memory system.
 *   [Arsitektur Sistem & Data](doc/architecture.md) — High-level architecture, model organisasi, dan struktur data database (Sled).
 *   [Spesifikasi Teknis & Keamanan](doc/technical_specs.md) — Functional/Non-functional requirements, Threat model, dan Observability pipeline.
+*   **[Shell-First Architecture](doc/shell_first.md)** — Filosofi shell-first, tool audit, common shell patterns, safety, dan best practices.
 
 ---
 

@@ -39,7 +39,7 @@ impl AppState {
         Self::new_with_store(Arc::new(KvInMemory::new()))
     }
 
-    /// Create AppState dengan shared KV store (untuk prod dengan sled).
+    /// Create AppState dengan shared KV store.
     #[must_use]
     pub fn new_with_store(kv_store: Arc<dyn Store>) -> Self {
         let limits = SwarmLimitsConfig {

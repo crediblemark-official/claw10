@@ -435,7 +435,10 @@ impl TuiApp {
                                                 self.is_streaming = true;
                                                 self.stream_status = Some("Memulai agent...".to_string());
 
-                                                let runtime = Arc::clone(self.agent_runtime.as_ref().unwrap());
+                                                let Some(runtime_ref) = self.agent_runtime.as_ref() else {
+                                                    return;
+                                                };
+                                                let runtime = Arc::clone(runtime_ref);
                                                 let (agent_tx, agent_rx) = tokio::sync::mpsc::unbounded_channel();
                                                 self.agent_rx = Some(agent_rx);
 
@@ -489,6 +492,7 @@ impl TuiApp {
                                                         messages.push(ModelMessage {
                                                             role,
                                                             content: msg.clone(),
+                                                            content_parts: None,
                                                             tool_calls: None,
                                                             tool_call_id: None,
                                                             name: if !model.is_empty() { Some(model.clone()) } else { None },
@@ -875,6 +879,22 @@ impl TuiApp {
                 ));
                 self.save_chat_history().await;
             }
+            AgentEvent::BudgetExceeded { spent, hard_limit } => {
+                self.stream_status = None;
+                self.is_streaming = false;
+                self.agent_rx = None;
+                self.agent_task = None;
+                self.active_agent_id = None;
+                self.chat_history.push((
+                    "System".to_string(),
+                    String::new(),
+                    format!(
+                        "⛔ Budget habis! Terpakai ${:.2} dari batas ${:.2}. Eksekusi dihentikan.",
+                        spent, hard_limit
+                    ),
+                ));
+                self.save_chat_history().await;
+            }
             AgentEvent::SessionPaused { reason } => {
                 self.stream_status = Some(format!("Agent dijeda: {}", reason));
                 self.is_streaming = false;
@@ -906,6 +926,17 @@ impl TuiApp {
                     "System".to_string(),
                     String::new(),
                     format!("Error agent: {}", message),
+                ));
+                self.save_chat_history().await;
+            }
+            AgentEvent::ToolRetry { tool, attempt, max_retries, reason } => {
+                self.stream_status = Some(format!("🔄 Retry {} ({}/{}) karena: {}", tool, attempt, max_retries, reason));
+            }
+            AgentEvent::VerificationFailed { tool, reason, suggestion } => {
+                self.chat_history.push((
+                    "System".to_string(),
+                    String::new(),
+                    format!("⚠️ Verifikasi tool '{tool}' gagal: {reason}. Saran: {}", suggestion.unwrap_or_default()),
                 ));
                 self.save_chat_history().await;
             }

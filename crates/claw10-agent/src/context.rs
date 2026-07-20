@@ -153,6 +153,7 @@ impl ContextBuilder {
             ModelMessage {
                 role: MessageRole::System,
                 content: system_prompt,
+                content_parts: None,
                 tool_calls: None,
                 tool_call_id: None,
                 name: None,
@@ -160,6 +161,7 @@ impl ContextBuilder {
             ModelMessage {
                 role: MessageRole::User,
                 content: context_message,
+                content_parts: None,
                 tool_calls: None,
                 tool_call_id: None,
                 name: None,

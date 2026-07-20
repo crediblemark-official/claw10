@@ -62,7 +62,7 @@ pub async fn perform_uninstall(force: bool) -> Result<(), Box<dyn std::error::Er
     let config_dir = std::path::PathBuf::from(&home).join(".claw10");
     if config_dir.exists() {
         if let Err(e) = std::fs::remove_dir_all(&config_dir) {
-            eprintln!("Warning: Gagal menghapus folder config: {e}");
+            tracing::warn!("Gagal menghapus folder config: {e}");
         } else {
             println!("✓ Folder ~/.claw10 berhasil dihapus.");
         }
@@ -72,7 +72,12 @@ pub async fn perform_uninstall(force: bool) -> Result<(), Box<dyn std::error::Er
 
     println!("[3/4] Membersihkan entri PATH dari file konfigurasi shell...");
     let shell_name = std::env::var("SHELL")
-        .map(|s| std::path::Path::new(&s).file_name().unwrap().to_string_lossy().into_owned())
+        .map(|s| {
+            std::path::Path::new(&s)
+                .file_name()
+                .map(|f| f.to_string_lossy().into_owned())
+                .unwrap_or_else(|| "bash".to_string())
+        })
         .unwrap_or_else(|_| "bash".to_string());
     
     let rc_files = match shell_name.as_str() {
@@ -101,7 +106,7 @@ pub async fn perform_uninstall(force: bool) -> Result<(), Box<dyn std::error::Er
 
                 if lines.len() != original_len {
                     if let Err(e) = std::fs::write(&rc, lines.join("\n") + "\n") {
-                        eprintln!("Warning: Gagal membersihkan PATH di {}: {e}", rc.display());
+                        tracing::warn!("Gagal membersihkan PATH di {}: {e}", rc.display());
                     } else {
                         println!("✓ Entri PATH dibersihkan dari {}", rc.display());
                     }

@@ -21,12 +21,6 @@ pub enum StoreError {
     NotFound(String),
 }
 
-impl From<sled::Error> for StoreError {
-    fn from(e: sled::Error) -> Self {
-        Self::Database(e.to_string())
-    }
-}
-
 /// Object-safe core store trait (no generics).
 #[async_trait]
 pub trait Store: Send + Sync {
@@ -163,81 +157,149 @@ impl Store for InMemoryStore {
     }
 }
 
-// ── SledStore ─────────────────────────────────────────────────────
+// ── JsonFileStore ─────────────────────────────────────────────────
 
+/// Persistent key-value store backed by a single JSON file.
+/// All data is kept in-memory for fast lookups and synced to disk on every write.
+/// Uses atomic writes (temp file + rename) for crash safety.
 #[derive(Clone)]
-pub struct SledStore {
-    db: sled::Db,
+pub struct JsonFileStore {
+    path: Option<std::path::PathBuf>,
+    data: Arc<RwLock<HashMap<String, Vec<u8>>>>,
 }
 
-impl SledStore {
+impl JsonFileStore {
+    /// Open or create a JSON file store at the given path.
+    ///
     /// # Errors
-    /// Returns an error if the database could not be opened.
+    /// Returns an error if the file exists but cannot be read/parsed.
     pub fn new(path: impl AsRef<std::path::Path>) -> Result<Self, StoreError> {
-        let db = sled::open(path).map_err(|e| StoreError::Database(e.to_string()))?;
-        Ok(Self { db })
+        let path = path.as_ref().to_path_buf();
+        let data = if path.exists() {
+            let content = std::fs::read_to_string(&path)
+                .map_err(|e| StoreError::Database(format!("failed to read store file: {e}")))?;
+            if content.trim().is_empty() {
+                HashMap::new()
+            } else {
+                let map: HashMap<String, serde_json::Value> = serde_json::from_str(&content)
+                    .map_err(|e| StoreError::Database(format!("failed to parse store file: {e}")))?;
+                // Convert JSON values back to raw bytes
+                map.into_iter()
+                    .map(|(k, v)| {
+                        let bytes = serde_json::to_vec(&v).unwrap_or_default();
+                        (k, bytes)
+                    })
+                    .collect()
+            }
+        } else {
+            // Create parent directory if needed
+            if let Some(parent) = path.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            HashMap::new()
+        };
+        Ok(Self {
+            path: Some(path),
+            data: Arc::new(RwLock::new(data)),
+        })
     }
 
-    /// # Errors
-    /// Returns an error if the temporary database could not be opened.
-    pub fn new_temporary() -> Result<Self, StoreError> {
-        let db = sled::Config::new()
-            .temporary(true)
-            .open()
-            .map_err(|e| StoreError::Database(e.to_string()))?;
-        Ok(Self { db })
+    /// Create a temporary in-memory store (no disk persistence).
+    #[must_use]
+    pub fn new_temporary() -> Self {
+        Self {
+            path: None,
+            data: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    /// Flush all data to disk atomically.
+    async fn flush(&self) -> Result<(), StoreError> {
+        let Some(ref path) = self.path else {
+            return Ok(());
+        };
+        let data = self.data.read().await;
+
+        // Build a JSON map from raw bytes
+        let mut map = serde_json::Map::new();
+        for (key, bytes) in data.iter() {
+            if let Ok(value) = serde_json::from_slice::<serde_json::Value>(bytes) {
+                map.insert(key.clone(), value);
+            }
+        }
+
+        let json = serde_json::to_string_pretty(&map)
+            .map_err(|e| StoreError::Serialization(e.to_string()))?;
+
+        // Atomic write: write to temp file then rename
+        let tmp_path = path.with_extension("json.tmp");
+        tokio::fs::write(&tmp_path, &json)
+            .await
+            .map_err(|e| StoreError::Database(format!("failed to write store file: {e}")))?;
+        tokio::fs::rename(&tmp_path, path)
+            .await
+            .map_err(|e| StoreError::Database(format!("failed to rename store file: {e}")))?;
+
+        Ok(())
     }
 }
 
 #[async_trait]
-impl Store for SledStore {
+impl Store for JsonFileStore {
     async fn get_raw(&self, key: &str) -> Result<Option<Vec<u8>>, StoreError> {
-        match self.db.get(key.as_bytes())? {
-            Some(ivec) => Ok(Some(ivec.to_vec())),
-            None => Ok(None),
-        }
+        let data = self.data.read().await;
+        Ok(data.get(key).cloned())
     }
 
     async fn set_raw(&self, key: &str, value: Vec<u8>) -> Result<(), StoreError> {
-        self.db.insert(key.as_bytes(), value)?;
-        Ok(())
+        {
+            let mut data = self.data.write().await;
+            data.insert(key.to_string(), value);
+        }
+        self.flush().await
     }
 
     async fn delete(&self, key: &str) -> Result<(), StoreError> {
-        self.db.remove(key.as_bytes())?;
-        Ok(())
+        {
+            let mut data = self.data.write().await;
+            data.remove(key);
+        }
+        self.flush().await
     }
 
     async fn exists(&self, key: &str) -> Result<bool, StoreError> {
-        Ok(self.db.contains_key(key.as_bytes())?)
+        let data = self.data.read().await;
+        Ok(data.contains_key(key))
     }
 
     async fn scan_prefix_raw(&self, prefix: &str) -> Result<Vec<(String, Vec<u8>)>, StoreError> {
-        let mut results = Vec::new();
-        for result in self.db.scan_prefix(prefix.as_bytes()) {
-            let (key_bytes, value_bytes) = result?;
-            let key = String::from_utf8_lossy(&key_bytes).to_string();
-            let value = value_bytes.to_vec();
-            results.push((key, value));
-        }
+        let data = self.data.read().await;
+        let mut results: Vec<(String, Vec<u8>)> = data
+            .iter()
+            .filter(|(key, _)| key.starts_with(prefix))
+            .map(|(key, bytes)| (key.clone(), bytes.clone()))
+            .collect();
         results.sort_by(|a, b| a.0.cmp(&b.0));
         Ok(results)
     }
 
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>, StoreError> {
-        let mut keys = Vec::new();
-        for result in self.db.scan_prefix(prefix.as_bytes()) {
-            let (key_bytes, _) = result?;
-            let key = String::from_utf8_lossy(&key_bytes).to_string();
-            keys.push(key);
-        }
+        let data = self.data.read().await;
+        let mut keys: Vec<String> = data
+            .keys()
+            .filter(|k| k.starts_with(prefix))
+            .cloned()
+            .collect();
         keys.sort();
         Ok(keys)
     }
 
     async fn clear(&self) -> Result<(), StoreError> {
-        self.db.clear()?;
-        Ok(())
+        {
+            let mut data = self.data.write().await;
+            data.clear();
+        }
+        self.flush().await
     }
 }
 

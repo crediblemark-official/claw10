@@ -225,3 +225,173 @@ fn test_assign_lease() {
     assert!(agent.current_runtime.is_some());
     assert_eq!(agent.current_runtime.unwrap().worker_id, "worker-4");
 }
+
+// ── New tests for B4 improvements ──────────────────────────────
+
+#[test]
+fn test_detect_stale_active_no_lease() {
+    // Active agent with no runtime lease should be detected as stale
+    let mut agent = make_test_agent();
+    agent.current_runtime = None;
+
+    let agents = vec![agent];
+    let stale = LifecycleService::detect_stale(&agents, 60);
+    assert_eq!(stale.len(), 1, "Active agent with no lease should be stale");
+}
+
+#[test]
+fn test_detect_stale_ignores_hibernating() {
+    // Hibernating agent should never be detected as stale
+    let mut agent = make_test_agent();
+    LifecycleService::hibernate(&mut agent).unwrap();
+    assert_eq!(agent.state, AgentState::Hibernating);
+
+    let agents = vec![agent];
+    let stale = LifecycleService::detect_stale(&agents, 5);
+    assert_eq!(stale.len(), 0, "Hibernating agent should not be stale");
+}
+
+#[test]
+fn test_wake_corrupted_checkpoint_fallback() {
+    // If the latest checkpoint is corrupted, wake should try earlier ones
+    let mut agent = make_test_agent();
+
+    // Create a valid checkpoint
+    let cp1 = LifecycleService::create_checkpoint(&agent, CheckpointReason::Periodic);
+    agent.checkpoints.push(cp1);
+    agent.turn_count = 42;
+
+    // Then hibernate (creates checkpoint with turn_count=42)
+    LifecycleService::hibernate(&mut agent).unwrap();
+    assert_eq!(agent.checkpoints.len(), 2);
+
+    // Corrupt the latest checkpoint (the pre-hibernation one)
+    if let Some(latest) = agent.checkpoints.last_mut() {
+        latest.state_snapshot = serde_json::json!({
+            "state": "InvalidState",
+        });
+    }
+
+    // Wake should fallback to the earlier (periodic) checkpoint
+    let lease = make_lease("worker-fallback");
+    LifecycleService::wake(&mut agent, lease).unwrap();
+    assert_eq!(
+        agent.state,
+        AgentState::Active,
+        "Should still wake despite corrupted latest checkpoint"
+    );
+}
+
+#[test]
+fn test_wake_all_checkpoints_corrupted_fails() {
+    let mut agent = make_test_agent();
+    LifecycleService::hibernate(&mut agent).unwrap();
+
+    // Corrupt all checkpoints
+    for cp in agent.checkpoints.iter_mut() {
+        cp.state_snapshot = serde_json::json!({"state": "Bogus"});
+    }
+
+    let lease = make_lease("worker-fail");
+    let result = LifecycleService::wake(&mut agent, lease);
+    assert!(
+        result.is_err(),
+        "Wake should fail when all checkpoints are corrupted"
+    );
+    assert!(result.unwrap_err().to_string().contains("corrupted"));
+}
+
+#[test]
+fn test_validate_agent_state_active_no_lease() {
+    let mut agent = make_test_agent();
+    agent.current_runtime = None;
+    agent.state = AgentState::Active;
+
+    let issues = LifecycleService::validate_agent_state(&mut agent);
+    assert_eq!(issues.len(), 1, "Should detect Active + no lease");
+    assert_eq!(agent.state, AgentState::Hibernating, "Should fix to Hibernating");
+}
+
+#[test]
+fn test_validate_agent_state_hibernating_with_lease() {
+    let mut agent = make_test_agent();
+    // Hibernate first
+    LifecycleService::hibernate(&mut agent).unwrap();
+    // Force a lease back (inconsistent)
+    agent.current_runtime = Some(claw10_domain::RuntimeLease {
+        worker_id: "stray-lease".into(),
+        acquired_at: Utc::now(),
+        expires_at: Utc::now() + Duration::seconds(60),
+        renewal_interval_seconds: 60,
+    });
+
+    let issues = LifecycleService::validate_agent_state(&mut agent);
+    assert_eq!(issues.len(), 1, "Should detect Hibernating + lease");
+    assert!(agent.current_runtime.is_none(), "Should clear the stray lease");
+}
+
+#[test]
+fn test_validate_agent_state_terminated_with_checkpoints() {
+    let mut agent = make_test_agent();
+    LifecycleService::hibernate(&mut agent).unwrap();
+    LifecycleService::terminate(&mut agent);
+
+    assert_eq!(agent.state, AgentState::Terminated);
+    assert!(!agent.checkpoints.is_empty(), "Terminated should have checkpoints");
+
+    let issues = LifecycleService::validate_agent_state(&mut agent);
+    assert_eq!(issues.len(), 1, "Should detect terminated + checkpoints");
+    assert!(agent.checkpoints.is_empty(), "Should clear checkpoints");
+}
+
+#[test]
+fn test_validate_agent_state_consistent_no_issues() {
+    let mut agent = make_test_agent();
+    // Should be consistent: Active + lease
+    let issues = LifecycleService::validate_agent_state(&mut agent);
+    assert!(issues.is_empty(), "Consistent state should have no issues");
+}
+
+#[test]
+fn test_create_periodic_checkpoint() {
+    let mut agent = make_test_agent();
+
+    // Fill up with 9 dummy checkpoints
+    for _ in 0..9 {
+        let cp = LifecycleService::create_checkpoint(&agent, CheckpointReason::Periodic);
+        agent.checkpoints.push(cp);
+    }
+    assert_eq!(agent.checkpoints.len(), 9);
+
+    // Create periodic checkpoint (should auto-GC to max 10, adding 1 more means 1 removed)
+    let cp = LifecycleService::create_periodic_checkpoint(&mut agent);
+    assert_eq!(cp.reason, CheckpointReason::Periodic);
+
+    // With 9 existing + 1 new = 10, max is 10, so 0 removed
+    assert_eq!(agent.checkpoints.len(), 10, "Should have max 10 checkpoints after periodic");
+
+    // Add one more — should GC to 10
+    let _cp2 = LifecycleService::create_periodic_checkpoint(&mut agent);
+    assert_eq!(agent.checkpoints.len(), 10, "Should still be exactly 10 after GC");
+}
+
+#[test]
+fn test_gc_checkpoints_by_age() {
+    let mut agent = make_test_agent();
+
+    // Add some old checkpoints
+    let old_cp = LifecycleService::create_checkpoint(&agent, CheckpointReason::Periodic);
+    agent.checkpoints.push(old_cp);
+
+    // Sleep 10ms so the next one is newer
+    std::thread::sleep(std::time::Duration::from_millis(10));
+    let cp = LifecycleService::create_checkpoint(&agent, CheckpointReason::Periodic);
+    agent.checkpoints.push(cp);
+
+    assert_eq!(agent.checkpoints.len(), 2);
+
+    // GC with a very short max_age — should remove the old one
+    let removed = LifecycleService::gc_checkpoints_by_age(&mut agent, chrono::Duration::milliseconds(5));
+    assert_eq!(removed, 1, "Should remove 1 old checkpoint");
+    assert_eq!(agent.checkpoints.len(), 1, "Should keep 1 recent checkpoint");
+}

@@ -55,7 +55,7 @@ enum Commands {
         /// Bind address
         #[arg(default_value = "0.0.0.0:3000")]
         bind: String,
-        /// Path to sled database (in-memory if not set)
+        /// Path to database (in-memory if not set)
         #[arg(long)]
         db: Option<String>,
         /// Also start TUI in the same process to share the database
@@ -64,13 +64,13 @@ enum Commands {
     },
     /// Start the TUI
     Tui {
-        /// Path to sled database (in-memory if not set)
+        /// Path to database (in-memory if not set)
         #[arg(long)]
         db: Option<String>,
     },
     /// Run an agent objective directly from CLI with tools execution
     RunAgent {
-        /// Path to sled database (in-memory if not set)
+        /// Path to database (in-memory if not set)
         #[arg(long)]
         db: Option<String>,
         /// The objective description for the agent
@@ -209,6 +209,7 @@ async fn main() {
     if needs_setup {
         eprintln!("Belum ada konfigurasi ditemukan. Menjalankan setup wizard...\n");
         if let Err(e) = setup::run_setup_wizard(false).await {
+            tracing::error!("Setup gagal: {e}");
             eprintln!("Setup gagal: {e}");
             std::process::exit(1);
         }
@@ -226,6 +227,7 @@ async fn main() {
     // Jika user secara eksplisit memanggil `setup`, jalankan wizard lalu otomatis alihkan ke `serve` (auto run)
     if let Commands::Setup { force } = command {
         if let Err(e) = setup::run_setup_wizard(force).await {
+            tracing::error!("Setup gagal: {e}");
             eprintln!("Setup gagal: {e}");
             std::process::exit(1);
         }
@@ -250,13 +252,12 @@ async fn main() {
                 if let Some(parent) = db_path.parent() {
                     let _ = std::fs::create_dir_all(parent);
                 }
-                tracing::info!("using sled database at {}", db_path.display());
-                match claw10_store::SledStore::new(&db_path) {
+                tracing::info!("using JSON file store at {}", db_path.display());
+                match claw10_store::JsonFileStore::new(&db_path) {
                     Ok(store) => Arc::new(store),
                     Err(e) => {
-                        eprintln!("Warning: Gagal membuka database sled di '{}'.", db_path.display());
-                        eprintln!("Detail: {e}");
-                        eprintln!("Menggunakan in-memory store sebagai fallback. Data tidak akan disimpan secara persisten.");
+                        tracing::warn!("Gagal membuka store di '{}': {e}", db_path.display());
+                        tracing::warn!("Menggunakan in-memory store sebagai fallback. Data tidak akan disimpan secara persisten.");
                         Arc::new(claw10_store::InMemoryStore::new())
                     }
                 }
@@ -335,10 +336,12 @@ async fn main() {
 
             // Register built-in tools
             let mut tool_registry = claw10_tool::registry::ToolRegistry::new();
-            tool_registry.register(Box::new(claw10_tool::builtin::ShellTool));
-            tool_registry.register(Box::new(claw10_tool::builtin::ReadFileTool));
-            tool_registry.register(Box::new(claw10_tool::builtin::WriteFileTool));
-            tool_registry.register(Box::new(claw10_tool::builtin::HttpTool));
+            tool_registry.register(Box::new(claw10_tool::builtin::ShellTool::new()));
+            tool_registry.register(Box::new(claw10_tool::builtin::BrowserTool::new()));
+            tool_registry.register(Box::new(claw10_tool::builtin::WindowTool::new()));
+            tool_registry.register(Box::new(claw10_tool::builtin::ProcessTool::new()));
+            tool_registry.register(Box::new(claw10_tool::builtin::ScreenshotTool::new()));
+            tool_registry.register(Box::new(claw10_tool::builtin::InputTool::new()));
             tool_registry.register(Box::new(claw10_tool::builtin::DeclareArtifactTool::new(Arc::clone(&kv_store))));
             let tool_registry = Arc::new(tool_registry);
 
@@ -372,14 +375,13 @@ async fn main() {
                             l
                         }
                         Err(err) => {
-                            eprintln!("Error: Gagal melakukan bind ke {} meskipun telah mencoba membebaskan port.", addr);
-                            eprintln!("Detail: {err}");
+                            tracing::error!("Gagal melakukan bind ke {} meskipun telah mencoba membebaskan port: {err}", addr);
                             std::process::exit(1);
                         }
                     }
                 }
                 Err(e) => {
-                    eprintln!("Error: Gagal melakukan bind ke {}: {}", addr, e);
+                    tracing::error!("Gagal melakukan bind ke {}: {e}", addr);
                     std::process::exit(1);
                 }
             };
@@ -396,7 +398,10 @@ async fn main() {
                     tracing::error!("TUI error: {e}");
                 }
             } else {
-                axum::serve(listener, app).await.unwrap();
+                if let Err(e) = axum::serve(listener, app).await {
+                    tracing::error!("Server error: {e}");
+                    std::process::exit(1);
+                }
             }
         }
         Commands::Tui { db } => {
@@ -409,14 +414,13 @@ async fn main() {
                 if let Some(parent) = db_path.parent() {
                     let _ = std::fs::create_dir_all(parent);
                 }
-                match claw10_store::SledStore::new(&db_path) {
+                match claw10_store::JsonFileStore::new(&db_path) {
                     Ok(store) => {
                         claw10_tui::run_with_store(Arc::new(store)).await
                     }
                     Err(e) => {
-                        eprintln!("Warning: Gagal membuka database sled di '{}'.", db_path.display());
-                        eprintln!("Detail: {e}");
-                        eprintln!("Menggunakan in-memory store sebagai fallback. Data tidak akan disimpan secara persisten.");
+                        tracing::warn!("Gagal membuka store di '{}': {e}", db_path.display());
+                        tracing::warn!("Menggunakan in-memory store sebagai fallback. Data tidak akan disimpan secara persisten.");
                         claw10_tui::run().await
                     }
                 }
@@ -438,13 +442,12 @@ async fn main() {
                 if let Some(parent) = db_path.parent() {
                     let _ = std::fs::create_dir_all(parent);
                 }
-                tracing::info!("using sled database at {}", db_path.display());
-                match claw10_store::SledStore::new(&db_path) {
+                tracing::info!("using JSON file store at {}", db_path.display());
+                match claw10_store::JsonFileStore::new(&db_path) {
                     Ok(store) => Arc::new(store),
                     Err(e) => {
-                        eprintln!("Warning: Gagal membuka database sled di '{}'.", db_path.display());
-                        eprintln!("Detail: {e}");
-                        eprintln!("Menggunakan in-memory store sebagai fallback. Data tidak akan disimpan secara persisten.");
+                        tracing::warn!("Gagal membuka store di '{}': {e}", db_path.display());
+                        tracing::warn!("Menggunakan in-memory store sebagai fallback. Data tidak akan disimpan secara persisten.");
                         Arc::new(claw10_store::InMemoryStore::new())
                     }
                 }
@@ -505,10 +508,12 @@ async fn main() {
 
             // Setup tools
             let mut tool_registry = claw10_tool::registry::ToolRegistry::new();
-            tool_registry.register(Box::new(claw10_tool::builtin::ShellTool));
-            tool_registry.register(Box::new(claw10_tool::builtin::ReadFileTool));
-            tool_registry.register(Box::new(claw10_tool::builtin::WriteFileTool));
-            tool_registry.register(Box::new(claw10_tool::builtin::HttpTool));
+            tool_registry.register(Box::new(claw10_tool::builtin::ShellTool::new()));
+            tool_registry.register(Box::new(claw10_tool::builtin::BrowserTool::new()));
+            tool_registry.register(Box::new(claw10_tool::builtin::WindowTool::new()));
+            tool_registry.register(Box::new(claw10_tool::builtin::ProcessTool::new()));
+            tool_registry.register(Box::new(claw10_tool::builtin::ScreenshotTool::new()));
+            tool_registry.register(Box::new(claw10_tool::builtin::InputTool::new()));
             tool_registry.register(Box::new(claw10_tool::builtin::DeclareArtifactTool::new(Arc::clone(&kv_store))));
             let tool_registry = Arc::new(tool_registry);
 
@@ -618,7 +623,7 @@ async fn main() {
                     };
                     let id = new_agent.id.clone();
                     if let Err(e) = agent_store.save(&new_agent).await {
-                        eprintln!("Error: Gagal menyimpan agent default: {e}");
+                        tracing::error!("Gagal menyimpan agent default: {e}");
                         std::process::exit(1);
                     }
                     id
@@ -677,14 +682,14 @@ async fn main() {
                     println!("Estimasi Biaya: ${:.5}", session.total_cost_usd);
                 }
                 Err(e) => {
-                    eprintln!("\nError Eksekusi Agent: {e}");
+                    tracing::error!("Eksekusi agent gagal: {e}");
                     std::process::exit(1);
                 }
             }
         }
         Commands::Setup { force } => {
             if let Err(e) = setup::run_setup_wizard(force).await {
-                eprintln!("Setup failed: {e}");
+                tracing::error!("Setup gagal: {e}");
                 std::process::exit(1);
             }
         }
@@ -706,19 +711,19 @@ async fn main() {
         }
         Commands::Update => {
             if let Err(e) = update::check_and_perform_update(false).await {
-                eprintln!("Update gagal: {e}");
+                tracing::error!("Update gagal: {e}");
                 std::process::exit(1);
             }
         }
         Commands::Check => {
             if let Err(e) = update::check_version_only().await {
-                eprintln!("Gagal memeriksa versi: {e}");
+                tracing::error!("Gagal memeriksa versi: {e}");
                 std::process::exit(1);
             }
         }
         Commands::Uninstall { force } => {
             if let Err(e) = setup::perform_uninstall(force).await {
-                eprintln!("Uninstall gagal: {e}");
+                tracing::error!("Uninstall gagal: {e}");
                 std::process::exit(1);
             }
         }

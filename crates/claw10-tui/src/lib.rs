@@ -29,7 +29,7 @@ pub async fn run() -> Result<(), TuiError> {
     app.run().await
 }
 
-/// Run the TUI application with a shared KV store (sled).
+/// Run the TUI application with a shared KV store.
 pub async fn run_with_store(kv_store: Arc<dyn Store>) -> Result<(), TuiError> {
     let state = AppState::new_with_store(kv_store);
     let mut app = TuiApp::new(state);

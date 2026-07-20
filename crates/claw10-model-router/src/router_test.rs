@@ -45,6 +45,7 @@ impl ModelProvider for MockProvider {
             message: ModelMessage {
                 role: MessageRole::Assistant,
                 content: format!("Hello from {}", request.model),
+                content_parts: None,
                 tool_calls: None,
                 tool_call_id: None,
                 name: None,

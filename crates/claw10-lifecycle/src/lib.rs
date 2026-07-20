@@ -98,22 +98,40 @@ impl LifecycleService {
         agent.updated_at = Utc::now();
         agent.checkpoints.push(checkpoint.clone());
 
+        // GC old checkpoints to prevent unbounded growth
+        Self::gc_checkpoints(agent);
+
         Ok(checkpoint)
     }
 
-    /// Wake an agent from hibernation using its latest checkpoint.
+    /// Wake an agent from hibernation using its latest valid checkpoint.
+    /// Falls back to earlier checkpoints if the latest one fails restoration.
     pub fn wake(agent: &mut Agent, target_runtime: RuntimeLease) -> Result<(), LifecycleError> {
         if agent.state != AgentState::Hibernating {
             return Err(LifecycleError::NotHibernating);
         }
 
-        let latest = agent
-            .checkpoints
-            .last()
-            .ok_or_else(|| LifecycleError::Other("no checkpoint available for resume".into()))?
-            .clone();
+        // Try checkpoints in reverse order (newest first), skip corrupted ones
+        // Clone to avoid borrow conflict with restore_checkpoint(&mut agent, &cp)
+        let checkpoints: Vec<Checkpoint> = agent.checkpoints.iter().rev().cloned().collect();
+        let restored = checkpoints.iter().any(|cp| {
+            if Self::restore_checkpoint(agent, cp).is_err() {
+                tracing::warn!(
+                    "wake: checkpoint {} restoration failed, trying earlier checkpoint",
+                    cp.id.0
+                );
+                false
+            } else {
+                true
+            }
+        });
 
-        Self::restore_checkpoint(agent, &latest)?;
+        if !restored {
+            return Err(LifecycleError::Other(
+                "no valid checkpoint available for resume — all checkpoints corrupted".into(),
+            ));
+        }
+
         agent.state = AgentState::Active;
         agent.current_runtime = Some(target_runtime);
         agent.updated_at = Utc::now();
@@ -164,6 +182,7 @@ impl LifecycleService {
     }
 
     /// Detect agents whose lease has expired past the grace period.
+    /// Also detects Active agents with no runtime lease (inconsistent state).
     #[must_use]
     pub fn detect_stale(agents: &[Agent], grace_seconds: i64) -> Vec<&Agent> {
         let now = Utc::now();
@@ -175,7 +194,10 @@ impl LifecycleService {
                 }
                 match &a.current_runtime {
                     Some(lease) => (now - lease.expires_at).num_seconds() > grace_seconds,
-                    None => false,
+                    None => {
+                        // Active but no runtime lease = inconsistent state = stale
+                        true
+                    }
                 }
             })
             .collect()
@@ -212,6 +234,9 @@ impl LifecycleService {
         });
         agent.state = AgentState::Active;
         agent.updated_at = Utc::now();
+
+        // GC old checkpoints to prevent unbounded growth
+        Self::gc_checkpoints(agent);
 
         Ok(checkpoint)
     }
@@ -318,6 +343,37 @@ impl LifecycleService {
 
     // ── Persistent Pattern Support ───────────────────────────────
 
+    // ── Checkpoint Garbage Collection ──────────────────────────
+
+    /// Maximum number of checkpoints to retain per agent.
+    pub const MAX_CHECKPOINTS_PER_AGENT: usize = 10;
+
+    /// Garbage-collect old checkpoints for an agent, keeping only the most recent ones.
+    /// Returns the number of checkpoints removed.
+    pub fn gc_checkpoints(agent: &mut Agent) -> usize {
+        let before = agent.checkpoints.len();
+        if before > Self::MAX_CHECKPOINTS_PER_AGENT {
+            let drain_count = before - Self::MAX_CHECKPOINTS_PER_AGENT;
+            agent.checkpoints.drain(..drain_count);
+            agent.updated_at = Utc::now();
+            return drain_count;
+        }
+        0
+    }
+
+    /// Garbage-collect checkpoints older than the given duration.
+    /// Returns the number of checkpoints removed.
+    pub fn gc_checkpoints_by_age(agent: &mut Agent, max_age: chrono::Duration) -> usize {
+        let cutoff = Utc::now() - max_age;
+        let before = agent.checkpoints.len();
+        agent.checkpoints.retain(|cp| cp.created_at > cutoff);
+        let removed = before - agent.checkpoints.len();
+        if removed > 0 {
+            agent.updated_at = Utc::now();
+        }
+        removed
+    }
+
     /// Apply the agent's persistent pattern logic.
     /// Returns `true` if the agent should be active, `false` if it should remain hibernating.
     #[must_use]
@@ -357,7 +413,66 @@ impl LifecycleService {
             // This is a signal; actual wake requires a lease assignment
         } else if !should_be_active && agent.state == AgentState::Active {
             // Agent should hibernate
-            let _ = Self::hibernate(agent);
+            if let Err(e) = Self::hibernate(agent) {
+                tracing::warn!(
+                    "apply_pattern: failed to hibernate agent {}: {e}",
+                    agent.id.0
+                );
+            }
         }
+    }
+
+    // ── State Consistency Validation ────────────────────────────
+
+    /// Validate and fix inconsistent agent states.
+    /// Returns a list of issues that were detected and fixed.
+    ///
+    /// Detects:
+    /// - Active agents with no runtime lease → auto-hibernate
+    /// - Hibernating agents with active runtime lease → clear lease
+    /// - Terminated agents with lingering checkpoints → clear checkpoints
+    pub fn validate_agent_state(agent: &mut Agent) -> Vec<String> {
+        let mut issues = Vec::new();
+
+        if agent.state == AgentState::Active && agent.current_runtime.is_none() {
+            issues.push(
+                "Active state with no runtime lease — forcing Hibernating state".into(),
+            );
+            agent.state = AgentState::Hibernating;
+        }
+
+        if agent.state == AgentState::Hibernating && agent.current_runtime.is_some() {
+            issues.push(
+                "Hibernating state with active runtime lease — clearing lease".into(),
+            );
+            agent.current_runtime = None;
+        }
+
+        if agent.state == AgentState::Terminated && !agent.checkpoints.is_empty() {
+            issues.push(format!(
+                "Terminated state with {} lingering checkpoints — clearing",
+                agent.checkpoints.len()
+            ));
+            agent.checkpoints.clear();
+        }
+
+        if !issues.is_empty() {
+            agent.updated_at = Utc::now();
+        }
+
+        issues
+    }
+
+    // ── Periodic Checkpoint ─────────────────────────────────────
+
+    /// Create a periodic checkpoint for long-running agent sessions.
+    /// Automatically runs GC to keep checkpoint count bounded.
+    #[must_use]
+    pub fn create_periodic_checkpoint(agent: &mut Agent) -> Checkpoint {
+        let cp = Self::create_checkpoint(agent, CheckpointReason::Periodic);
+        agent.checkpoints.push(cp.clone());
+        Self::gc_checkpoints(agent);
+        agent.updated_at = Utc::now();
+        cp
     }
 }

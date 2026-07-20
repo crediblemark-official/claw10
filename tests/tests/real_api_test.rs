@@ -131,9 +131,7 @@ async fn test_real_llm_api_call() {
     agent_store.save(&agent).await.unwrap();
 
     let mut tool_registry = ToolRegistry::new();
-    tool_registry.register(Box::new(claw10_tool::builtin::ReadFileTool));
-    tool_registry.register(Box::new(claw10_tool::builtin::WriteFileTool));
-    tool_registry.register(Box::new(claw10_tool::builtin::HttpTool));
+    tool_registry.register(Box::new(claw10_tool::builtin::ShellTool::new()));
     let tool_registry = Arc::new(tool_registry);
 
     let worker_service = Arc::new(claw10_worker::WorkerService::new(Arc::clone(&kv_store)));

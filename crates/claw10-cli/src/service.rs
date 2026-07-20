@@ -27,7 +27,7 @@ pub fn handle_service_command(action: ServiceAction) {
         ServiceAction::Install => {
             println!("Menginstal Claw10 systemd user service...");
             if let Err(e) = std::fs::create_dir_all(&systemd_dir) {
-                eprintln!("Error: Gagal membuat direktori systemd user: {e}");
+                tracing::error!("Gagal membuat direktori systemd user: {e}");
                 std::process::exit(1);
             }
 
@@ -52,7 +52,7 @@ pub fn handle_service_command(action: ServiceAction) {
             );
 
             if let Err(e) = std::fs::write(&service_file_path, service_content) {
-                eprintln!("Error: Gagal menulis file service unit: {e}");
+                tracing::error!("Gagal menulis file service unit: {e}");
                 std::process::exit(1);
             }
 
@@ -84,7 +84,7 @@ pub fn handle_service_command(action: ServiceAction) {
                 
             if service_file_path.exists() {
                 if let Err(e) = std::fs::remove_file(&service_file_path) {
-                    eprintln!("Error: Gagal menghapus file service unit: {e}");
+                    tracing::error!("Gagal menghapus file service unit: {e}");
                 } else {
                     println!("✓ File service unit berhasil dihapus.");
                 }

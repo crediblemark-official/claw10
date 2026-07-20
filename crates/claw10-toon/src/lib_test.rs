@@ -160,3 +160,65 @@ fn test_toon_context_new() {
     let ctx = ToonContext::new();
     assert_eq!(ctx.build(), "[TOON v1]");
 }
+
+#[test]
+fn test_context_output_to_string() {
+    let toon = ContextOutput::Toon("[TOON v1]".to_string());
+    assert_eq!(toon.to_string(), "[TOON v1]");
+
+    let json = ContextOutput::Json("{}".to_string());
+    assert_eq!(json.to_string(), "{}");
+}
+
+#[test]
+fn test_suitability_score_tabular_only() {
+    let memories = vec![];
+    let agents = vec![];
+    let score = ToonEncoder::suitability_score(None, None, &memories, &[], &agents, None, &[]);
+    assert!(score >= 0.3);
+}
+
+#[test]
+fn test_suitability_score_with_task() {
+    let task = make_test_task();
+    let score = ToonEncoder::suitability_score(Some(&task), None, &[], &[], &[], None, &[]);
+    assert!(score < 0.3);
+}
+
+#[test]
+fn test_build_context_with_fallback_to_json() {
+    let task = make_test_task();
+    let result = ToonEncoder::build_context_with_fallback(Some(&task), None, &[], &[], &[], None, &[]);
+    assert!(result.is_ok());
+    let output = result.unwrap();
+    assert!(matches!(output, ContextOutput::Json(_)));
+}
+
+#[test]
+fn test_build_context_with_fallback_to_toon() {
+    let memories = vec![Memory {
+        id: MemoryId(uuid::Uuid::nil()),
+        tenant_id: "test".to_string(),
+        scope: "test".to_string(),
+        memory_type: MemoryType::Semantic,
+        content: "Use transactions".to_string(),
+        source: MemorySource {
+            agent_id: AgentId(uuid::Uuid::nil()),
+            task_id: TaskId(uuid::Uuid::nil()),
+            evidence_id: None,
+        },
+        confidence: 0.95,
+        classification: "public".to_string(),
+        status: claw10_domain::memory::MemoryStatus::Active,
+        verified_by: Vec::new(),
+        created_at: chrono::Utc::now(),
+        updated_at: chrono::Utc::now(),
+    }];
+
+    let agents = vec![];
+
+    let result = ToonEncoder::build_context_with_fallback(None, None, &memories, &[], &agents, None, &[]);
+    assert!(result.is_ok());
+    let output = result.unwrap();
+    assert!(matches!(output, ContextOutput::Toon(_)));
+}

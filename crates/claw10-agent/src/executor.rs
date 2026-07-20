@@ -17,6 +17,7 @@ use claw10_store::StoreExt;
 use crate::context::ContextBuilder;
 use crate::error::AgentError;
 use crate::events::AgentEvent;
+use crate::self_correct::{RetryTracker, VerificationEngine, VerificationResult};
 use crate::session::{AgentSession, SessionState};
 
 pub type EventSender = mpsc::UnboundedSender<AgentEvent>;
@@ -26,6 +27,7 @@ pub struct AgentExecutor {
     tool_registry: Arc<ToolRegistry>,
     budget_service: Arc<BudgetService>,
     kv_store: Arc<dyn claw10_store::Store>,
+    verifier: VerificationEngine,
 }
 
 impl AgentExecutor {
@@ -37,10 +39,11 @@ impl AgentExecutor {
         kv_store: Arc<dyn claw10_store::Store>,
     ) -> Self {
         Self {
-            model_router,
-            tool_registry,
+            model_router: Arc::clone(&model_router),
+            tool_registry: Arc::clone(&tool_registry),
             budget_service,
             kv_store,
+            verifier: VerificationEngine::with_model_router(Arc::clone(&tool_registry), Arc::clone(&model_router)),
         }
     }
 
@@ -59,13 +62,16 @@ impl AgentExecutor {
         let (event_tx, mut event_rx) = mpsc::unbounded_channel();
         let mut events = Vec::new();
 
-        event_tx
+        if event_tx
             .send(AgentEvent::SessionStarted {
                 agent_id: agent.id.0.to_string(),
                 session_id: session.id.0.to_string(),
                 objective: objective.to_string(),
             })
-            .ok();
+            .is_err()
+        {
+            tracing::warn!("SessionStarted event send failed (receiver may be dropped)");
+        }
 
         let messages = ContextBuilder::build_initial_messages(agent, objective, &context, &self.tool_registry);
         for msg in messages {
@@ -85,15 +91,19 @@ impl AgentExecutor {
         );
         match policy_result {
             Ok(r) if !r.allowed => {
-                event_tx.send(AgentEvent::Error {
+                if event_tx.send(AgentEvent::Error {
                     message: r.reason.clone(),
-                }).ok();
+                }).is_err() {
+                    tracing::warn!("PolicyDenied event send failed (receiver may be dropped)");
+                }
                 return Err(AgentError::PolicyDenied(r.reason));
             }
             Err(e) => {
-                event_tx.send(AgentEvent::Error {
+                if event_tx.send(AgentEvent::Error {
                     message: e.to_string(),
-                }).ok();
+                }).is_err() {
+                    tracing::warn!("PolicyDenied event send failed (receiver may be dropped)");
+                }
                 return Err(AgentError::PolicyDenied(e.to_string()));
             }
             _ => {}
@@ -105,11 +115,30 @@ impl AgentExecutor {
             }
 
             if agent.budget.is_soft_limit_reached() {
-                event_tx
+                if event_tx
                     .send(AgentEvent::BudgetWarning {
                         remaining: agent.budget.remaining(),
                     })
-                    .ok();
+                    .is_err()
+                {
+                    tracing::warn!("BudgetWarning event send failed (receiver may be dropped)");
+                }
+            }
+
+            // ── Budget circuit breaker: hard limit check BEFORE each turn ──
+            if agent.budget.is_exhausted() {
+                let spent = agent.budget.spent_usd;
+                let hard_limit = agent.budget.hard_limit_usd.unwrap_or(agent.budget.allocated_usd);
+                if event_tx
+                    .send(AgentEvent::BudgetExceeded {
+                        spent,
+                        hard_limit,
+                    })
+                    .is_err()
+                {
+                    tracing::warn!("BudgetExceeded event send failed (receiver may be dropped)");
+                }
+                return Err(AgentError::BudgetExhausted);
             }
 
             let profile_id = &agent.genome.model_policy.preferred_profile;
@@ -124,13 +153,16 @@ impl AgentExecutor {
                 stop: None,
             };
 
-            event_tx
+            if event_tx
                 .send(AgentEvent::ModelCall {
                     turn,
                     tokens: 0,
                     cost: 0.0,
                 })
-                .ok();
+                .is_err()
+            {
+                tracing::warn!("ModelCall event send failed (receiver may be dropped)");
+            }
 
             tracing::info!("[Agent Loop] Memulai Turn {}/{} untuk Agent {}", turn + 1, max_turns, agent.id.0);
 
@@ -141,13 +173,16 @@ impl AgentExecutor {
 
             session.record_turn(response.usage.total_tokens, response.usage.cost_usd);
 
-            // Enforce budget per turn
+            // Enforce budget per turn (post-facto check via reserve)
             if let Err(e) = self.budget_service.reserve(&mut agent.budget, response.usage.cost_usd) {
-                event_tx
+                if event_tx
                     .send(AgentEvent::BudgetWarning {
                         remaining: agent.budget.remaining(),
                     })
-                    .ok();
+                    .is_err()
+                {
+                    tracing::warn!("BudgetWarning (reserve) event send failed (receiver may be dropped)");
+                }
                 return Err(AgentError::from(e));
             }
 
@@ -158,12 +193,15 @@ impl AgentExecutor {
             tracing::info!("[Agent Loop] Respon LLM diterima untuk Turn {}. Content: '{}', has_tool_calls: {}", turn + 1, response.message.content.trim(), has_tool_calls);
 
             if !response.message.content.is_empty() {
-                event_tx
+                if event_tx
                     .send(AgentEvent::Thought {
                         turn,
                         content: response.message.content.clone(),
                     })
-                    .ok();
+                    .is_err()
+                {
+                    tracing::warn!("Thought event send failed (receiver may be dropped)");
+                }
             }
 
             session.add_message(msg);
@@ -184,15 +222,19 @@ impl AgentExecutor {
                         );
                         match tool_policy_result {
                             Ok(r) if !r.allowed => {
-                                event_tx.send(AgentEvent::Error {
+                                if event_tx.send(AgentEvent::Error {
                                     message: r.reason.clone(),
-                                }).ok();
+                                }).is_err() {
+                                    tracing::warn!("Tool policy denied event send failed (receiver may be dropped)");
+                                }
                                 return Err(AgentError::PolicyDenied(r.reason));
                             }
                             Err(e) => {
-                                event_tx.send(AgentEvent::Error {
+                                if event_tx.send(AgentEvent::Error {
                                     message: e.to_string(),
-                                }).ok();
+                                }).is_err() {
+                                    tracing::warn!("Tool policy error event send failed (receiver may be dropped)");
+                                }
                                 return Err(AgentError::PolicyDenied(e.to_string()));
                             }
                             _ => {}
@@ -200,13 +242,16 @@ impl AgentExecutor {
 
                         let tool_result = match self.tool_registry.get(tool_name) {
                             Ok(tool) => {
-                                event_tx
+                                if event_tx
                                     .send(AgentEvent::ToolCall {
                                         tool: tool_name.clone(),
                                         args: args.clone(),
                                         result: serde_json::Value::Null,
                                     })
-                                    .ok();
+                                    .is_err()
+                                {
+                                    tracing::warn!("ToolCall event send failed (receiver may be dropped)");
+                                }
 
                                 tracing::info!("[Agent Loop] Agent memanggil tool '{}' dengan argumen: {}", tool_name, args);
 
@@ -214,26 +259,32 @@ impl AgentExecutor {
                                 if approved {
                                     match tool.execute(&tool_context, args.clone()).await {
                                         Ok(output) => {
-                                            event_tx
+                                            if event_tx
                                                 .send(AgentEvent::ToolCall {
                                                     tool: tool_name.clone(),
                                                     args: args.clone(),
                                                     result: output.data.clone(),
                                                 })
-                                                .ok();
+                                                .is_err()
+                                            {
+                                                tracing::warn!("ToolCall result event send failed (receiver may be dropped)");
+                                            }
                                             output
                                         }
                                         Err(e) => ToolOutput::fail(e.to_string()),
                                     }
                                 } else {
                                     let output = ToolOutput::fail("Tool invocation denied by operator".to_string());
-                                    event_tx
+                                    if event_tx
                                         .send(AgentEvent::ToolCall {
                                             tool: tool_name.clone(),
                                             args: args.clone(),
                                             result: output.data.clone(),
                                         })
-                                        .ok();
+                                        .is_err()
+                                    {
+                                        tracing::warn!("ToolCall denied event send failed (receiver may be dropped)");
+                                    }
                                     output
                                 }
                             }
@@ -244,10 +295,16 @@ impl AgentExecutor {
 
                         tracing::info!("[Agent Loop] Hasil eksekusi tool '{}': {}", tool_name, serde_json::to_string(&tool_result.data).unwrap_or_default());
 
+                        // ── Self-correction: verify result ──────────────────
+                        let enriched_data = self
+                            .verify_tool_result(tool_name, args, &tool_result, &tool_context, &event_tx)
+                            .await;
+
                         session.add_message(ModelMessage {
                             role: MessageRole::Tool,
-                            content: serde_json::to_string(&tool_result.data)
+                            content: serde_json::to_string(&enriched_data)
                                 .unwrap_or_else(|_| "{}".into()),
+                            content_parts: None,
                             tool_calls: None,
                             tool_call_id: Some(tc.id.clone()),
                             name: Some(tool_name.clone()),
@@ -261,12 +318,15 @@ impl AgentExecutor {
             tracing::info!("[Agent Loop] Agent berhasil menyelesaikan objektif. Final answer: '{}'", response.message.content.trim());
 
             events.extend(self.drain_events(&mut event_rx).await);
-            event_tx
+            if event_tx
                 .send(AgentEvent::ObjectiveComplete {
                     summary: response.message.content.clone(),
                     evidence: vec![],
                 })
-                .ok();
+                .is_err()
+            {
+                tracing::warn!("ObjectiveComplete event send failed (receiver may be dropped)");
+            }
             session.state = SessionState::Completed;
             events.extend(self.drain_events(&mut event_rx).await);
             return Ok((session, events));
@@ -306,13 +366,16 @@ impl AgentExecutor {
             Some(agent.genome.model_policy.max_context_tokens),
         );
 
-        event_tx
+        if event_tx
             .send(AgentEvent::SessionStarted {
                 agent_id: agent.id.0.to_string(),
                 session_id: session.id.0.to_string(),
                 objective: objective.to_string(),
             })
-            .ok();
+            .is_err()
+        {
+            tracing::warn!("SessionStarted event send failed (receiver may be dropped)");
+        }
 
         let messages = ContextBuilder::build_initial_messages(agent, objective, &context, &self.tool_registry);
         for msg in messages {
@@ -328,11 +391,14 @@ impl AgentExecutor {
             }
 
             if agent.budget.is_soft_limit_reached() {
-                event_tx
+                if event_tx
                     .send(AgentEvent::BudgetWarning {
                         remaining: agent.budget.remaining(),
                     })
-                    .ok();
+                    .is_err()
+                {
+                    tracing::warn!("BudgetWarning event send failed (receiver may be dropped)");
+                }
             }
 
             let profile_id = &agent.genome.model_policy.preferred_profile;
@@ -346,13 +412,32 @@ impl AgentExecutor {
                 stop: None,
             };
 
-            event_tx
+            // ── Budget circuit breaker: hard limit check BEFORE sending ModelCall event ──
+            if agent.budget.is_exhausted() {
+                let spent = agent.budget.spent_usd;
+                let hard_limit = agent.budget.hard_limit_usd.unwrap_or(agent.budget.allocated_usd);
+                if event_tx
+                    .send(AgentEvent::BudgetExceeded {
+                        spent,
+                        hard_limit,
+                    })
+                    .is_err()
+                {
+                    tracing::warn!("BudgetExceeded event send failed (receiver may be dropped)");
+                }
+                return Err(AgentError::BudgetExhausted);
+            }
+
+            if event_tx
                 .send(AgentEvent::ModelCall {
                     turn,
                     tokens: 0,
                     cost: 0.0,
                 })
-                .ok();
+                .is_err()
+            {
+                tracing::warn!("ModelCall event send failed (receiver may be dropped)");
+            }
 
             // ── Coba streaming terlebih dulu ─────────────────────────────
             let stream_handle = self.model_router.route_chat_stream(profile_id, chat_request.clone()).await;
@@ -372,12 +457,15 @@ impl AgentExecutor {
                             Some(StreamEvent::TextDelta(delta)) => {
                                 full_text.push_str(&delta);
                                 // Emit ke TUI per-karakter
-                                event_tx
+                                if event_tx
                                     .send(AgentEvent::TextDelta {
                                         turn,
                                         delta: delta.clone(),
                                     })
-                                    .ok();
+                                    .is_err()
+                                {
+                                    tracing::warn!("TextDelta event send failed (receiver may be dropped)");
+                                }
                             }
                             Some(StreamEvent::ToolCallDelta { index, id, name, arguments }) => {
                                 let entry = tool_chunks.entry(index).or_insert_with(|| {
@@ -398,11 +486,14 @@ impl AgentExecutor {
                             Some(StreamEvent::Done) | None => break,
                             Some(StreamEvent::Error(e)) => {
                                 stream_had_error = true;
-                                event_tx
+                                if event_tx
                                     .send(AgentEvent::Error {
                                         message: format!("Stream error turn {turn}: {e}"),
                                     })
-                                    .ok();
+                                    .is_err()
+                                {
+                                    tracing::warn!("StreamError event send failed (receiver may be dropped)");
+                                }
                                 break;
                             }
                         }
@@ -416,11 +507,14 @@ impl AgentExecutor {
 
                     // Enforce budget per turn
                     if let Err(e) = self.budget_service.reserve(&mut agent.budget, total_cost) {
-                        event_tx
+                        if event_tx
                             .send(AgentEvent::BudgetWarning {
                                 remaining: agent.budget.remaining(),
                             })
-                            .ok();
+                            .is_err()
+                        {
+                            tracing::warn!("BudgetWarning (stream) event send failed (receiver may be dropped)");
+                        }
                         return Err(AgentError::from(e));
                     }
                     self.record_cost(
@@ -438,12 +532,15 @@ impl AgentExecutor {
                     if has_tool_calls {
                         // Emit Thought jika ada teks sebelum tool calls
                         if !full_text.is_empty() {
-                            event_tx
+                            if event_tx
                                 .send(AgentEvent::Thought {
                                     turn,
                                     content: full_text.clone(),
                                 })
-                                .ok();
+                                .is_err()
+                            {
+                                tracing::warn!("Thought event send failed (receiver may be dropped)");
+                            }
                         }
 
                         // Tambah message assistant dengan tool calls ke session
@@ -486,6 +583,7 @@ impl AgentExecutor {
                         session.add_message(ModelMessage {
                             role: MessageRole::Assistant,
                             content: full_text.clone(),
+                            content_parts: None,
                             tool_calls: Some(assembled_tool_calls.clone()),
                             tool_call_id: None,
                             name: None,
@@ -498,13 +596,16 @@ impl AgentExecutor {
                             let args = &tc.arguments;
 
                             // Emit "memanggil tool" sebelum eksekusi
-                            event_tx
+                            if event_tx
                                 .send(AgentEvent::ToolCall {
                                     tool: tool_name.to_string(),
                                     args: args.clone(),
                                     result: serde_json::Value::Null,
                                 })
-                                .ok();
+                                .is_err()
+                            {
+                                tracing::warn!("ToolCall event send failed (receiver may be dropped)");
+                            }
 
                             let tool_result = match self.tool_registry.get(tool_name) {
                                 Ok(tool) => {
@@ -512,26 +613,32 @@ impl AgentExecutor {
                                     if approved {
                                         match tool.execute(&tool_context, args.clone()).await {
                                             Ok(output) => {
-                                                event_tx
+                                                if event_tx
                                                     .send(AgentEvent::ToolCall {
                                                         tool: tool_name.to_string(),
                                                         args: args.clone(),
                                                         result: output.data.clone(),
                                                     })
-                                                    .ok();
+                                                    .is_err()
+                                                {
+                                                    tracing::warn!("ToolCall result event send failed (receiver may be dropped)");
+                                                }
                                                 output
                                             }
                                             Err(e) => ToolOutput::fail(e.to_string()),
                                         }
                                     } else {
                                         let output = ToolOutput::fail("Tool invocation denied by operator".to_string());
-                                        event_tx
+                                        if event_tx
                                             .send(AgentEvent::ToolCall {
                                                 tool: tool_name.to_string(),
                                                 args: args.clone(),
                                                 result: output.data.clone(),
                                             })
-                                            .ok();
+                                            .is_err()
+                                        {
+                                            tracing::warn!("ToolCall denied event send failed (receiver may be dropped)");
+                                        }
                                         output
                                     }
                                 }
@@ -540,41 +647,52 @@ impl AgentExecutor {
                                 }
                             };
 
-                            session.add_message(ModelMessage {
-                                role: MessageRole::Tool,
-                                content: serde_json::to_string(&tool_result.data)
-                                    .unwrap_or_else(|_| "{}".into()),
-                                tool_calls: None,
-                                tool_call_id: Some(tool_id.to_string()),
-                                name: Some(tool_name.to_string()),
-                            });
+                            // ── Self-correction: verify result ──────────────────
+                            let enriched_data = self
+                                .verify_tool_result(tool_name, args, &tool_result, &tool_context, &event_tx)
+                                .await;                        session.add_message(ModelMessage {
+                            role: MessageRole::Tool,
+                            content: serde_json::to_string(&enriched_data)
+                                .unwrap_or_else(|_| "{}".into()),
+                            content_parts: None,
+                            tool_calls: None,
+                            tool_call_id: Some(tool_id.to_string()),
+                            name: Some(tool_name.to_string()),
+                        });
                         }
                         continue; // lanjut ke turn berikutnya
                     } else {
                         // Tidak ada tool calls = jawaban final
                         if !full_text.is_empty() {
-                            event_tx
+                            if event_tx
                                 .send(AgentEvent::Thought {
                                     turn,
                                     content: full_text.clone(),
                                 })
-                                .ok();
+                                .is_err()
+                            {
+                                tracing::warn!("Thought event send failed (receiver may be dropped)");
+                            }
                         }
 
                         session.add_message(ModelMessage {
                             role: MessageRole::Assistant,
                             content: full_text.clone(),
+                            content_parts: None,
                             tool_calls: None,
                             tool_call_id: None,
                             name: None,
                         });
 
-                        event_tx
+                        if event_tx
                             .send(AgentEvent::ObjectiveComplete {
                                 summary: full_text,
                                 evidence: vec![],
                             })
-                            .ok();
+                            .is_err()
+                        {
+                            tracing::warn!("ObjectiveComplete event send failed (receiver may be dropped)");
+                        }
                         session.state = SessionState::Completed;
                         return Ok(session);
                     }
@@ -591,11 +709,14 @@ impl AgentExecutor {
 
                     // Enforce budget per turn
                     if let Err(e) = self.budget_service.reserve(&mut agent.budget, response.usage.cost_usd) {
-                        event_tx
+                        if event_tx
                             .send(AgentEvent::BudgetWarning {
                                 remaining: agent.budget.remaining(),
                             })
-                            .ok();
+                            .is_err()
+                        {
+                            tracing::warn!("BudgetWarning (fallback) event send failed (receiver may be dropped)");
+                        }
                         return Err(AgentError::from(e));
                     }
                     self.record_cost(
@@ -611,12 +732,15 @@ impl AgentExecutor {
                         || response.message.tool_calls.as_ref().map_or(false, |tc| !tc.is_empty());
 
                     if !response.message.content.is_empty() {
-                        event_tx
+                        if event_tx
                             .send(AgentEvent::Thought {
                                 turn,
                                 content: response.message.content.clone(),
                             })
-                            .ok();
+                            .is_err()
+                        {
+                            tracing::warn!("Thought event send failed (receiver may be dropped)");
+                        }
                     }
 
                     let msg = response.message.clone();
@@ -628,13 +752,16 @@ impl AgentExecutor {
                                 let tool_name = &tc.name;
                                 let args = &tc.arguments;
 
-                                event_tx
+                                if event_tx
                                     .send(AgentEvent::ToolCall {
                                         tool: tool_name.clone(),
                                         args: args.clone(),
                                         result: serde_json::Value::Null,
                                     })
-                                    .ok();
+                                    .is_err()
+                                {
+                                    tracing::warn!("ToolCall event send failed (receiver may be dropped)");
+                                }
 
                                 let tool_result = match self.tool_registry.get(tool_name) {
                                     Ok(tool) => {
@@ -642,26 +769,32 @@ impl AgentExecutor {
                                         if approved {
                                             match tool.execute(&tool_context, args.clone()).await {
                                                 Ok(output) => {
-                                                    event_tx
+                                                    if event_tx
                                                         .send(AgentEvent::ToolCall {
                                                             tool: tool_name.clone(),
                                                             args: args.clone(),
                                                             result: output.data.clone(),
                                                         })
-                                                        .ok();
+                                                        .is_err()
+                                                    {
+                                                        tracing::warn!("ToolCall result event send failed (receiver may be dropped)");
+                                                    }
                                                     output
                                                 }
                                                 Err(e) => ToolOutput::fail(e.to_string()),
                                             }
                                         } else {
                                             let output = ToolOutput::fail("Tool invocation denied by operator".to_string());
-                                            event_tx
+                                            if event_tx
                                                 .send(AgentEvent::ToolCall {
                                                     tool: tool_name.clone(),
                                                     args: args.clone(),
                                                     result: output.data.clone(),
                                                 })
-                                                .ok();
+                                                .is_err()
+                                            {
+                                                tracing::warn!("ToolCall denied event send failed (receiver may be dropped)");
+                                            }
                                             output
                                         }
                                     }
@@ -670,10 +803,16 @@ impl AgentExecutor {
                                     }
                                 };
 
+                                // ── Self-correction: verify result ──────────────────
+                                let enriched_data = self
+                                    .verify_tool_result(tool_name, args, &tool_result, &tool_context, &event_tx)
+                                    .await;
+
                                 session.add_message(ModelMessage {
                                     role: MessageRole::Tool,
-                                    content: serde_json::to_string(&tool_result.data)
+                                    content: serde_json::to_string(&enriched_data)
                                         .unwrap_or_else(|_| "{}".into()),
+                                    content_parts: None,
                                     tool_calls: None,
                                     tool_call_id: Some(tc.id.clone()),
                                     name: Some(tool_name.clone()),
@@ -683,12 +822,15 @@ impl AgentExecutor {
                         continue;
                     }
 
-                    event_tx
+                    if event_tx
                         .send(AgentEvent::ObjectiveComplete {
                             summary: response.message.content.clone(),
                             evidence: vec![],
                         })
-                        .ok();
+                        .is_err()
+                    {
+                        tracing::warn!("ObjectiveComplete event send failed (receiver may be dropped)");
+                    }
                     session.state = SessionState::Completed;
                     return Ok(session);
                 }
@@ -783,7 +925,9 @@ impl AgentExecutor {
                     }
                     ToolApprovalState::AlwaysApproved => {
                         // Set always allow ke true
-                        let _ = self.kv_store.set(&always_allow_key, &true).await;
+                        if self.kv_store.set(&always_allow_key, &true).await.is_err() {
+                            tracing::warn!("Gagal menyimpan always_allow key");
+                        }
                         return Ok(true);
                     }
                     ToolApprovalState::Denied => {
@@ -794,6 +938,147 @@ impl AgentExecutor {
             }
             tokio::time::sleep(std::time::Duration::from_millis(interval_ms)).await;
             interval_ms = (interval_ms * 2).min(MAX_INTERVAL_MS);
+        }
+    }
+
+    /// Verify a tool result and enrich it with self-correction context.
+    ///
+    /// Runs text-based verification checks based on the tool type.
+    /// If verification fails and retries are available, auto-retries.
+    /// Returns the enriched tool data with `_verification` field.
+    async fn verify_tool_result(
+        &self,
+        tool_name: &str,
+        args: &serde_json::Value,
+        result: &ToolOutput,
+        context: &ToolContext,
+        event_tx: &mpsc::UnboundedSender<AgentEvent>,
+    ) -> serde_json::Value {
+        // Run verification
+        let verification = self.verifier.verify(tool_name, args, result, context).await;
+
+        match verification {
+            VerificationResult::Success => {
+                // Enrich with success marker for LLM context
+                VerificationEngine::enrich_success(result)
+            }
+            VerificationResult::Failed { ref reason, ref suggestion } => {
+                let mut tracker = RetryTracker::new();
+                tracker.record_failure(reason.clone());
+
+                // Emit retry event
+                if event_tx
+                    .send(AgentEvent::ToolRetry {
+                        tool: tool_name.to_string(),
+                        attempt: tracker.attempt,
+                        max_retries: 3,
+                        reason: reason.clone(),
+                    })
+                    .is_err()
+                {
+                    tracing::warn!("ToolRetry event send failed");
+                }
+
+                // Emit verification failure event
+                if event_tx
+                    .send(AgentEvent::VerificationFailed {
+                        tool: tool_name.to_string(),
+                        reason: reason.clone(),
+                        suggestion: suggestion.clone(),
+                    })
+                    .is_err()
+                {
+                    tracing::warn!("VerificationFailed event send failed");
+                }
+
+                tracing::warn!(
+                    "[Self-Correct] Tool '{}' failed verification: {}. Retries exhausted.",
+                    tool_name, reason
+                );
+
+                // Auto-retry for shell commands (up to 2 more times)
+                if tool_name == "shell" && tracker.can_retry() {
+                    // Re-execute the same command as auto-retry
+                    let retry_cmd = args.get("command").and_then(|v| v.as_str()).unwrap_or("");
+                    let retry_timeout = args.get("timeout_seconds").and_then(|v| v.as_u64()).unwrap_or(30);
+                    let retry_args = serde_json::json!({
+                        "action": "exec",
+                        "command": retry_cmd,
+                        "timeout_seconds": retry_timeout,
+                    });
+
+                    if event_tx
+                        .send(AgentEvent::ToolRetry {
+                            tool: tool_name.to_string(),
+                            attempt: 2,
+                            max_retries: 3,
+                            reason: format!("Auto-retry after: {reason}"),
+                        })
+                        .is_err()
+                    {
+                        tracing::warn!("ToolRetry event send failed");
+                    }
+
+                    // Retry the command
+                    if let Ok(tool) = self.tool_registry.get(tool_name) {
+                        if let Ok(retry_result) = tool.execute(context, retry_args).await {
+                            let retry_verification = self.verifier.verify(tool_name, args, &retry_result, context).await;
+                            if retry_verification.is_success() {
+                                return VerificationEngine::enrich_success(&retry_result);
+                            }
+                        }
+                    }
+                }
+
+                // Enrich with failure context for LLM
+                VerificationEngine::enrich_failure(result, &verification, &tracker)
+            }
+            VerificationResult::RequiresScreenshot { ref reason } => {
+                // For now, just mark as ambiguous and let LLM decide
+                let mut enriched = result.data.clone();
+                enriched["_verification"] = serde_json::json!({
+                    "status": "ambiguous",
+                    "reason": reason,
+                    "suggestion": "Screenshot verification recommended",
+                });
+                enriched
+            }
+            VerificationResult::OcrMismatch { ref expected, ref actual, confidence } => {
+                let mut tracker = RetryTracker::new();
+                tracker.record_failure(format!("OCR mismatch: expected '{}' but got '{}' (confidence: {})", expected, actual, confidence));
+
+                // Emit retry event (consistency with Failed arm)
+                if event_tx
+                    .send(AgentEvent::ToolRetry {
+                        tool: tool_name.to_string(),
+                        attempt: tracker.attempt,
+                        max_retries: 3,
+                        reason: format!("OCR mismatch: expected '{}' not found", expected),
+                    })
+                    .is_err()
+                {
+                    tracing::warn!("ToolRetry event send failed");
+                }
+
+                // Emit verification failure event
+                if event_tx
+                    .send(AgentEvent::VerificationFailed {
+                        tool: tool_name.to_string(),
+                        reason: format!("OCR text mismatch — expected '{}' not found in OCR output", expected),
+                        suggestion: Some(format!("The screen shows '{}' but expected '{}'. Try a different approach or adjust the target area.", actual, expected)),
+                    })
+                    .is_err()
+                {
+                    tracing::warn!("VerificationFailed event send failed");
+                }
+
+                tracing::warn!(
+                    "[Self-Correct] Tool '{}' OCR mismatch: expected='{}' actual='{}' confidence={}",
+                    tool_name, expected, actual, confidence
+                );
+
+                VerificationEngine::enrich_failure(result, &verification, &tracker)
+            }
         }
     }
 
@@ -820,5 +1105,3 @@ impl AgentExecutor {
         }
     }
 }
-
-

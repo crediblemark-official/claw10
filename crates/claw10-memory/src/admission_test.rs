@@ -18,10 +18,18 @@ fn make_memory(content: &str, confidence: f64) -> Memory {
         confidence,
         classification: "internal".into(),
         status: MemoryStatus::Candidate,
-        verified_by: vec![],
+        verified_by: vec![AgentId(Uuid::now_v7())],
         created_at: Utc::now(),
         updated_at: Utc::now(),
     }
+}
+
+fn make_memory_with_verifiers(content: &str, confidence: f64, verifier_count: usize) -> Memory {
+    let mut mem = make_memory(content, confidence);
+    mem.verified_by = (0..verifier_count)
+        .map(|_| AgentId(Uuid::now_v7()))
+        .collect();
+    mem
 }
 
 #[test]
@@ -98,5 +106,58 @@ fn test_allow_duplicates_when_configured() {
     existing.scope = candidate.scope.clone();
 
     let result = pipeline.evaluate(&candidate, &[existing]);
+    assert!(matches!(result, AdmissionResult::Activated));
+}
+
+#[test]
+fn test_reject_insufficient_verifiers() {
+    let pipeline = AdmissionPipeline::with_defaults();
+    let mem = make_memory_with_verifiers("Some fact", 0.9, 0);
+    let result = pipeline.evaluate(&mem, &[]);
+    assert!(matches!(result, AdmissionResult::Rejected { ref reason } if reason == "insufficient verifiers"));
+}
+
+#[test]
+fn test_accept_sufficient_verifiers() {
+    let pipeline = AdmissionPipeline::with_defaults();
+    let mem = make_memory_with_verifiers("Some fact", 0.9, 1);
+    let result = pipeline.evaluate(&mem, &[]);
+    assert!(matches!(result, AdmissionResult::Activated));
+}
+
+#[test]
+fn test_accept_multiple_verifiers() {
+    let pipeline = AdmissionPipeline::with_defaults();
+    let mem = make_memory_with_verifiers("Some fact", 0.9, 3);
+    let result = pipeline.evaluate(&mem, &[]);
+    assert!(matches!(result, AdmissionResult::Activated));
+}
+
+#[test]
+fn test_custom_minimum_verifiers() {
+    let config = AdmissionConfig {
+        minimum_verifiers: 3,
+        ..AdmissionConfig::default()
+    };
+    let pipeline = AdmissionPipeline::new(config);
+
+    let mem = make_memory_with_verifiers("Some fact", 0.9, 2);
+    let result = pipeline.evaluate(&mem, &[]);
+    assert!(matches!(result, AdmissionResult::Rejected { ref reason } if reason == "insufficient verifiers"));
+
+    let mem = make_memory_with_verifiers("Some fact", 0.9, 3);
+    let result = pipeline.evaluate(&mem, &[]);
+    assert!(matches!(result, AdmissionResult::Activated));
+}
+
+#[test]
+fn test_zero_minimum_verifiers_bypasses_check() {
+    let config = AdmissionConfig {
+        minimum_verifiers: 0,
+        ..AdmissionConfig::default()
+    };
+    let pipeline = AdmissionPipeline::new(config);
+    let mem = make_memory_with_verifiers("Some fact", 0.9, 0);
+    let result = pipeline.evaluate(&mem, &[]);
     assert!(matches!(result, AdmissionResult::Activated));
 }

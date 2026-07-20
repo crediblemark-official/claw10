@@ -224,7 +224,7 @@ fn build_toon_context(request: &PromptBuildRequest) -> String {
     );
     ctx.add_section("budget", budget_text);
 
-    ctx.build()
+    ctx.build().unwrap_or_else(|e| format!("[TOON encode error: {e}]"))
 }
 
 fn build_json_context(request: &PromptBuildRequest) -> String {

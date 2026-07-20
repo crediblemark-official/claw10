@@ -5,7 +5,8 @@ use std::time::Instant;
 use uuid::Uuid;
 
 use claw10_domain::{
-    PolicyBundle, PolicyBundleId, PolicyEffect, PolicyEvaluateResult, PolicyRule, PolicySubject,
+    PolicyBundle, PolicyBundleId, PolicyEffect, PolicyEvaluateResult, PolicyRule, PolicyRuleId,
+    PolicySubject,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -238,84 +239,97 @@ impl PolicyService {
         sorted.sort_by_key(|b| std::cmp::Reverse(b.priority));
         sorted
     }
+
+    /// Create a default permissive policy bundle for new agents.
+    ///
+    /// Provides a sensible baseline:
+    /// - Priority 300: Allow all actions on all resources (permissive baseline)
+    /// - Priority 200: Deny destructive tool invocations
+    /// - Priority 100: Deny self-termination
+    #[must_use]
+    pub fn default_bundle() -> PolicyBundle {
+        let rules = vec![
+            PolicyRule {
+                id: PolicyRuleId(Uuid::now_v7()),
+                subject: PolicySubject::Role("*".to_string()),
+                effect: PolicyEffect::Allow,
+                action: "*".to_string(),
+                resource: "*".to_string(),
+                condition: None,
+                priority: 300,
+            },
+            PolicyRule {
+                id: PolicyRuleId(Uuid::now_v7()),
+                subject: PolicySubject::Role("*".to_string()),
+                effect: PolicyEffect::ExplicitDeny,
+                action: "tool:invoke".to_string(),
+                resource: "destructive:*".to_string(),
+                condition: None,
+                priority: 200,
+            },
+            PolicyRule {
+                id: PolicyRuleId(Uuid::now_v7()),
+                subject: PolicySubject::Role("*".to_string()),
+                effect: PolicyEffect::ExplicitDeny,
+                action: "agent:terminate".to_string(),
+                resource: "agent:self".to_string(),
+                condition: None,
+                priority: 100,
+            },
+        ];
+
+        let mut bundle = Self::create_bundle(
+            "default-permissive".to_string(),
+            "1.0.0".to_string(),
+            rules,
+        );
+        Self::activate(&mut bundle);
+        bundle
+    }
+
+    /// Create a default permissive policy bundle scoped to a specific role.
+    #[must_use]
+    pub fn default_bundle_for_role(role: &str) -> PolicyBundle {
+        let rules = vec![
+            PolicyRule {
+                id: PolicyRuleId(Uuid::now_v7()),
+                subject: PolicySubject::Role(role.to_string()),
+                effect: PolicyEffect::Allow,
+                action: "*".to_string(),
+                resource: "*".to_string(),
+                condition: None,
+                priority: 300,
+            },
+            PolicyRule {
+                id: PolicyRuleId(Uuid::now_v7()),
+                subject: PolicySubject::Role(role.to_string()),
+                effect: PolicyEffect::ExplicitDeny,
+                action: "tool:invoke".to_string(),
+                resource: "destructive:*".to_string(),
+                condition: None,
+                priority: 200,
+            },
+            PolicyRule {
+                id: PolicyRuleId(Uuid::now_v7()),
+                subject: PolicySubject::Role(role.to_string()),
+                effect: PolicyEffect::ExplicitDeny,
+                action: "agent:terminate".to_string(),
+                resource: "agent:self".to_string(),
+                condition: None,
+                priority: 100,
+            },
+        ];
+
+        let mut bundle = Self::create_bundle(
+            format!("default-permissive-{role}"),
+            "1.0.0".to_string(),
+            rules,
+        );
+        Self::activate(&mut bundle);
+        bundle
+    }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use claw10_domain::PolicySubject;
-
-    #[test]
-    fn test_subject_matches_role_wildcard() {
-        let rule = PolicySubject::Role("*".to_string());
-
-        // Should match anything
-        assert!(PolicyService::subject_matches(&rule, &PolicySubject::Role("admin".to_string())));
-        assert!(PolicyService::subject_matches(&rule, &PolicySubject::Agent("agent-1".to_string())));
-        assert!(PolicyService::subject_matches(&rule, &PolicySubject::Tenant("tenant-a".to_string())));
-    }
-
-    #[test]
-    fn test_subject_matches_exact_match() {
-        assert!(PolicyService::subject_matches(
-            &PolicySubject::Role("admin".to_string()),
-            &PolicySubject::Role("admin".to_string())
-        ));
-        assert!(PolicyService::subject_matches(
-            &PolicySubject::Agent("agent-1".to_string()),
-            &PolicySubject::Agent("agent-1".to_string())
-        ));
-        assert!(PolicyService::subject_matches(
-            &PolicySubject::Organization("org-a".to_string()),
-            &PolicySubject::Organization("org-a".to_string())
-        ));
-        assert!(PolicyService::subject_matches(
-            &PolicySubject::Department("dept-x".to_string()),
-            &PolicySubject::Department("dept-x".to_string())
-        ));
-        assert!(PolicyService::subject_matches(
-            &PolicySubject::Mission("mission-1".to_string()),
-            &PolicySubject::Mission("mission-1".to_string())
-        ));
-        assert!(PolicyService::subject_matches(
-            &PolicySubject::Task("task-1".to_string()),
-            &PolicySubject::Task("task-1".to_string())
-        ));
-        assert!(PolicyService::subject_matches(
-            &PolicySubject::Tool("tool-1".to_string()),
-            &PolicySubject::Tool("tool-1".to_string())
-        ));
-        assert!(PolicyService::subject_matches(
-            &PolicySubject::Worker("worker-1".to_string()),
-            &PolicySubject::Worker("worker-1".to_string())
-        ));
-        assert!(PolicyService::subject_matches(
-            &PolicySubject::Tenant("tenant-a".to_string()),
-            &PolicySubject::Tenant("tenant-a".to_string())
-        ));
-        assert!(PolicyService::subject_matches(
-            &PolicySubject::DataClass("class-1".to_string()),
-            &PolicySubject::DataClass("class-1".to_string())
-        ));
-    }
-
-    #[test]
-    fn test_subject_matches_different_value() {
-        assert!(!PolicyService::subject_matches(
-            &PolicySubject::Role("admin".to_string()),
-            &PolicySubject::Role("user".to_string())
-        ));
-        assert!(!PolicyService::subject_matches(
-            &PolicySubject::Agent("agent-1".to_string()),
-            &PolicySubject::Agent("agent-2".to_string())
-        ));
-    }
-
-    #[test]
-    fn test_subject_matches_different_type() {
-        assert!(!PolicyService::subject_matches(
-            &PolicySubject::Agent("admin".to_string()),
-            &PolicySubject::Role("admin".to_string())
-        ));
-    }
-}
+#[path = "lib_test.rs"]
+mod tests;

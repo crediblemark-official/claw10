@@ -38,6 +38,8 @@ pub struct AdmissionConfig {
     pub injection_keywords: Vec<String>,
     /// Apakah memory duplicate diperbolehkan (same scope + content).
     pub allow_duplicates: bool,
+    /// Jumlah minimum verifikasi dari agent lain yang dibutuhkan.
+    pub minimum_verifiers: usize,
 }
 
 impl Default for AdmissionConfig {
@@ -54,6 +56,7 @@ impl Default for AdmissionConfig {
                 "<|im_start|>".into(),
             ],
             allow_duplicates: false,
+            minimum_verifiers: 1,
         }
     }
 }
@@ -124,6 +127,13 @@ impl AdmissionPipeline {
 
         // Stage 5: Classification check (tidak boleh empty)
         if let AdmissionDecision::Reject { reason } = self.check_classification(candidate) {
+            return AdmissionResult::Rejected { reason };
+        }
+
+        // Stage 6: Verification check (jumlah minimum verifier)
+        if let AdmissionDecision::Reject { reason } =
+            self.check_verification(candidate.verified_by.len())
+        {
             return AdmissionResult::Rejected { reason };
         }
 
@@ -200,6 +210,16 @@ impl AdmissionPipeline {
             };
         }
         AdmissionDecision::Continue
+    }
+
+    fn check_verification(&self, verifier_count: usize) -> AdmissionDecision {
+        if verifier_count < self.config.minimum_verifiers {
+            AdmissionDecision::Reject {
+                reason: "insufficient verifiers".into(),
+            }
+        } else {
+            AdmissionDecision::Continue
+        }
     }
 }
 

@@ -82,7 +82,11 @@ pub async fn check_and_perform_update(is_auto: bool) -> Result<(), Box<dyn std::
         }
 
         let mut cmd = std::process::Command::new("sh");
-        cmd.arg(tmp_script_path.to_str().unwrap());
+        if let Some(path_str) = tmp_script_path.to_str() {
+            cmd.arg(path_str);
+        } else {
+            return Err("Temp file path is not valid UTF-8".into());
+        }
         if is_auto {
             cmd.stdout(std::process::Stdio::null())
                .stderr(std::process::Stdio::null());

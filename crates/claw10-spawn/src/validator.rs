@@ -74,19 +74,16 @@ impl SpawnValidator {
         Ok(())
     }
 
-    /// Check for duplicate objectives among existing agents
+    /// Check for duplicate objectives among existing agents.
+    /// Only flags a duplicate when a child's objective exactly matches
+    /// an existing agent's name (case-insensitive).
     fn check_duplicate_objective(
         request: &SpawnRequest,
         all_agents: &[Agent],
     ) -> Result<(), SpawnError> {
         for child in &request.children {
             for agent in all_agents {
-                if agent.role == child.role
-                    || agent
-                        .name
-                        .to_lowercase()
-                        .contains(&child.objective.to_lowercase())
-                {
+                if agent.name.to_lowercase() == child.objective.to_lowercase() {
                     return Err(SpawnError::DuplicateObjective(child.objective.clone()));
                 }
             }
