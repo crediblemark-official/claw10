@@ -95,7 +95,7 @@ claw10-lifecycle = { version = "0.3.0", path = "crates/claw10-lifecycle" }
 claw10-lineage = { version = "0.3.0", path = "crates/claw10-lineage" }
 claw10-memory = { version = "0.3.0", path = "crates/claw10-memory" }
 claw10-mission = { version = "0.3.0", path = "crates/claw10-mission" }
-claw10-model-router = { version = "0.3.0", path = "crates/claw10-model-router" }
+claw10-model-router = { version = "0.3.1", path = "crates/claw10-model-router" }
 claw10-policy = { version = "0.3.0", path = "crates/claw10-policy" }
 claw10-prompt = { version = "0.3.0", path = "crates/claw10-prompt" }
 claw10-scheduler = { version = "0.3.0", path = "crates/claw10-scheduler" }

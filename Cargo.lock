@@ -670,7 +670,7 @@ dependencies = [
 
 [[package]]
 name = "claw10-model-router"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "async-trait",
  "claw10-domain",
