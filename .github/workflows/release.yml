@@ -37,6 +37,10 @@ jobs:
             name: macOS ARM64
             os: macos-latest
             archive: claw10-macos-aarch64.tar.gz
+          - target: x86_64-pc-windows-msvc
+            name: Windows x86_64
+            os: windows-latest
+            archive: claw10-windows-x86_64.zip
 
     steps:
       - uses: actions/checkout@v4
@@ -56,18 +60,30 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Build release binary
-        run: |
-          cargo build --release --target ${{ matrix.target }} -p claw10
+        run: cargo build --release --target ${{ matrix.target }} -p claw10
 
-      - name: Package
+      - name: Package (Unix)
+        if: runner.os != 'Windows'
         run: |
           cd target/${{ matrix.target }}/release
           tar -czf ../../../${{ matrix.archive }} claw10
           cd ../../..
-          echo "### ${{ matrix.target }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "### ${{ matrix.name }}" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           ls -lh ${{ matrix.archive }}
           echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cd target/${{ matrix.target }}/release
+          Compress-Archive -Path claw10.exe -DestinationPath ../../../${{ matrix.archive }}
+          cd ../../..
+          echo "### ${{ matrix.name }}" >> $env:GITHUB_STEP_SUMMARY
+          echo '```' >> $env:GITHUB_STEP_SUMMARY
+          Get-Item ${{ matrix.archive }} | Select-Object Name, @{N='Size';E={[math]::Round($_.Length/1MB,1)} MB} | Out-String >> $env:GITHUB_STEP_SUMMARY
+          echo '```' >> $env:GITHUB_STEP_SUMMARY
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
