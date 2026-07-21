@@ -235,7 +235,7 @@ fn convert_to_configs(api: ModelsDevApi) -> Vec<ProviderConfig> {
             continue;
         }
 
-        let notes = entry.doc.unwrap_or(entry.name);
+        let notes = entry.name;
 
         configs.push(ProviderConfig {
             name: provider_id,
