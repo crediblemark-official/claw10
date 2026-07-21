@@ -1,6 +1,6 @@
 [package]
 name = "claw10-tui"
-version = "0.4.1"
+version = "0.4.2"
 edition = "2024"
 description = "Terminal UI for Claw10 OS"
 license.workspace = true

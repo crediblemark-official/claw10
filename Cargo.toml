@@ -105,7 +105,7 @@ claw10-task = { version = "0.4.0", path = "crates/claw10-task" }
 claw10-telemetry = { version = "0.4.0", path = "crates/claw10-telemetry" }
 claw10-tool = { version = "0.4.0", path = "crates/claw10-tool" }
 claw10-toon = { version = "0.4.0", path = "crates/claw10-toon" }
-claw10-tui = { version = "0.4.1", path = "crates/claw10-tui" }
+claw10-tui = { version = "0.4.2", path = "crates/claw10-tui" }
 claw10-worker = { version = "0.4.0", path = "crates/claw10-worker" }
 
 [profile.release]
