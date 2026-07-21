@@ -29,6 +29,51 @@ static PROVIDERS: OnceLock<Vec<ProviderConfig>> = OnceLock::new();
 pub async fn init_providers() {
     let _ = PROVIDERS.get_or_init(|| {
         tracing::info!("Fetching provider catalog from models.dev");
+        // Check if we're inside a tokio runtime. If so, we can't create a new one.
+        match tokio::runtime::Handle::try_current() {
+            Ok(_handle) => {
+                // Inside a tokio runtime — can't block, use fallback
+                tracing::info!("Inside tokio runtime, using fallback providers");
+                fallback_providers()
+            }
+            Err(_) => {
+                // Not inside a tokio runtime — create one and fetch
+                match tokio::runtime::Runtime::new() {
+                    Ok(rt) => {
+                        let providers = rt.block_on(models_dev::fetch_providers());
+                        match providers {
+                            Ok(p) if !p.is_empty() => {
+                                tracing::info!(
+                                    "Successfully loaded {} providers from models.dev",
+                                    p.len()
+                                );
+                                p
+                            }
+                            Ok(_) => {
+                                tracing::warn!("models.dev returned empty list, using fallback");
+                                fallback_providers()
+                            }
+                            Err(e) => {
+                                tracing::warn!("Failed to fetch from models.dev: {e}, using fallback");
+                                fallback_providers()
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to create tokio runtime: {e}, using fallback");
+                        fallback_providers()
+                    }
+                }
+            }
+        }
+    });
+}
+
+/// Fetch providers from models.dev synchronously. Can be called from outside
+/// a tokio runtime (e.g. from a CLI subcommand that doesn't use async).
+pub fn init_providers_sync() {
+    let _ = PROVIDERS.get_or_init(|| {
+        tracing::info!("Fetching provider catalog from models.dev (sync)");
         match tokio::runtime::Runtime::new() {
             Ok(rt) => {
                 let providers = rt.block_on(models_dev::fetch_providers());

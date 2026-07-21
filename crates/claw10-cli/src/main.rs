@@ -123,10 +123,8 @@ enum ServiceAction {
     Status,
 }
 
-#[tokio::main]
-async fn main() {
+fn main() {
     let cli = Cli::parse();
-    claw10_model_router::providers::init_providers().await;
     // When no subcommand is provided, start the API server in the background
     // and launch the TUI. This keeps the HTTP API and webhook endpoints
     // reachable while the user interacts with the terminal UI.
@@ -135,6 +133,17 @@ async fn main() {
         db: None,
         tui: true,
     });
+
+    // Pre-fetch provider catalog before entering tokio runtime.
+    // This avoids "Cannot start a runtime from within a runtime" panics.
+    let needs_providers = matches!(
+        &command,
+        Commands::Serve { .. } | Commands::Tui { .. } | Commands::RunAgent { .. }
+    );
+    if needs_providers {
+        claw10_model_router::providers::init_providers_sync();
+    }
+
     let is_tui = match &command {
         Commands::Tui { .. } => true,
         Commands::Serve { tui, .. } => *tui,
@@ -207,38 +216,40 @@ async fn main() {
         }
     };
 
-    if needs_setup {
-        eprintln!("Belum ada konfigurasi ditemukan. Menjalankan setup wizard...\n");
-        if let Err(e) = setup::run_setup_wizard(false).await {
-            tracing::error!("Setup gagal: {e}");
-            eprintln!("Setup gagal: {e}");
-            std::process::exit(1);
+    // Create tokio runtime and run async body
+    let rt = tokio::runtime::Runtime::new().expect("failed to create tokio runtime");
+    rt.block_on(async move {
+        if needs_setup {
+            eprintln!("Belum ada konfigurasi ditemukan. Menjalankan setup wizard...\n");
+            if let Err(e) = setup::run_setup_wizard(false).await {
+                tracing::error!("Setup gagal: {e}");
+                eprintln!("Setup gagal: {e}");
+                std::process::exit(1);
+            }
         }
-    }
 
-    // Jalankan auto-update asinkron di background saat startup
-    let cmd_clone = command.clone();
-    tokio::spawn(async move {
-        // Jangan jalankan auto-update jika setup wizard aktif, jika di mode TUI, atau jika memanggil command pengecualian
-        if !needs_setup && !is_tui && !matches!(cmd_clone, Commands::Uninstall { .. } | Commands::Setup { .. } | Commands::Version | Commands::Update | Commands::Check) {
-            let _ = update::check_and_perform_update(true).await;
-        }
-    });
+        // Jalankan auto-update asinkron di background saat startup
+        let cmd_clone = command.clone();
+        tokio::spawn(async move {
+            if !needs_setup && !is_tui && !matches!(cmd_clone, Commands::Uninstall { .. } | Commands::Setup { .. } | Commands::Version | Commands::Update | Commands::Check) {
+                let _ = update::check_and_perform_update(true).await;
+            }
+        });
 
-    // Jika user secara eksplisit memanggil `setup`, jalankan wizard lalu otomatis alihkan ke `serve` (auto run)
-    if let Commands::Setup { force } = command {
-        if let Err(e) = setup::run_setup_wizard(force).await {
-            tracing::error!("Setup gagal: {e}");
-            eprintln!("Setup gagal: {e}");
-            std::process::exit(1);
+        // Jika user secara eksplisit memanggil `setup`, jalankan wizard lalu otomatis alihkan ke `serve` (auto run)
+        if let Commands::Setup { force } = command {
+            if let Err(e) = setup::run_setup_wizard(force).await {
+                tracing::error!("Setup gagal: {e}");
+                eprintln!("Setup gagal: {e}");
+                std::process::exit(1);
+            }
+            println!("\nSetup sukses! Menginstal dan menjalankan Claw10 server daemon di background...");
+            service::handle_service_command(service::ServiceAction::Install);
+            service::handle_service_command(service::ServiceAction::Start);
+            println!("\n✓ Claw10 server daemon aktif dan berjalan otomatis sebagai systemd user service!");
+            println!("Gunakan 'claw10 service status' untuk memantau status service.");
+            std::process::exit(0);
         }
-        println!("\nSetup sukses! Menginstal dan menjalankan Claw10 server daemon di background...");
-        service::handle_service_command(service::ServiceAction::Install);
-        service::handle_service_command(service::ServiceAction::Start);
-        println!("\n✓ Claw10 server daemon aktif dan berjalan otomatis sebagai systemd user service!");
-        println!("Gunakan 'claw10 service status' untuk memantau status service.");
-        std::process::exit(0);
-    }
 
     match command {
         Commands::Serve { bind, db, tui } => {
@@ -710,6 +721,7 @@ async fn main() {
             }
         }
     }
+    });
 }
 
 
