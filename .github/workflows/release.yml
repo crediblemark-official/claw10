@@ -15,32 +15,24 @@ permissions:
 
 jobs:
   build:
-    name: Build ${{ matrix.name }}
+    name: Build ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - target: x86_64-unknown-linux-gnu
-            name: Linux x86_64
             os: ubuntu-latest
             archive: claw10-linux-x86_64.tar.gz
           - target: aarch64-unknown-linux-gnu
-            name: Linux ARM64
             os: ubuntu-latest
             archive: claw10-linux-aarch64.tar.gz
           - target: x86_64-apple-darwin
-            name: macOS x86_64
             os: macos-latest
             archive: claw10-macos-x86_64.tar.gz
           - target: aarch64-apple-darwin
-            name: macOS ARM64
             os: macos-latest
             archive: claw10-macos-aarch64.tar.gz
-          - target: x86_64-pc-windows-msvc
-            name: Windows x86_64
-            os: windows-latest
-            archive: claw10-windows-x86_64.zip
 
     steps:
       - uses: actions/checkout@v4
@@ -60,30 +52,18 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Build release binary
-        run: cargo build --release --target ${{ matrix.target }} -p claw10
+        run: |
+          cargo build --release --target ${{ matrix.target }} -p claw10
 
-      - name: Package (Unix)
-        if: runner.os != 'Windows'
+      - name: Package
         run: |
           cd target/${{ matrix.target }}/release
           tar -czf ../../../${{ matrix.archive }} claw10
           cd ../../..
-          echo "### ${{ matrix.name }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "### ${{ matrix.target }}" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           ls -lh ${{ matrix.archive }}
           echo '```' >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Package (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          cd target/${{ matrix.target }}/release
-          Compress-Archive -Path claw10.exe -DestinationPath ../../../${{ matrix.archive }}
-          cd ../../..
-          echo "### ${{ matrix.name }}" >> $env:GITHUB_STEP_SUMMARY
-          echo '```' >> $env:GITHUB_STEP_SUMMARY
-          Get-Item ${{ matrix.archive }} | ForEach-Object { "$($_.Name)  $([math]::Round($_.Length/1MB,1)) MB" } | Out-String >> $env:GITHUB_STEP_SUMMARY
-          echo '```' >> $env:GITHUB_STEP_SUMMARY
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
