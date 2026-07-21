@@ -32,7 +32,7 @@ impl SetupWizard {
             }
             KeyCode::Enter => {
                 let provider = self.current_provider();
-                if let Some(val) = self.configured_env_vars.get(provider.env_var) {
+                if let Some(val) = self.configured_env_vars.get(&provider.env_var) {
                     self.api_key = val.clone();
                 } else {
                     self.api_key.clear();

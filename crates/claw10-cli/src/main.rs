@@ -138,7 +138,7 @@ fn main() {
     // This avoids "Cannot start a runtime from within a runtime" panics.
     let needs_providers = matches!(
         &command,
-        Commands::Serve { .. } | Commands::Tui { .. } | Commands::RunAgent { .. }
+        Commands::Serve { .. } | Commands::Tui { .. } | Commands::Setup { .. } | Commands::RunAgent { .. }
     );
     if needs_providers {
         claw10_model_router::providers::init_providers_sync();

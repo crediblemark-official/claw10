@@ -6,23 +6,23 @@ use crate::setup_service::{ProviderOption, BindingEvent};
 mod draw;
 mod handlers;
 
-pub const PROVIDERS: &[ProviderOption] = &[
-    ProviderOption { name: "OpenAI", slot: "openai", env_var: "OPENAI_API_KEY", base_url: "https://api.openai.com/v1" },
-    ProviderOption { name: "Anthropic", slot: "anthropic", env_var: "ANTHROPIC_API_KEY", base_url: "https://api.anthropic.com/v1" },
-    ProviderOption { name: "Google Gemini", slot: "google-gemini", env_var: "GEMINI_API_KEY", base_url: "https://generativelanguage.googleapis.com/v1beta/openai" },
-    ProviderOption { name: "DeepSeek", slot: "deepseek", env_var: "DEEPSEEK_API_KEY", base_url: "https://api.deepseek.com" },
-    ProviderOption { name: "Mistral AI", slot: "mistral", env_var: "MISTRAL_API_KEY", base_url: "https://api.mistral.ai/v1" },
-    ProviderOption { name: "Cohere", slot: "cohere", env_var: "COHERE_API_KEY", base_url: "https://api.cohere.com/v1" },
-    ProviderOption { name: "Groq", slot: "groq", env_var: "GROQ_API_KEY", base_url: "https://api.groq.com/openai/v1" },
-    ProviderOption { name: "Perplexity", slot: "perplexity", env_var: "PERPLEXITY_API_KEY", base_url: "https://api.perplexity.ai" },
-    ProviderOption { name: "xAI", slot: "xai", env_var: "XAI_API_KEY", base_url: "https://api.x.ai/v1" },
-    ProviderOption { name: "NVIDIA NIM", slot: "nvidia", env_var: "NVIDIA_API_KEY", base_url: "https://integrate.api.nvidia.com/v1" },
-    ProviderOption { name: "Together AI", slot: "together", env_var: "TOGETHER_API_KEY", base_url: "https://api.together.xyz/v1" },
-    ProviderOption { name: "Fireworks AI", slot: "fireworks", env_var: "FIREWORKS_API_KEY", base_url: "https://api.fireworks.ai/inference/v1" },
-    ProviderOption { name: "Ollama (Local)", slot: "ollama", env_var: "OLLAMA_API_KEY", base_url: "http://localhost:11434/v1" },
-    ProviderOption { name: "OpenRouter", slot: "openrouter", env_var: "OPENROUTER_API_KEY", base_url: "https://openrouter.ai/api/v1" },
-    ProviderOption { name: "Custom Provider", slot: "custom", env_var: "CUSTOM_API_KEY", base_url: "" },
-];
+/// Build provider list dynamically from models.dev catalog + Custom Provider.
+fn build_providers() -> Vec<ProviderOption> {
+    let catalog = claw10_model_router::providers::provider_configs();
+    let mut providers: Vec<ProviderOption> = catalog.into_iter().map(|c| ProviderOption {
+        name: c.notes.clone(),
+        slot: c.name.clone(),
+        env_var: c.api_key_env.clone(),
+        base_url: c.base_url.clone(),
+    }).collect();
+    providers.push(ProviderOption {
+        name: "Custom Provider".into(),
+        slot: "custom".into(),
+        env_var: "CUSTOM_API_KEY".into(),
+        base_url: String::new(),
+    });
+    providers
+}
 
 pub struct SetupWizard {
     pub(crate) step: Step,
@@ -88,7 +88,7 @@ impl SetupWizard {
 
         Self {
             step: Step::Welcome,
-            providers: PROVIDERS.to_vec(),
+            providers: build_providers(),
             selected: 0,
             api_key: String::new(),
             custom_model: String::new(),
@@ -338,7 +338,7 @@ impl SetupWizard {
     pub(crate) fn load_static_models(&self) -> Vec<String> {
         let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
         let cache_file = std::path::PathBuf::from(&home).join(".claw10").join("models.json");
-        let slot = self.current_provider().slot;
+        let slot = &self.current_provider().slot;
 
         if cache_file.exists() {
             if let Ok(content) = std::fs::read_to_string(&cache_file) {
@@ -363,7 +363,7 @@ impl SetupWizard {
         
         let model_string;
         let model = if self.custom_model.is_empty() {
-            let preferred = match provider.slot {
+            let preferred = match provider.slot.as_str() {
                 "nvidia" => "meta/llama-3.3-70b-instruct",
                 "openai" => "gpt-4o",
                 "anthropic" => "claude-3-5-sonnet-latest",

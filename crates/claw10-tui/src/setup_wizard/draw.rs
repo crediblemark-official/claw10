@@ -157,12 +157,31 @@ impl SetupWizard {
         let list_area = horizontal_chunks[1];
 
         let cols = 3u16;
-        let rows_per_col = 5u16;
+        let rows_per_col = list_area.height.max(1);
         let col_width = list_area.width / cols;
+        let visible_count = (cols * rows_per_col) as usize;
 
-        for (i, provider) in self.providers.iter().enumerate() {
-            let col = i as u16 / rows_per_col;
-            let row = i as u16 % rows_per_col;
+        let total = self.providers.len();
+        let selected = self.selected.min(total.saturating_sub(1));
+
+        let page_start = if total <= visible_count {
+            0
+        } else if selected < visible_count / 2 {
+            0
+        } else if selected + visible_count / 2 >= total {
+            total.saturating_sub(visible_count)
+        } else {
+            selected - visible_count / 2
+        };
+
+        for offset in 0..visible_count {
+            let i = page_start + offset;
+            if i >= total {
+                break;
+            }
+            let provider = &self.providers[i];
+            let col = offset as u16 / rows_per_col;
+            let row = offset as u16 % rows_per_col;
 
             let item_x = list_area.x + col * col_width;
             let item_y = list_area.y + row;
@@ -175,11 +194,11 @@ impl SetupWizard {
                 height: 1,
             };
 
-            let is_configured = self.configured_env_vars.contains_key(provider.env_var);
+            let is_configured = self.configured_env_vars.contains_key(&provider.env_var);
             let text = if is_selected {
                 let mut spans = vec![
                     Span::styled("\u{25B6} ", Style::default().fg(Color::Rgb(254, 192, 126)).add_modifier(Modifier::BOLD)),
-                    Span::styled(provider.name, Style::default().fg(Color::Rgb(254, 192, 126)).add_modifier(Modifier::BOLD)),
+                    Span::styled(&provider.name, Style::default().fg(Color::Rgb(254, 192, 126)).add_modifier(Modifier::BOLD)),
                 ];
                 if is_configured {
                     spans.push(Span::styled(" [config]", Style::default().fg(Color::Rgb(46, 139, 87)).add_modifier(Modifier::BOLD)));
@@ -187,7 +206,7 @@ impl SetupWizard {
                 Line::from(spans)
             } else {
                 let mut spans = vec![
-                    Span::styled(provider.name, Style::default().fg(Color::Rgb(160, 160, 160))),
+                    Span::styled(&provider.name, Style::default().fg(Color::Rgb(160, 160, 160))),
                 ];
                 if is_configured {
                     spans.push(Span::styled(" [config]", Style::default().fg(Color::Rgb(46, 139, 87))));
@@ -348,7 +367,7 @@ impl SetupWizard {
         let provider = self.current_provider();
         let title = Paragraph::new(Line::from(vec![
             Span::styled("Pilih Model — ", Style::default().fg(Color::Rgb(254, 192, 126)).add_modifier(Modifier::BOLD)),
-            Span::styled(provider.name, Style::default().fg(Color::Rgb(200, 200, 200))),
+            Span::styled(&provider.name, Style::default().fg(Color::Rgb(200, 200, 200))),
         ]))
         .alignment(ratatui::layout::Alignment::Center)
         .style(Style::default().bg(Color::Rgb(15, 15, 15)));
@@ -743,7 +762,7 @@ impl SetupWizard {
         let mut lines = vec![
             Line::from(vec![
                 Span::styled("  Provider:    ", Style::default().fg(Color::Rgb(150, 150, 150))),
-                Span::styled(provider.name, Style::default().fg(Color::Rgb(254, 192, 126)).add_modifier(Modifier::BOLD)),
+                Span::styled(&provider.name, Style::default().fg(Color::Rgb(254, 192, 126)).add_modifier(Modifier::BOLD)),
             ]),
             Line::from(vec![
                 Span::styled("  Model:       ", Style::default().fg(Color::Rgb(150, 150, 150))),
@@ -755,7 +774,7 @@ impl SetupWizard {
             ]),
             Line::from(vec![
                 Span::styled("  Base URL:    ", Style::default().fg(Color::Rgb(150, 150, 150))),
-                Span::styled(if provider.base_url.is_empty() { &self.custom_url } else { provider.base_url }, Style::default().fg(Color::Rgb(200, 200, 200))),
+                Span::styled(if provider.base_url.is_empty() { &self.custom_url } else { &provider.base_url }, Style::default().fg(Color::Rgb(200, 200, 200))),
             ]),
             Line::from(""),
             Line::from(vec![

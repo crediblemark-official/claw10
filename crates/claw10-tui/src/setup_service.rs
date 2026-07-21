@@ -4,10 +4,10 @@ use std::thread::JoinHandle;
 
 #[derive(Clone)]
 pub struct ProviderOption {
-    pub name: &'static str,
-    pub slot: &'static str,
-    pub env_var: &'static str,
-    pub base_url: &'static str,
+    pub name: String,
+    pub slot: String,
+    pub env_var: String,
+    pub base_url: String,
 }
 
 pub enum BindingEvent {
