@@ -126,6 +126,7 @@ enum ServiceAction {
 #[tokio::main]
 async fn main() {
     let cli = Cli::parse();
+    claw10_model_router::providers::init_providers().await;
     // When no subcommand is provided, start the API server in the background
     // and launch the TUI. This keeps the HTTP API and webhook endpoints
     // reachable while the user interacts with the terminal UI.

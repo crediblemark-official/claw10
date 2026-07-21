@@ -21,6 +21,43 @@ pub struct ProviderConfig {
     pub models: Vec<ModelProfile>,
 }
 
+static PROVIDERS: OnceLock<Vec<ProviderConfig>> = OnceLock::new();
+
+/// Pre-fetch provider catalog from models.dev. Call at startup before any
+/// `provider_configs()` call. Safe to call multiple times (only the first
+/// call does the actual fetch).
+pub async fn init_providers() {
+    let _ = PROVIDERS.get_or_init(|| {
+        tracing::info!("Fetching provider catalog from models.dev");
+        match tokio::runtime::Runtime::new() {
+            Ok(rt) => {
+                let providers = rt.block_on(models_dev::fetch_providers());
+                match providers {
+                    Ok(p) if !p.is_empty() => {
+                        tracing::info!(
+                            "Successfully loaded {} providers from models.dev",
+                            p.len()
+                        );
+                        p
+                    }
+                    Ok(_) => {
+                        tracing::warn!("models.dev returned empty list, using fallback");
+                        fallback_providers()
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to fetch from models.dev: {e}, using fallback");
+                        fallback_providers()
+                    }
+                }
+            }
+            Err(e) => {
+                tracing::warn!("Failed to create tokio runtime: {e}, using fallback");
+                fallback_providers()
+            }
+        }
+    });
+}
+
 /// Return configurations for every known OpenAI-compatible provider.
 pub fn provider_configs() -> Vec<ProviderConfig> {
     get_all_configs().clone()
@@ -35,48 +72,13 @@ pub fn get_provider_slot(name: &str) -> Option<ProviderConfig> {
         .cloned()
 }
 
-/// Get all provider configs, fetching from models.dev on first access.
+/// Get all provider configs. If `init_providers()` was called, returns the
+/// full catalog. Otherwise falls back to a minimal set.
 fn get_all_configs() -> &'static Vec<ProviderConfig> {
-    static PROVIDERS: OnceLock<Vec<ProviderConfig>> = OnceLock::new();
     PROVIDERS.get_or_init(|| {
-        // Try to fetch from models.dev synchronously using a new tokio runtime
-        match tokio::runtime::Handle::try_current() {
-            Ok(_handle) => {
-                // We're inside a tokio runtime — can't block, use fallback
-                tracing::info!("Inside tokio runtime, using fallback providers");
-                fallback_providers()
-            }
-            Err(_) => {
-                // Not inside a tokio runtime — create one and fetch
-                tracing::info!("Fetching provider catalog from models.dev");
-                match tokio::runtime::Runtime::new() {
-                    Ok(rt) => {
-                        let providers = rt.block_on(models_dev::fetch_providers());
-                        match providers {
-                            Ok(p) if !p.is_empty() => {
-                                tracing::info!(
-                                    "Successfully loaded {} providers from models.dev",
-                                    p.len()
-                                );
-                                p
-                            }
-                            Ok(_) => {
-                                tracing::warn!("models.dev returned empty list, using fallback");
-                                fallback_providers()
-                            }
-                            Err(e) => {
-                                tracing::warn!("Failed to fetch from models.dev: {e}, using fallback");
-                                fallback_providers()
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        tracing::warn!("Failed to create tokio runtime: {e}, using fallback");
-                        fallback_providers()
-                    }
-                }
-            }
-        }
+        // Called before init_providers() — use fallback
+        tracing::warn!("provider_configs() called before init_providers(), using fallback");
+        fallback_providers()
     })
 }
 
