@@ -34,6 +34,7 @@ pub async fn perform_uninstall(force: bool) -> Result<(), Box<dyn std::error::Er
         println!("Perintah ini akan menghapus:");
         println!("  - Daemon Service (systemd)");
         println!("  - Folder Database & Konfigurasi (~/.claw10)");
+        println!("  - Folder Cache (~/.cache/claw10)");
         println!("  - File Eksekusi Binary (claw10)");
         println!("");
         print!("Apakah Anda yakin ingin menghapus Claw10 dari sistem? [y/N]: ");
@@ -53,12 +54,13 @@ pub async fn perform_uninstall(force: bool) -> Result<(), Box<dyn std::error::Er
         }
     }
 
-    println!("\n[1/4] Menghentikan dan menghapus daemon service...");
+    println!("\n[1/5] Menghentikan dan menghapus daemon service...");
     handle_service_command(ServiceAction::Stop);
     handle_service_command(ServiceAction::Uninstall);
 
-    println!("[2/4] Menghapus folder konfigurasi dan database (~/.claw10)...");
     let home = std::env::var("HOME").unwrap_or_else(|_| "/home/rasyiqi".to_string());
+
+    println!("[2/5] Menghapus folder konfigurasi dan database (~/.claw10)...");
     let config_dir = std::path::PathBuf::from(&home).join(".claw10");
     if config_dir.exists() {
         if let Err(e) = std::fs::remove_dir_all(&config_dir) {
@@ -70,7 +72,19 @@ pub async fn perform_uninstall(force: bool) -> Result<(), Box<dyn std::error::Er
         println!("✓ Folder config tidak ditemukan.");
     }
 
-    println!("[3/4] Membersihkan entri PATH dari file konfigurasi shell...");
+    println!("[3/5] Menghapus cache models.dev (~/.cache/claw10)...");
+    let cache_dir = std::path::PathBuf::from(&home).join(".cache").join("claw10");
+    if cache_dir.exists() {
+        if let Err(e) = std::fs::remove_dir_all(&cache_dir) {
+            tracing::warn!("Gagal menghapus folder cache: {e}");
+        } else {
+            println!("✓ Folder ~/.cache/claw10 berhasil dihapus.");
+        }
+    } else {
+        println!("✓ Folder cache tidak ditemukan.");
+    }
+
+    println!("[4/5] Membersihkan entri PATH dari file konfigurasi shell...");
     let shell_name = std::env::var("SHELL")
         .map(|s| {
             std::path::Path::new(&s)
@@ -115,7 +129,7 @@ pub async fn perform_uninstall(force: bool) -> Result<(), Box<dyn std::error::Er
         }
     }
 
-    println!("[4/4] Menghapus file binary claw10...");
+    println!("[5/5] Menghapus file binary claw10...");
     let exe_paths = vec![
         install_dir.join("claw10"),
         cargo_dir.join("claw10"),
@@ -135,14 +149,8 @@ pub async fn perform_uninstall(force: bool) -> Result<(), Box<dyn std::error::Er
         }
     }
 
-    // Pembersihan sisa logs dan folder /tmp/claw10
-    println!("\n[Tambahan] Membersihkan berkas log dan folder temporary...");
-    let tmp_dir = std::path::PathBuf::from("/tmp/claw10");
-    if tmp_dir.exists() {
-        let _ = std::fs::remove_dir_all(&tmp_dir);
-        println!("✓ Folder temporary /tmp/claw10 berhasil dibersihkan.");
-    }
-
+    // Pembersihan sisa logs
+    println!("\n[Tambahan] Membersihkan berkas log...");
     let logs_dir = std::path::PathBuf::from(&home).join("logs");
     if logs_dir.exists() {
         if let Ok(entries) = std::fs::read_dir(&logs_dir) {
@@ -156,6 +164,13 @@ pub async fn perform_uninstall(force: bool) -> Result<(), Box<dyn std::error::Er
             }
         }
         println!("✓ Berkas log claw10 di ~/logs/ berhasil dibersihkan.");
+    }
+
+    // Hapus folder temporary
+    let tmp_dir = std::path::PathBuf::from("/tmp/claw10");
+    if tmp_dir.exists() {
+        let _ = std::fs::remove_dir_all(&tmp_dir);
+        println!("✓ Folder temporary /tmp/claw10 berhasil dibersihkan.");
     }
 
     println!("\n🎉 Claw10 OS berhasil di-uninstall seutuhnya dari sistem Anda.");
