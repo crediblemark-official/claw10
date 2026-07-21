@@ -424,7 +424,7 @@ Type any message to start a chat with the active model.",
         }
     }
 
-    async fn update_tool_approval_state(&mut self, id_str: &str, state: ToolApprovalState) -> String {
+    pub(crate) async fn update_tool_approval_state(&mut self, id_str: &str, state: ToolApprovalState) -> String {
         use claw10_store::StoreExt;
         let requests = self
             .state

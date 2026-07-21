@@ -27,7 +27,7 @@ pub fn draw_tab_bar(_frame: &mut Frame, _area: Rect, _app: &TuiApp) {
 
 fn draw_footer(frame: &mut Frame, area: Rect, app: &TuiApp, title: &str) {
     let hint = format!(
-        "{} | Tab: next | ↑↓: scroll | Esc/q: home | {}",
+        "{} | n: new | e: edit | d: delete | Enter: detail | Tab: next | Esc: home | {}",
         title,
         app.status_message
     );

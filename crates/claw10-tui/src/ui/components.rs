@@ -2,7 +2,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Wrap},
+    widgets::{Block, Borders, Clear, Paragraph, Wrap},
     Frame,
 };
 
@@ -446,5 +446,151 @@ pub fn draw_manual_model_input(frame: &mut Frame, area: Rect, app: &TuiApp) {
         // Cursor
         let cursor_x = input_inner.x + model_input.len() as u16;
         frame.set_cursor_position((cursor_x, input_inner.y));
+    }
+}
+
+pub fn draw_entity_form(frame: &mut Frame, area: Rect, app: &TuiApp) {
+    if let CommandMode::EntityForm { title, fields, current_field, error_message, .. } = &app.command_mode {
+        let height = (fields.len() as u16) + 8;
+        let modal_area = get_fixed_centered_rect(65, height, area);
+
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Rgb(218, 165, 32)))
+            .style(Style::default().bg(Color::Rgb(15, 15, 15)))
+            .title(format!(" {} ", title))
+            .title_alignment(Alignment::Center);
+
+        let inner = block.inner(modal_area);
+        frame.render_widget(Clear, modal_area);
+        frame.render_widget(block, modal_area);
+
+        let mut constraints = vec![
+            Constraint::Length(1), // hint
+            Constraint::Length(1), // spacer
+        ];
+        for _ in fields {
+            constraints.push(Constraint::Length(3)); // field row
+        }
+        constraints.push(Constraint::Length(1)); // error
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(constraints)
+            .split(inner);
+
+        for (i, field) in fields.iter().enumerate() {
+            let row_idx = 2 + i;
+            if row_idx >= chunks.len() { break; }
+
+            let label = Paragraph::new(Line::from(vec![Span::styled(
+                format!(" {}:", field.label),
+                Style::default().fg(Color::Rgb(180, 180, 180)).add_modifier(Modifier::BOLD),
+            )]))
+            .style(Style::default().bg(Color::Rgb(15, 15, 15)));
+            frame.render_widget(label, chunks[row_idx]);
+
+            let input_chunks = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Length(field.label.len() as u16 + 3), Constraint::Min(0)])
+                .split(chunks[row_idx]);
+
+            let border_color = if i == *current_field {
+                Color::Rgb(218, 165, 32)
+            } else {
+                Color::Rgb(80, 80, 80)
+            };
+            let input_block = Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(border_color));
+            let input_inner = input_block.inner(input_chunks[1]);
+            frame.render_widget(input_block, input_chunks[1]);
+
+            let display_text = if field.value.is_empty() {
+                field.placeholder.clone()
+            } else {
+                field.value.clone()
+            };
+            let text_color = if field.value.is_empty() { Color::DarkGray } else { Color::White };
+            let input_para = Paragraph::new(Line::from(vec![Span::styled(
+                display_text,
+                Style::default().fg(text_color),
+            )]))
+            .style(Style::default().bg(Color::Rgb(25, 25, 25)));
+            frame.render_widget(input_para, input_inner);
+
+            // Cursor on active field
+            if i == *current_field {
+                let cursor_x = input_inner.x + field.value.len() as u16;
+                frame.set_cursor_position((cursor_x, input_inner.y));
+            }
+        }
+
+        if !error_message.is_empty() {
+            let err_idx = 2 + fields.len();
+            if err_idx < chunks.len() {
+                let err = Paragraph::new(Line::from(vec![Span::styled(
+                    format!("  {}", error_message),
+                    Style::default().fg(Color::Red),
+                )]))
+                .style(Style::default().bg(Color::Rgb(15, 15, 15)));
+                frame.render_widget(err, chunks[err_idx]);
+            }
+        }
+
+        let hint = Paragraph::new(Line::from(vec![
+            Span::styled("Esc", Style::default().fg(Color::Rgb(218, 165, 32)).add_modifier(Modifier::BOLD)),
+            Span::raw(" cancel  "),
+            Span::styled("Tab", Style::default().fg(Color::Rgb(218, 165, 32)).add_modifier(Modifier::BOLD)),
+            Span::raw(" next field  "),
+            Span::styled("Enter", Style::default().fg(Color::Rgb(218, 165, 32)).add_modifier(Modifier::BOLD)),
+            Span::raw(" submit"),
+        ]))
+        .style(Style::default().bg(Color::Rgb(15, 15, 15)));
+        frame.render_widget(hint, chunks[0]);
+    }
+}
+
+pub fn draw_confirm_dialog(frame: &mut Frame, area: Rect, app: &TuiApp) {
+    if let CommandMode::ConfirmDialog { message, .. } = &app.command_mode {
+        let modal_area = get_fixed_centered_rect(50, 7, area);
+
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Rgb(218, 165, 32)))
+            .style(Style::default().bg(Color::Rgb(15, 15, 15)))
+            .title(" Confirm ")
+            .title_alignment(Alignment::Center);
+
+        let inner = block.inner(modal_area);
+        frame.render_widget(Clear, modal_area);
+        frame.render_widget(block, modal_area);
+
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(1),
+                Constraint::Length(1),
+                Constraint::Length(1),
+                Constraint::Length(1),
+            ])
+            .split(inner);
+
+        let msg = Paragraph::new(Line::from(vec![Span::styled(
+            format!("  {}", message),
+            Style::default().fg(Color::White),
+        )]))
+        .style(Style::default().bg(Color::Rgb(15, 15, 15)));
+        frame.render_widget(msg, chunks[0]);
+
+        let hint = Paragraph::new(Line::from(vec![
+            Span::styled("y", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+            Span::raw(" yes  "),
+            Span::styled("n", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
+            Span::raw(" no  "),
+            Span::styled("Esc", Style::default().fg(Color::Rgb(140, 140, 140)).add_modifier(Modifier::BOLD)),
+            Span::raw(" cancel"),
+        ]))
+        .style(Style::default().bg(Color::Rgb(15, 15, 15)));
+        frame.render_widget(hint, chunks[2]);
     }
 }

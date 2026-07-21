@@ -1,4 +1,24 @@
 use super::*;
+use crate::providers::ProviderConfig;
+
+fn test_providers() -> Vec<ProviderConfig> {
+    vec![
+        ProviderConfig {
+            name: "openai".into(),
+            base_url: "https://api.openai.com/v1".into(),
+            api_key_env: "OPENAI_API_KEY".into(),
+            notes: "OpenAI".into(),
+            models: vec![],
+        },
+        ProviderConfig {
+            name: "anthropic".into(),
+            base_url: "https://api.anthropic.com/v1".into(),
+            api_key_env: "ANTHROPIC_API_KEY".into(),
+            notes: "Anthropic".into(),
+            models: vec![],
+        },
+    ]
+}
 
 #[test]
 fn test_parse_minimal_config() {
@@ -80,11 +100,8 @@ fn test_config_discovery_candidates() {
 
 #[test]
 fn test_resolve_providers_with_aliases() {
-    use crate::providers;
-    let builtin = providers::provider_configs();
-    // Use a provider that exists in the dynamic catalog (or fallback)
-    let slot_name = builtin.first().map(|c| c.name.clone()).unwrap_or_default();
-    assert!(!slot_name.is_empty(), "should have at least one builtin provider");
+    let builtin = test_providers();
+    let slot_name = builtin[0].name.clone();
 
     let config_toml = format!(
         r#"
@@ -108,14 +125,9 @@ api_key = "sk-test-key"
 
 #[test]
 fn test_resolve_providers_bare_slot() {
-    use crate::providers;
-    let builtin = providers::provider_configs();
-    // Use the first available provider slot
-    let slot_name = builtin.first().map(|c| c.name.clone()).unwrap_or_default();
-    if slot_name.is_empty() {
-        return; // No providers available, skip test
-    }
-    let api_key_env = builtin.first().map(|c| c.api_key_env.clone()).unwrap_or_default();
+    let builtin = test_providers();
+    let slot_name = builtin[0].name.clone();
+    let api_key_env = builtin[0].api_key_env.clone();
     unsafe { std::env::set_var(&api_key_env, "sk-bare-test"); }
     let config: Option<Claw10Config> = None;
     let kv = |_: &str| None;
@@ -128,8 +140,7 @@ fn test_resolve_providers_bare_slot() {
 
 #[test]
 fn test_resolve_providers_custom() {
-    use crate::providers;
-    let builtin = providers::provider_configs();
+    let builtin = test_providers();
     let config_toml = r#"
 [custom.my-llm]
 base_url = "https://my-llm.example.com/v1"

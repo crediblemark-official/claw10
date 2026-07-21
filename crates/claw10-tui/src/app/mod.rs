@@ -65,7 +65,7 @@ pub enum CommandMode {
     CommandPalette {
         search_query: String,
         selected_index: usize,
-        filtered_items: Vec<(String, String, String, String)>, // (category, name, shortcut, action)
+        filtered_items: Vec<(String, String, String, String)>,
     },
     ApiKeyInput {
         key_input: String,
@@ -76,6 +76,56 @@ pub enum CommandMode {
         model_input: String,
         error_message: String,
     },
+    /// Generic entity create/edit form. Used by all full-page CRUD screens.
+    EntityForm {
+        title: String,
+        fields: Vec<FormField>,
+        current_field: usize,
+        error_message: String,
+        /// Which entity and action triggered this form
+        entity_type: EntityType,
+        action: EntityAction,
+    },
+    /// Confirmation dialog for destructive actions (delete, resolve, etc.)
+    ConfirmDialog {
+        message: String,
+        entity_type: EntityType,
+        action: EntityAction,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FormField {
+    pub label: String,
+    pub value: String,
+    pub placeholder: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EntityType {
+    Mission,
+    Task,
+    Memory,
+    Policy,
+    Skill,
+    Artifact,
+    Incident,
+    Approval,
+    Worker,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EntityAction {
+    Create,
+    Edit(usize), // index in list
+    Delete(usize),
+    Resolve(usize),
+    Approve(usize),
+    Deny(usize),
+    Install(usize),
+    Uninstall(usize),
+    Download(usize),
+    View(usize),
 }
 
 pub struct TuiApp {
@@ -932,6 +982,779 @@ impl TuiApp {
                     ));
                 }
             }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // CRUD Operations for Full-Page Screens
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Open the create form for the current screen.
+    pub(crate) async fn open_create_form(&mut self) {
+        
+
+        match self.active_screen {
+            Screen::Missions => {
+                self.command_mode = CommandMode::EntityForm {
+                    title: "Create Mission".into(),
+                    fields: vec![
+                        FormField { label: "objective".into(), value: String::new(), placeholder: "Mission objective".into() },
+                        FormField { label: "budget_usd".into(), value: "10.0".into(), placeholder: "Budget in USD".into() },
+                        FormField { label: "risk".into(), value: "Low".into(), placeholder: "Low|Medium|High|Critical".into() },
+                    ],
+                    current_field: 0,
+                    error_message: String::new(),
+                    entity_type: EntityType::Mission,
+                    action: EntityAction::Create,
+                };
+            }
+            Screen::Tasks => {
+                self.command_mode = CommandMode::EntityForm {
+                    title: "Create Task".into(),
+                    fields: vec![
+                        FormField { label: "objective".into(), value: String::new(), placeholder: "Task objective".into() },
+                        FormField { label: "mission_id".into(), value: String::new(), placeholder: "Mission UUID (leave empty to use active)".into() },
+                        FormField { label: "budget_usd".into(), value: "5.0".into(), placeholder: "Budget in USD".into() },
+                    ],
+                    current_field: 0,
+                    error_message: String::new(),
+                    entity_type: EntityType::Task,
+                    action: EntityAction::Create,
+                };
+            }
+            Screen::Memory => {
+                self.command_mode = CommandMode::EntityForm {
+                    title: "Create Memory".into(),
+                    fields: vec![
+                        FormField { label: "content".into(), value: String::new(), placeholder: "Memory content".into() },
+                        FormField { label: "type".into(), value: "Working".into(), placeholder: "Working|Episodic|Semantic|Procedural|User".into() },
+                        FormField { label: "scope".into(), value: "local".into(), placeholder: "local|global|workspace".into() },
+                    ],
+                    current_field: 0,
+                    error_message: String::new(),
+                    entity_type: EntityType::Memory,
+                    action: EntityAction::Create,
+                };
+            }
+            Screen::Policies => {
+                self.command_mode = CommandMode::EntityForm {
+                    title: "Create Policy".into(),
+                    fields: vec![
+                        FormField { label: "name".into(), value: String::new(), placeholder: "Policy name".into() },
+                        FormField { label: "action".into(), value: "allow".into(), placeholder: "allow|deny".into() },
+                        FormField { label: "resource".into(), value: "*".into(), placeholder: "Resource pattern (e.g. tool:*)".into() },
+                    ],
+                    current_field: 0,
+                    error_message: String::new(),
+                    entity_type: EntityType::Policy,
+                    action: EntityAction::Create,
+                };
+            }
+            Screen::Skills => {
+                self.command_mode = CommandMode::EntityForm {
+                    title: "Create Skill".into(),
+                    fields: vec![
+                        FormField { label: "name".into(), value: String::new(), placeholder: "Skill name".into() },
+                        FormField { label: "purpose".into(), value: String::new(), placeholder: "What this skill does".into() },
+                        FormField { label: "version".into(), value: "0.1.0".into(), placeholder: "Semver".into() },
+                    ],
+                    current_field: 0,
+                    error_message: String::new(),
+                    entity_type: EntityType::Skill,
+                    action: EntityAction::Create,
+                };
+            }
+            Screen::Incidents => {
+                self.command_mode = CommandMode::EntityForm {
+                    title: "Report Incident".into(),
+                    fields: vec![
+                        FormField { label: "severity".into(), value: "Medium".into(), placeholder: "Low|Medium|High|Critical".into() },
+                        FormField { label: "description".into(), value: String::new(), placeholder: "Incident description".into() },
+                    ],
+                    current_field: 0,
+                    error_message: String::new(),
+                    entity_type: EntityType::Incident,
+                    action: EntityAction::Create,
+                };
+            }
+            _ => {}
+        }
+    }
+
+    /// Open the edit form for the currently selected item.
+    pub(crate) async fn open_edit_form(&mut self) {
+        let idx = self.selected_index;
+        match self.active_screen {
+            Screen::Missions if idx < self.missions.len() => {
+                let m = &self.missions[idx];
+                self.command_mode = CommandMode::EntityForm {
+                    title: format!("Edit Mission: {}", &m.objective[..m.objective.len().min(30)]),
+                    fields: vec![
+                        FormField { label: "objective".into(), value: m.objective.clone(), placeholder: "Mission objective".into() },
+                        FormField { label: "budget_usd".into(), value: format!("{}", m.budget.allocated_usd), placeholder: "Budget in USD".into() },
+                        FormField { label: "risk".into(), value: format!("{:?}", m.risk), placeholder: "Low|Medium|High|Critical".into() },
+                    ],
+                    current_field: 0,
+                    error_message: String::new(),
+                    entity_type: EntityType::Mission,
+                    action: EntityAction::Edit(idx),
+                };
+            }
+            Screen::Tasks if idx < self.tasks.len() => {
+                let t = &self.tasks[idx];
+                self.command_mode = CommandMode::EntityForm {
+                    title: format!("Edit Task: {}", &t.objective[..t.objective.len().min(30)]),
+                    fields: vec![
+                        FormField { label: "objective".into(), value: t.objective.clone(), placeholder: "Task objective".into() },
+                        FormField { label: "budget_usd".into(), value: format!("{}", t.budget.allocated_usd), placeholder: "Budget in USD".into() },
+                    ],
+                    current_field: 0,
+                    error_message: String::new(),
+                    entity_type: EntityType::Task,
+                    action: EntityAction::Edit(idx),
+                };
+            }
+            Screen::Memory if idx < self.memories.len() => {
+                let m = &self.memories[idx];
+                self.command_mode = CommandMode::EntityForm {
+                    title: format!("Edit Memory: {}", &m.content[..m.content.len().min(30)]),
+                    fields: vec![
+                        FormField { label: "content".into(), value: m.content.clone(), placeholder: "Memory content".into() },
+                        FormField { label: "status".into(), value: format!("{:?}", m.status), placeholder: "Candidate|Verified|Active|Rejected".into() },
+                    ],
+                    current_field: 0,
+                    error_message: String::new(),
+                    entity_type: EntityType::Memory,
+                    action: EntityAction::Edit(idx),
+                };
+            }
+            Screen::Policies if idx < self.policies.len() => {
+                let p = &self.policies[idx];
+                self.command_mode = CommandMode::EntityForm {
+                    title: format!("Edit Policy: {}", p.name),
+                    fields: vec![
+                        FormField { label: "name".into(), value: p.name.clone(), placeholder: "Policy name".into() },
+                        FormField { label: "active".into(), value: if p.is_active { "true".into() } else { "false".into() }, placeholder: "true|false".into() },
+                    ],
+                    current_field: 0,
+                    error_message: String::new(),
+                    entity_type: EntityType::Policy,
+                    action: EntityAction::Edit(idx),
+                };
+            }
+            Screen::Skills if idx < self.skills.len() => {
+                let s = &self.skills[idx];
+                self.command_mode = CommandMode::EntityForm {
+                    title: format!("Edit Skill: {}", s.name),
+                    fields: vec![
+                        FormField { label: "name".into(), value: s.name.clone(), placeholder: "Skill name".into() },
+                        FormField { label: "purpose".into(), value: s.purpose.clone(), placeholder: "What this skill does".into() },
+                        FormField { label: "version".into(), value: s.version.clone(), placeholder: "Semver".into() },
+                    ],
+                    current_field: 0,
+                    error_message: String::new(),
+                    entity_type: EntityType::Skill,
+                    action: EntityAction::Edit(idx),
+                };
+            }
+            Screen::Incidents if idx < self.incidents.len() => {
+                let inc = &self.incidents[idx];
+                self.command_mode = CommandMode::EntityForm {
+                    title: format!("Edit Incident: {}", &inc.description[..inc.description.len().min(30)]),
+                    fields: vec![
+                        FormField { label: "severity".into(), value: inc.severity.clone(), placeholder: "Low|Medium|High|Critical".into() },
+                        FormField { label: "description".into(), value: inc.description.clone(), placeholder: "Description".into() },
+                        FormField { label: "state".into(), value: format!("{:?}", inc.state), placeholder: "Open|Investigating|Mitigating|Resolved|Closed".into() },
+                    ],
+                    current_field: 0,
+                    error_message: String::new(),
+                    entity_type: EntityType::Incident,
+                    action: EntityAction::Edit(idx),
+                };
+            }
+            _ => {}
+        }
+    }
+
+    /// Open delete confirmation for the currently selected item.
+    pub(crate) fn open_delete_confirm(&mut self) {
+        let idx = self.selected_index;
+        let (entity_type, message) = match self.active_screen {
+            Screen::Missions if idx < self.missions.len() => {
+                let m = &self.missions[idx];
+                (EntityType::Mission, format!("Delete mission '{}'?", m.objective))
+            }
+            Screen::Tasks if idx < self.tasks.len() => {
+                let t = &self.tasks[idx];
+                (EntityType::Task, format!("Delete task '{}'?", t.objective))
+            }
+            Screen::Memory if idx < self.memories.len() => {
+                (EntityType::Memory, "Delete this memory entry?".into())
+            }
+            Screen::Policies if idx < self.policies.len() => {
+                let p = &self.policies[idx];
+                (EntityType::Policy, format!("Delete policy '{}'?", p.name))
+            }
+            Screen::Skills if idx < self.skills.len() => {
+                let s = &self.skills[idx];
+                (EntityType::Skill, format!("Uninstall skill '{}'?", s.name))
+            }
+            Screen::Incidents if idx < self.incidents.len() => {
+                (EntityType::Incident, "Delete this incident?".into())
+            }
+            _ => return,
+        };
+
+        self.command_mode = CommandMode::ConfirmDialog {
+            message,
+            entity_type,
+            action: EntityAction::Delete(idx),
+        };
+    }
+
+    /// Open detail view or execute screen-specific action on Enter.
+    pub(crate) async fn open_detail_or_action(&mut self) {
+        let idx = self.selected_index;
+        match self.active_screen {
+            Screen::Approvals if idx < self.approvals.len() => {
+                let a = &self.approvals[idx];
+                if a.state == claw10_domain::approval::ToolApprovalState::Pending {
+                    self.command_mode = CommandMode::ConfirmDialog {
+                        message: format!("Approve tool '{}'?", a.tool_name),
+                        entity_type: EntityType::Approval,
+                        action: EntityAction::Approve(idx),
+                    };
+                }
+            }
+            Screen::Costs if idx < self.agents.len() => {
+                // Drill-down: show agent cost details in chat
+                let a = &self.agents[idx];
+                let detail = format!(
+                    "Agent: {} | State: {:?} | Cost: ${:.4} | ID: {}",
+                    a.name, a.state, a.total_cost_usd, a.id.0
+                );
+                self.chat_history.push(("System".into(), "".into(), detail));
+                self.active_screen = Screen::Chat;
+            }
+            Screen::Artifacts if idx < self.artifacts.len() => {
+                let a = &self.artifacts[idx];
+                self.command_mode = CommandMode::ConfirmDialog {
+                    message: format!("Download artifact '{}' to current directory?", a.name),
+                    entity_type: EntityType::Artifact,
+                    action: EntityAction::Download(idx),
+                };
+            }
+            Screen::Skills if idx < self.skills.len() => {
+                let s = &self.skills[idx];
+                match s.state {
+                    claw10_domain::SkillState::Active | claw10_domain::SkillState::Approved => {
+                        self.command_mode = CommandMode::ConfirmDialog {
+                            message: format!("Deactivate skill '{}'?", s.name),
+                            entity_type: EntityType::Skill,
+                            action: EntityAction::Uninstall(idx),
+                        };
+                    }
+                    _ => {
+                        self.command_mode = CommandMode::ConfirmDialog {
+                            message: format!("Activate skill '{}'?", s.name),
+                            entity_type: EntityType::Skill,
+                            action: EntityAction::Install(idx),
+                        };
+                    }
+                }
+            }
+            Screen::Incidents if idx < self.incidents.len() => {
+                let inc = &self.incidents[idx];
+                if inc.state != claw10_domain::IncidentState::Resolved && inc.state != claw10_domain::IncidentState::Closed {
+                    self.command_mode = CommandMode::ConfirmDialog {
+                        message: format!("Resolve incident '{}'?", inc.description),
+                        entity_type: EntityType::Incident,
+                        action: EntityAction::Resolve(idx),
+                    };
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Submit entity form data and persist to store.
+    pub(crate) async fn submit_entity_form(
+        &mut self,
+        entity_type: &EntityType,
+        action: &EntityAction,
+        field_values: &[(String, String)],
+    ) {
+        use claw10_store::StoreExt;
+
+        let fields: std::collections::HashMap<&str, &str> = field_values.iter()
+            .map(|(k, v)| (k.as_str(), v.as_str()))
+            .collect();
+
+        match entity_type {
+            EntityType::Mission => {
+                let objective = fields.get("objective").unwrap_or(&"").to_string();
+                if objective.is_empty() {
+                    self.status_message = "Objective cannot be empty".into();
+                    return;
+                }
+                let budget: f64 = fields.get("budget_usd").and_then(|s| s.parse().ok()).unwrap_or(10.0);
+                let risk_str = fields.get("risk").unwrap_or(&"Low");
+                let risk = claw10_domain::RiskLevel(risk_str.to_string());
+
+                match action {
+                    EntityAction::Create => {
+                        let mission = claw10_domain::Mission {
+                            id: claw10_domain::MissionId(uuid::Uuid::now_v7()),
+                            owner_id: claw10_domain::IdentityId(uuid::Uuid::now_v7()),
+                            objective,
+                            scope: None,
+                            lifecycle_mode: claw10_domain::LifecycleMode::Ephemeral,
+                            campaign_end: None,
+                            review_interval_days: None,
+                            budget: claw10_domain::Budget {
+                                allocated_usd: budget,
+                                spent_usd: 0.0,
+                                soft_limit_usd: None,
+                                hard_limit_usd: Some(budget * 2.0),
+                                recurring_monthly_usd: None,
+                            },
+                            risk,
+                            require_evidence: false,
+                            minimum_verifiers: 0,
+                            state: claw10_domain::MissionState::Active,
+                            created_at: chrono::Utc::now(),
+                            updated_at: chrono::Utc::now(),
+                        };
+                        let key = format!("mission:{}", mission.id.0);
+                        let _ = self.state.kv_store.set(&key, &mission).await;
+                        self.status_message = format!("Mission created: {}", mission.objective);
+                        self.refresh().await;
+                    }
+                    EntityAction::Edit(idx) if *idx < self.missions.len() => {
+                        let mut mission = self.missions[*idx].clone();
+                        mission.objective = objective;
+                        mission.budget.allocated_usd = budget;
+                        mission.risk = risk;
+                        mission.updated_at = chrono::Utc::now();
+                        let key = format!("mission:{}", mission.id.0);
+                        let _ = self.state.kv_store.set(&key, &mission).await;
+                        self.status_message = "Mission updated".into();
+                        self.refresh().await;
+                    }
+                    _ => {}
+                }
+            }
+            EntityType::Task => {
+                let objective = fields.get("objective").unwrap_or(&"").to_string();
+                if objective.is_empty() {
+                    self.status_message = "Objective cannot be empty".into();
+                    return;
+                }
+                let budget: f64 = fields.get("budget_usd").and_then(|s| s.parse().ok()).unwrap_or(5.0);
+                let mission_id_str = fields.get("mission_id").unwrap_or(&"");
+
+                let mission_id = if !mission_id_str.is_empty() {
+                    uuid::Uuid::parse_str(mission_id_str).ok().map(claw10_domain::MissionId).unwrap_or_else(|| claw10_domain::MissionId(uuid::Uuid::now_v7()))
+                } else {
+                    claw10_domain::MissionId(uuid::Uuid::now_v7())
+                };
+
+                match action {
+                    EntityAction::Create => {
+                        let task = claw10_domain::Task {
+                            id: claw10_domain::TaskId(uuid::Uuid::now_v7()),
+                            mission_id,
+                            parent_task_id: None,
+                            owner_id: claw10_domain::AgentId(uuid::Uuid::now_v7()),
+                            objective,
+                            dependencies: vec![],
+                            risk: claw10_domain::RiskLevel("Low".into()),
+                            budget: claw10_domain::Budget {
+                                allocated_usd: budget,
+                                spent_usd: 0.0,
+                                soft_limit_usd: None,
+                                hard_limit_usd: Some(budget * 2.0),
+                                recurring_monthly_usd: None,
+                            },
+                            deadline: None,
+                            input: serde_json::Value::Null,
+                            output_contract: serde_json::Value::Null,
+                            evidence_contract: vec![],
+                            retry_policy: claw10_domain::RetryPolicy { max_retries: 0, backoff_seconds: 0 },
+                            idempotency_key: None,
+                            lifecycle_mode: "ephemeral".into(),
+                            state: claw10_domain::TaskState::Created,
+                            evidence: vec![],
+                            created_at: chrono::Utc::now(),
+                            updated_at: chrono::Utc::now(),
+                        };
+                        let key = format!("task:{}", task.id.0);
+                        let _ = self.state.kv_store.set(&key, &task).await;
+                        self.status_message = format!("Task created: {}", task.objective);
+                        self.refresh().await;
+                    }
+                    EntityAction::Edit(idx) if *idx < self.tasks.len() => {
+                        let mut task = self.tasks[*idx].clone();
+                        task.objective = objective;
+                        task.budget.allocated_usd = budget;
+                        task.updated_at = chrono::Utc::now();
+                        let key = format!("task:{}", task.id.0);
+                        let _ = self.state.kv_store.set(&key, &task).await;
+                        self.status_message = "Task updated".into();
+                        self.refresh().await;
+                    }
+                    _ => {}
+                }
+            }
+            EntityType::Memory => {
+                let content = fields.get("content").unwrap_or(&"").to_string();
+                if content.is_empty() {
+                    self.status_message = "Content cannot be empty".into();
+                    return;
+                }
+                let mem_type_str = fields.get("type").unwrap_or(&"Working");
+                let memory_type = match mem_type_str.to_lowercase().as_str() {
+                    "episodic" => claw10_domain::MemoryType::Episodic,
+                    "semantic" => claw10_domain::MemoryType::Semantic,
+                    "procedural" => claw10_domain::MemoryType::Procedural,
+                    "user" => claw10_domain::MemoryType::User,
+                    _ => claw10_domain::MemoryType::Working,
+                };
+                let scope = fields.get("scope").unwrap_or(&"local").to_string();
+
+                match action {
+                    EntityAction::Create => {
+                        let memory = claw10_domain::Memory {
+                            id: claw10_domain::MemoryId(uuid::Uuid::now_v7()),
+                            tenant_id: "default".into(),
+                            scope,
+                            memory_type,
+                            content,
+                            source: claw10_domain::MemorySource {
+                                agent_id: claw10_domain::AgentId(uuid::Uuid::nil()),
+                                task_id: claw10_domain::TaskId(uuid::Uuid::nil()),
+                                evidence_id: None,
+                            },
+                            confidence: 1.0,
+                            classification: "internal".into(),
+                            status: claw10_domain::MemoryStatus::Active,
+                            verified_by: vec![],
+                            created_at: chrono::Utc::now(),
+                            updated_at: chrono::Utc::now(),
+                        };
+                        let key = format!("memory:{}", memory.id.0);
+                        let _ = self.state.kv_store.set(&key, &memory).await;
+                        self.status_message = "Memory created".into();
+                        self.refresh().await;
+                    }
+                    EntityAction::Edit(idx) if *idx < self.memories.len() => {
+                        let mut mem = self.memories[*idx].clone();
+                        mem.content = content;
+                        let status_str = fields.get("status").unwrap_or(&"");
+                        mem.status = match status_str.to_lowercase().as_str() {
+                            "verified" => claw10_domain::MemoryStatus::Verified,
+                            "active" => claw10_domain::MemoryStatus::Active,
+                            "rejected" => claw10_domain::MemoryStatus::Rejected,
+                            "expired" => claw10_domain::MemoryStatus::Expired,
+                            _ => mem.status,
+                        };
+                        mem.updated_at = chrono::Utc::now();
+                        let key = format!("memory:{}", mem.id.0);
+                        let _ = self.state.kv_store.set(&key, &mem).await;
+                        self.status_message = "Memory updated".into();
+                        self.refresh().await;
+                    }
+                    _ => {}
+                }
+            }
+            EntityType::Policy => {
+                let name = fields.get("name").unwrap_or(&"").to_string();
+                if name.is_empty() {
+                    self.status_message = "Policy name cannot be empty".into();
+                    return;
+                }
+                let action_str = fields.get("action").unwrap_or(&"allow");
+                let resource = fields.get("resource").unwrap_or(&"*").to_string();
+
+                match action {
+                    EntityAction::Create => {
+                        let effect = match action_str.to_lowercase().as_str() {
+                            "deny" => claw10_domain::PolicyEffect::ExplicitDeny,
+                            _ => claw10_domain::PolicyEffect::Allow,
+                        };
+                        let policy = claw10_domain::PolicyBundle {
+                            id: claw10_domain::PolicyBundleId(uuid::Uuid::now_v7()),
+                            name,
+                            version: "1.0.0".into(),
+                            rules: vec![claw10_domain::PolicyRule {
+                                id: claw10_domain::PolicyRuleId(uuid::Uuid::now_v7()),
+                                subject: claw10_domain::PolicySubject::Agent("*".into()),
+                                effect,
+                                action: "*".into(),
+                                resource,
+                                condition: None,
+                                priority: 100,
+                            }],
+                            is_active: true,
+                            signed_by: None,
+                            signature: None,
+                            activated_at: Some(chrono::Utc::now()),
+                            created_at: chrono::Utc::now(),
+                        };
+                        let key = format!("policy:bundle:{}", policy.id.0);
+                        let _ = self.state.kv_store.set(&key, &policy).await;
+                        self.status_message = format!("Policy created: {}", policy.name);
+                        self.refresh().await;
+                    }
+                    EntityAction::Edit(idx) if *idx < self.policies.len() => {
+                        let mut policy = self.policies[*idx].clone();
+                        policy.name = name;
+                        let active_str = fields.get("active").unwrap_or(&"true");
+                        policy.is_active = active_str.to_lowercase() == "true" || active_str.to_lowercase() == "yes";
+                        let key = format!("policy:bundle:{}", policy.id.0);
+                        let _ = self.state.kv_store.set(&key, &policy).await;
+                        self.status_message = "Policy updated".into();
+                        self.refresh().await;
+                    }
+                    _ => {}
+                }
+            }
+            EntityType::Skill => {
+                let name = fields.get("name").unwrap_or(&"").to_string();
+                if name.is_empty() {
+                    self.status_message = "Skill name cannot be empty".into();
+                    return;
+                }
+                let purpose = fields.get("purpose").unwrap_or(&"").to_string();
+                let version = fields.get("version").unwrap_or(&"0.1.0").to_string();
+
+                match action {
+                    EntityAction::Create => {
+                        let skill = claw10_domain::Skill {
+                            id: claw10_domain::SkillId(uuid::Uuid::now_v7()),
+                            name,
+                            purpose,
+                            version,
+                            input_schema: serde_json::json!({}),
+                            output_schema: serde_json::json!({}),
+                            steps: vec![],
+                            required_tools: vec![],
+                            required_permissions: vec![],
+                            state: claw10_domain::SkillState::Active,
+                            signature: None,
+                            cost_profile: claw10_domain::SkillCostProfile {
+                                estimated_cost_usd: 0.0,
+                                average_duration_seconds: 0.0,
+                            },
+                            created_at: chrono::Utc::now(),
+                            updated_at: chrono::Utc::now(),
+                        };
+                        let key = format!("skill:{}", skill.id.0);
+                        let _ = self.state.kv_store.set(&key, &skill).await;
+                        self.status_message = format!("Skill created: {}", skill.name);
+                        self.refresh().await;
+                    }
+                    EntityAction::Edit(idx) if *idx < self.skills.len() => {
+                        let mut skill = self.skills[*idx].clone();
+                        skill.name = name;
+                        skill.purpose = purpose;
+                        skill.version = version;
+                        skill.updated_at = chrono::Utc::now();
+                        let key = format!("skill:{}", skill.id.0);
+                        let _ = self.state.kv_store.set(&key, &skill).await;
+                        self.status_message = "Skill updated".into();
+                        self.refresh().await;
+                    }
+                    EntityAction::Install(idx) if *idx < self.skills.len() => {
+                        let mut skill = self.skills[*idx].clone();
+                        skill.state = claw10_domain::SkillState::Active;
+                        skill.updated_at = chrono::Utc::now();
+                        let key = format!("skill:{}", skill.id.0);
+                        let _ = self.state.kv_store.set(&key, &skill).await;
+                        self.status_message = format!("Skill '{}' activated", skill.name);
+                        self.refresh().await;
+                    }
+                    EntityAction::Uninstall(idx) if *idx < self.skills.len() => {
+                        let mut skill = self.skills[*idx].clone();
+                        skill.state = claw10_domain::SkillState::Deprecated;
+                        skill.updated_at = chrono::Utc::now();
+                        let key = format!("skill:{}", skill.id.0);
+                        let _ = self.state.kv_store.set(&key, &skill).await;
+                        self.status_message = format!("Skill '{}' deprecated", skill.name);
+                        self.refresh().await;
+                    }
+                    _ => {}
+                }
+            }
+            EntityType::Incident => {
+                match action {
+                    EntityAction::Create => {
+                        let severity = fields.get("severity").unwrap_or(&"Medium").to_string();
+                        let description = fields.get("description").unwrap_or(&"").to_string();
+                        if description.is_empty() {
+                            self.status_message = "Description cannot be empty".into();
+                            return;
+                        }
+                        let incident = claw10_domain::Incident {
+                            id: uuid::Uuid::now_v7().to_string(),
+                            mission_id: claw10_domain::MissionId(uuid::Uuid::nil()),
+                            agent_id: claw10_domain::AgentId(uuid::Uuid::nil()),
+                            severity,
+                            description,
+                            state: claw10_domain::IncidentState::Open,
+                            created_at: chrono::Utc::now(),
+                            resolved_at: None,
+                        };
+                        let key = format!("incident:{}", incident.id);
+                        let _ = self.state.kv_store.set(&key, &incident).await;
+                        self.status_message = "Incident reported".into();
+                        self.refresh().await;
+                    }
+                    EntityAction::Edit(idx) if *idx < self.incidents.len() => {
+                        let mut inc = self.incidents[*idx].clone();
+                        if let Some(s) = fields.get("severity") {
+                            inc.severity = s.to_string();
+                        }
+                        if let Some(d) = fields.get("description") {
+                            inc.description = d.to_string();
+                        }
+                        let state_str = fields.get("state").unwrap_or(&"");
+                        inc.state = match state_str.to_lowercase().as_str() {
+                            "investigating" => claw10_domain::IncidentState::Investigating,
+                            "mitigating" => claw10_domain::IncidentState::Mitigating,
+                            "resolved" => claw10_domain::IncidentState::Resolved,
+                            "closed" => claw10_domain::IncidentState::Closed,
+                            _ => inc.state,
+                        };
+                        let key = format!("incident:{}", inc.id);
+                        let _ = self.state.kv_store.set(&key, &inc).await;
+                        self.status_message = "Incident updated".into();
+                        self.refresh().await;
+                    }
+                    EntityAction::Resolve(idx) if *idx < self.incidents.len() => {
+                        let mut inc = self.incidents[*idx].clone();
+                        inc.state = claw10_domain::IncidentState::Resolved;
+                        inc.resolved_at = Some(chrono::Utc::now());
+                        let key = format!("incident:{}", inc.id);
+                        let _ = self.state.kv_store.set(&key, &inc).await;
+                        self.status_message = "Incident resolved".into();
+                        self.refresh().await;
+                    }
+                    _ => {}
+                }
+            }
+            EntityType::Approval => {
+                if let EntityAction::Approve(idx) = action {
+                    if *idx < self.approvals.len() {
+                        let req_id = self.approvals[*idx].id.clone();
+                        let tool_name = self.approvals[*idx].tool_name.clone();
+                        self.update_tool_approval_state(&req_id, claw10_domain::approval::ToolApprovalState::Approved).await;
+                        self.status_message = format!("Approved tool '{}'", tool_name);
+                        self.refresh().await;
+                    }
+                }
+            }
+            EntityType::Artifact => {
+                if let EntityAction::Download(idx) = action {
+                    if *idx < self.artifacts.len() {
+                        let a = &self.artifacts[*idx];
+                        match tokio::fs::copy(&a.storage_path, &a.name).await {
+                            Ok(_) => self.status_message = format!("Downloaded '{}' ({} bytes)", a.name, a.size_bytes),
+                            Err(e) => self.status_message = format!("Download failed: {e}"),
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Execute confirmation dialog action (delete, resolve, etc.)
+    pub(crate) async fn execute_confirm_action(
+        &mut self,
+        entity_type: &EntityType,
+        action: &EntityAction,
+    ) {
+        use claw10_store::StoreExt;
+
+        match (entity_type, action) {
+            (EntityType::Mission, EntityAction::Delete(idx)) => {
+                if *idx < self.missions.len() {
+                    let m = &self.missions[*idx];
+                    let key = format!("mission:{}", m.id.0);
+                    let _ = self.state.kv_store.delete(&key).await;
+                    self.status_message = format!("Mission deleted: {}", m.objective);
+                    self.refresh().await;
+                }
+            }
+            (EntityType::Task, EntityAction::Delete(idx)) => {
+                if *idx < self.tasks.len() {
+                    let t = &self.tasks[*idx];
+                    let key = format!("task:{}", t.id.0);
+                    let _ = self.state.kv_store.delete(&key).await;
+                    self.status_message = format!("Task deleted: {}", t.objective);
+                    self.refresh().await;
+                }
+            }
+            (EntityType::Memory, EntityAction::Delete(idx)) => {
+                if *idx < self.memories.len() {
+                    let m = &self.memories[*idx];
+                    let key = format!("memory:{}", m.id.0);
+                    let _ = self.state.kv_store.delete(&key).await;
+                    self.status_message = "Memory deleted".into();
+                    self.refresh().await;
+                }
+            }
+            (EntityType::Policy, EntityAction::Delete(idx)) => {
+                if *idx < self.policies.len() {
+                    let p = &self.policies[*idx];
+                    let key = format!("policy:bundle:{}", p.id.0);
+                    let _ = self.state.kv_store.delete(&key).await;
+                    self.status_message = format!("Policy deleted: {}", p.name);
+                    self.refresh().await;
+                }
+            }
+            (EntityType::Skill, EntityAction::Delete(idx) | EntityAction::Uninstall(idx)) => {
+                if *idx < self.skills.len() {
+                    let s = &self.skills[*idx];
+                    let key = format!("skill:{}", s.id.0);
+                    let _ = self.state.kv_store.delete(&key).await;
+                    self.status_message = format!("Skill uninstalled: {}", s.name);
+                    self.refresh().await;
+                }
+            }
+            (EntityType::Incident, EntityAction::Delete(idx)) => {
+                if *idx < self.incidents.len() {
+                    let inc = &self.incidents[*idx];
+                    let key = format!("incident:{}", inc.id);
+                    let _ = self.state.kv_store.delete(&key).await;
+                    self.status_message = "Incident deleted".into();
+                    self.refresh().await;
+                }
+            }
+            (EntityType::Incident, EntityAction::Resolve(idx)) => {
+                if *idx < self.incidents.len() {
+                    let mut inc = self.incidents[*idx].clone();
+                    inc.state = claw10_domain::IncidentState::Resolved;
+                    inc.resolved_at = Some(chrono::Utc::now());
+                    let key = format!("incident:{}", inc.id);
+                    let _ = self.state.kv_store.set(&key, &inc).await;
+                    self.status_message = "Incident resolved".into();
+                    self.refresh().await;
+                }
+            }
+            (EntityType::Skill, EntityAction::Install(idx)) => {
+                if *idx < self.skills.len() {
+                    let mut skill = self.skills[*idx].clone();
+                    skill.state = claw10_domain::SkillState::Active;
+                    skill.updated_at = chrono::Utc::now();
+                    let key = format!("skill:{}", skill.id.0);
+                    let _ = self.state.kv_store.set(&key, &skill).await;
+                    self.status_message = format!("Skill '{}' activated", skill.name);
+                    self.refresh().await;
+                }
+            }
+            _ => {}
         }
     }
 

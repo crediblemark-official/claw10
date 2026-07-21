@@ -90,6 +90,12 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &TuiApp) {
     if matches!(app.command_mode, CommandMode::ManualModelInput { .. }) {
         crate::ui::components::draw_manual_model_input(frame, area, app);
     }
+    if matches!(app.command_mode, CommandMode::EntityForm { .. }) {
+        crate::ui::components::draw_entity_form(frame, area, app);
+    }
+    if matches!(app.command_mode, CommandMode::ConfirmDialog { .. }) {
+        crate::ui::components::draw_confirm_dialog(frame, area, app);
+    }
 }
 
 fn draw_top_bar(frame: &mut Frame, area: Rect, app: &TuiApp) {

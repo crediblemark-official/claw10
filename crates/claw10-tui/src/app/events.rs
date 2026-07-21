@@ -4,7 +4,7 @@ use crossterm::event::{Event, KeyCode, KeyEventKind};
 
 use claw10_agent::events::AgentEvent;
 use claw10_model_router::types::{ChatRequest, MessageRole, ModelMessage, StreamEvent};
-use crate::app::{CommandMode, ModelSelectionStep, Screen, Tab, TuiApp};
+use crate::app::{CommandMode, EntityType, EntityAction, ModelSelectionStep, Screen, Tab, TuiApp};
 use crate::app::palette::get_palette_items;
 
 impl TuiApp {
@@ -234,6 +234,64 @@ impl TuiApp {
                             _ => {}
                         }
                     }
+                    CommandMode::EntityForm { title: _, fields, current_field, error_message: _, entity_type, action } => {
+                        match key.code {
+                            KeyCode::Esc => {
+                                self.command_mode = CommandMode::None;
+                            }
+                            KeyCode::Up => {
+                                if *current_field > 0 {
+                                    *current_field -= 1;
+                                }
+                            }
+                            KeyCode::Down => {
+                                if *current_field < fields.len().saturating_sub(1) {
+                                    *current_field += 1;
+                                }
+                            }
+                            KeyCode::Tab | KeyCode::Enter => {
+                                if *current_field < fields.len().saturating_sub(1) {
+                                    *current_field += 1;
+                                } else {
+                                    // Submit form
+                                    let et = entity_type.clone();
+                                    let act = action.clone();
+                                    let field_values: Vec<(String, String)> = fields.iter()
+                                        .map(|f| (f.label.clone(), f.value.clone()))
+                                        .collect();
+                                    self.command_mode = CommandMode::None;
+                                    self.submit_entity_form(&et, &act, &field_values).await;
+                                }
+                            }
+                            KeyCode::Backspace => {
+                                if let Some(field) = fields.get_mut(*current_field) {
+                                    field.value.pop();
+                                }
+                            }
+                            KeyCode::Char(c) => {
+                                if let Some(field) = fields.get_mut(*current_field) {
+                                    field.value.push(c);
+                                }
+                            }
+                            _ => {}
+                        }
+                        return;
+                    }
+                    CommandMode::ConfirmDialog { message: _, entity_type, action } => {
+                        match key.code {
+                            KeyCode::Esc | KeyCode::Char('n') | KeyCode::Char('N') => {
+                                self.command_mode = CommandMode::None;
+                            }
+                            KeyCode::Char('y') | KeyCode::Char('Y') | KeyCode::Enter => {
+                                let et = entity_type.clone();
+                                let act = action.clone();
+                                self.command_mode = CommandMode::None;
+                                self.execute_confirm_action(&et, &act).await;
+                            }
+                            _ => {}
+                        }
+                        return;
+                    }
                     CommandMode::None => {
                         // ── Workspace Home Screen Handler ─────────────────────────────────────
                         if self.active_screen == Screen::Home {
@@ -296,7 +354,7 @@ impl TuiApp {
                             return;
                         }
 
-                        // ── Read-only list screens handler ────────────────────────────────────
+                        // ── Full-page CRUD screens handler ────────────────────────────────────
                         if matches!(
                             self.active_screen,
                             Screen::Missions
@@ -323,6 +381,18 @@ impl TuiApp {
                                     if self.selected_index < max {
                                         self.selected_index += 1;
                                     }
+                                }
+                                KeyCode::Char('n') => {
+                                    self.open_create_form().await;
+                                }
+                                KeyCode::Char('e') => {
+                                    self.open_edit_form().await;
+                                }
+                                KeyCode::Char('d') => {
+                                    self.open_delete_confirm();
+                                }
+                                KeyCode::Enter => {
+                                    self.open_detail_or_action().await;
                                 }
                                 KeyCode::Tab => {
                                     self.selected_tab = match self.selected_tab {
@@ -710,12 +780,74 @@ impl TuiApp {
                 self.clear_app_data().await;
             }
             "/session_share" => {
-                self.chat_history.push(("System".into(), "".into(), "Tautan sesi berhasil disalin ke clipboard!".into()));
+                // Export chat history as text and copy to system clipboard
+                let export: String = self.chat_history.iter()
+                    .filter(|(_, _, msg)| !msg.is_empty())
+                    .map(|(sender, model, msg)| {
+                        if model.is_empty() {
+                            format!("{}: {}", sender, msg)
+                        } else {
+                            format!("{} ({}): {}", sender, model, msg)
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n\n");
+                if export.is_empty() {
+                    self.chat_history.push(("System".into(), "".into(), "No messages to share.".into()));
+                } else {
+                    // Try clipboard: xclip → wl-copy → fallback to file
+                    let copied = std::process::Command::new("xclip")
+                        .args(["-selection", "clipboard"])
+                        .stdin(std::process::Stdio::piped())
+                        .stdout(std::process::Stdio::null())
+                        .spawn()
+                        .and_then(|mut p| {
+                            use std::io::Write;
+                            p.stdin.take().unwrap().write_all(export.as_bytes())?;
+                            p.wait()?;
+                            Ok(())
+                        })
+                        .is_ok();
+                    let copied = if !copied {
+                        std::process::Command::new("wl-copy")
+                            .spawn()
+                            .and_then(|mut p| {
+                                use std::io::Write;
+                                p.stdin.take().unwrap().write_all(export.as_bytes())?;
+                                p.wait()?;
+                                Ok(())
+                            })
+                            .is_ok()
+                    } else {
+                        true
+                    };
+                    if copied {
+                        self.chat_history.push(("System".into(), "".into(), "Chat history copied to clipboard.".into()));
+                    } else {
+                        // Fallback: write to file
+                        let path = "claw10_session_export.md";
+                        let _ = std::fs::write(path, &export);
+                        self.chat_history.push(("System".into(), "".into(), format!("Clipboard unavailable. Exported to {path}.")));
+                    }
+                }
                 self.active_screen = Screen::Chat;
             }
             "/session_rename" => {
-                self.chat_history.push(("System".into(), "".into(), "Sesi berhasil diganti namanya.".into()));
-                self.active_screen = Screen::Chat;
+                if let Some(ws) = self.active_workspace.clone() {
+                    self.command_mode = CommandMode::EntityForm {
+                        title: format!("Rename Workspace: {}", ws.name),
+                        fields: vec![
+                            crate::app::FormField { label: "new_name".into(), value: ws.name.clone(), placeholder: "New workspace name".into() },
+                        ],
+                        current_field: 0,
+                        error_message: String::new(),
+                        entity_type: EntityType::Worker,
+                        action: EntityAction::Edit(0),
+                    };
+                } else {
+                    self.chat_history.push(("System".into(), "".into(), "No active workspace to rename.".into()));
+                    self.active_screen = Screen::Chat;
+                }
             }
             act if act.starts_with("/apikey") || act.starts_with("/connect") => {
                 let prefix = if let Some(p) = act.strip_prefix("/apikey ").or_else(|| act.strip_prefix("/connect ")) {
