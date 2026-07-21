@@ -1,6 +1,6 @@
 [package]
 name = "claw10-prompt"
-version.workspace = true
+version = "0.4.0"
 edition.workspace = true
 description = "Prompt assembly for Claw10 agents"
 license.workspace = true

@@ -1,6 +1,6 @@
 [package]
 name = "claw10-toon"
-version.workspace = true
+version = "0.4.0"
 edition = "2024"
 description = "Token-Oriented Object Notation utilities for Claw10 OS"
 license.workspace = true
