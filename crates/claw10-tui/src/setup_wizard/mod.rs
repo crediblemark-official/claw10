@@ -27,6 +27,7 @@ fn build_providers() -> Vec<ProviderOption> {
 pub struct SetupWizard {
     pub(crate) step: Step,
     pub(crate) providers: Vec<ProviderOption>,
+    pub(crate) provider_search: String,
     pub(crate) selected: usize,
     pub(crate) api_key: String,
     pub(crate) custom_model: String,
@@ -89,6 +90,7 @@ impl SetupWizard {
         Self {
             step: Step::Welcome,
             providers: build_providers(),
+            provider_search: String::new(),
             selected: 0,
             api_key: String::new(),
             custom_model: String::new(),
@@ -331,8 +333,20 @@ impl SetupWizard {
         self.scroll = 0;
     }
 
+    pub(crate) fn filtered_providers(&self) -> Vec<usize> {
+        if self.provider_search.is_empty() {
+            return (0..self.providers.len()).collect();
+        }
+        let q = self.provider_search.to_lowercase();
+        (0..self.providers.len())
+            .filter(|&i| self.providers[i].name.to_lowercase().contains(&q))
+            .collect()
+    }
+
     pub(crate) fn current_provider(&self) -> &ProviderOption {
-        &self.providers[self.selected]
+        let filtered = self.filtered_providers();
+        let idx = filtered.get(self.selected).copied().unwrap_or(0);
+        &self.providers[idx]
     }
 
     pub(crate) fn load_static_models(&self) -> Vec<String> {

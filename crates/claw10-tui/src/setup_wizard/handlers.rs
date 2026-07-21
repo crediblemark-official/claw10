@@ -17,7 +17,8 @@ impl SetupWizard {
                 self.selected = self.selected.saturating_sub(1);
             }
             KeyCode::Down | KeyCode::Char('j') => {
-                if self.selected + 1 < self.providers.len() {
+                let filtered = self.filtered_providers();
+                if self.selected + 1 < filtered.len() {
                     self.selected += 1;
                 }
             }
@@ -25,8 +26,9 @@ impl SetupWizard {
                 self.selected = self.selected.saturating_sub(5);
             }
             KeyCode::Right | KeyCode::Char('l') => {
+                let filtered = self.filtered_providers();
                 let next = self.selected + 5;
-                if next < self.providers.len() {
+                if next < filtered.len() {
                     self.selected = next;
                 }
             }
@@ -39,9 +41,24 @@ impl SetupWizard {
                 }
                 self.next_step();
             }
-            KeyCode::Esc => self.prev_step(),
+            KeyCode::Esc => {
+                if self.provider_search.is_empty() {
+                    self.prev_step();
+                } else {
+                    self.provider_search.clear();
+                    self.selected = 0;
+                }
+            }
+            KeyCode::Backspace => {
+                self.provider_search.pop();
+                self.selected = 0;
+            }
             KeyCode::Tab | KeyCode::Char('s') | KeyCode::Char('S') => {
                 self.step = Step::Review;
+            }
+            KeyCode::Char(c) => {
+                self.provider_search.push(c);
+                self.selected = 0;
             }
             _ => {}
         }

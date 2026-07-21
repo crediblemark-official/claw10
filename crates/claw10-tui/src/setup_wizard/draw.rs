@@ -141,9 +141,35 @@ impl SetupWizard {
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Length(1),
+                Constraint::Length(1),
                 Constraint::Min(0),
             ])
             .split(area);
+
+        let search_text = if self.provider_search.is_empty() {
+            Line::from(vec![
+                Span::styled("Ketik untuk cari provider...", Style::default().fg(Color::Rgb(100, 100, 100))),
+            ])
+        } else {
+            Line::from(vec![
+                Span::styled("Cari: ", Style::default().fg(Color::Rgb(100, 100, 100))),
+                Span::styled(&self.provider_search, Style::default().fg(Color::Rgb(254, 192, 126)).add_modifier(Modifier::BOLD)),
+                Span::styled("_", Style::default().fg(Color::Rgb(254, 192, 126))),
+            ])
+        };
+        let search_para = Paragraph::new(search_text)
+            .style(Style::default().bg(Color::Rgb(15, 15, 15)));
+        frame.render_widget(search_para, chunks[0]);
+
+        let count_text = Line::from(vec![
+            Span::styled(
+                format!("{}/{} provider", self.filtered_providers().len(), self.providers.len()),
+                Style::default().fg(Color::Rgb(100, 100, 100)),
+            ),
+        ]);
+        let count_para = Paragraph::new(count_text)
+            .style(Style::default().bg(Color::Rgb(15, 15, 15)));
+        frame.render_widget(count_para, chunks[1]);
 
         let horizontal_chunks = Layout::default()
             .direction(Direction::Horizontal)
@@ -152,16 +178,16 @@ impl SetupWizard {
                 Constraint::Min(0),
                 Constraint::Length(4),
             ])
-            .split(chunks[1]);
+            .split(chunks[2]);
 
         let list_area = horizontal_chunks[1];
-
         let cols = 3u16;
         let rows_per_col = list_area.height.max(1);
         let col_width = list_area.width / cols;
         let visible_count = (cols * rows_per_col) as usize;
 
-        let total = self.providers.len();
+        let filtered = self.filtered_providers();
+        let total = filtered.len();
         let selected = self.selected.min(total.saturating_sub(1));
 
         let page_start = if total <= visible_count {
@@ -175,17 +201,18 @@ impl SetupWizard {
         };
 
         for offset in 0..visible_count {
-            let i = page_start + offset;
-            if i >= total {
+            let fi = page_start + offset;
+            if fi >= total {
                 break;
             }
+            let i = filtered[fi];
             let provider = &self.providers[i];
             let col = offset as u16 / rows_per_col;
             let row = offset as u16 % rows_per_col;
 
             let item_x = list_area.x + col * col_width;
             let item_y = list_area.y + row;
-            let is_selected = i == self.selected;
+            let is_selected = fi == self.selected;
 
             let item_rect = Rect {
                 x: item_x,
