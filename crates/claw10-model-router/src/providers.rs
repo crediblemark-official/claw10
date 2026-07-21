@@ -83,20 +83,24 @@ pub fn init_providers_sync() {
                             "Successfully loaded {} providers from models.dev",
                             p.len()
                         );
+                        eprintln!("[claw10] Loaded {} providers from models.dev", p.len());
                         p
                     }
                     Ok(_) => {
                         tracing::warn!("models.dev returned empty list, using fallback");
+                        eprintln!("[claw10] models.dev returned empty list, using fallback (15 providers)");
                         fallback_providers()
                     }
                     Err(e) => {
                         tracing::warn!("Failed to fetch from models.dev: {e}, using fallback");
+                        eprintln!("[claw10] Failed to fetch from models.dev: {e}, using fallback (15 providers)");
                         fallback_providers()
                     }
                 }
             }
             Err(e) => {
                 tracing::warn!("Failed to create tokio runtime: {e}, using fallback");
+                eprintln!("[claw10] Failed to create tokio runtime: {e}, using fallback (15 providers)");
                 fallback_providers()
             }
         }
@@ -123,6 +127,7 @@ fn get_all_configs() -> &'static Vec<ProviderConfig> {
     PROVIDERS.get_or_init(|| {
         // Called before init_providers() — use fallback
         tracing::warn!("provider_configs() called before init_providers(), using fallback");
+        eprintln!("[claw10] WARNING: provider_configs() called before init_providers(), using fallback (15 providers)");
         fallback_providers()
     })
 }
